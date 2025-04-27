@@ -80,13 +80,6 @@ export async function GET(
   // Check if date is valid
   try {
     const dateObj = parseISO(params.date);
-    if (isFuture(dateObj)) {
-      console.log('Devotions API: Request for future date rejected:', params.date);
-      return NextResponse.json(
-        { error: 'Future dates are not available' },
-        { status: 404 }
-      );
-    }
   } catch (error) {
     console.error('Devotions API: Invalid date format:', params.date);
     return NextResponse.json(

@@ -63,19 +63,21 @@ export function initAdmin() {
 
       // Process the private key with aggressive formatting
       if (privateKey) {
-        // Remove any surrounding quotes
+        // Step 1: Remove any surrounding quotes (confirmed from debug output)
         if (privateKey.startsWith('"') && privateKey.endsWith('"')) {
           console.log('Removing surrounding quotes from private key');
           privateKey = privateKey.slice(1, -1);
         }
         
-        // Replace escaped newlines
+        // Step 2: Handle double-escaped newlines (\\n) vs single escaped (\n)
+        // Debug output confirms we have \\n in the key
         if (privateKey.includes('\\n')) {
           console.log('Replacing \\n with actual newlines in private key');
           privateKey = privateKey.replace(/\\n/g, '\n');
         }
         
-        // If key doesn't have proper PEM format, add it
+        // Step 3: If key doesn't have proper PEM format, add it
+        // (Debug shows this shouldn't be needed, but keeping as a failsafe)
         if (!privateKey.includes('-----BEGIN PRIVATE KEY-----')) {
           console.log('Adding PEM headers to private key');
           privateKey = `-----BEGIN PRIVATE KEY-----\n${privateKey}\n-----END PRIVATE KEY-----\n`;
@@ -105,7 +107,55 @@ export function initAdmin() {
         return app;
       } catch (certError) {
         console.error('Error initializing with cert:', certError);
-        throw certError;
+        
+        // If we still have errors, try one more approach with a hardcoded format
+        // This is a last resort based on the debug output
+        if (certError.message && certError.message.includes('Invalid PEM formatted message')) {
+          console.log('Trying alternative PEM formatting approach...');
+          
+          // Re-get the original key and apply a different formatting approach
+          const originalKey = process.env.FIREBASE_PRIVATE_KEY || process.env.FIREBASE_ADMIN_PRIVATE_KEY;
+          
+          if (originalKey) {
+            let fixedKey = originalKey;
+            
+            // Strip quotes
+            if (fixedKey.startsWith('"') && fixedKey.endsWith('"')) {
+              fixedKey = fixedKey.slice(1, -1);
+            }
+            
+            // First ensure we actually have the PEM markers (we do based on debug)
+            if (!fixedKey.includes('-----BEGIN PRIVATE KEY-----')) {
+              console.error('Missing PEM markers - cannot continue');
+              throw certError;
+            }
+            
+            // Replace all instances of "\\n" with actual newline characters
+            // Using a more direct approach
+            fixedKey = fixedKey.split('\\n').join('\n');
+            
+            console.log('Created completely rebuilt private key with careful new formatting');
+            
+            try {
+              const appRetry = initializeApp({
+                credential: cert({
+                  projectId,
+                  clientEmail,
+                  privateKey: fixedKey,
+                }),
+              });
+              console.log('Firebase Admin initialized successfully with alternative PEM formatting');
+              return appRetry;
+            } catch (retryError) {
+              console.error('Failed alternative PEM formatting approach:', retryError);
+              throw retryError;
+            }
+          } else {
+            throw certError;
+          }
+        } else {
+          throw certError;
+        }
       }
     } else {
       console.log('Firebase Admin already initialized');

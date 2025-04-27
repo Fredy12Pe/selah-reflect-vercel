@@ -81,11 +81,6 @@ export default function DatePicker({
 
   // Handle date selection
   const handleDateClick = (date: Date) => {
-    // Don't allow selecting future dates
-    if (isFuture(date)) {
-      return;
-    }
-
     setSelectedDate(date);
     onDateSelect(date);
     onClose();
@@ -120,16 +115,7 @@ export default function DatePicker({
 
           <button
             onClick={nextMonth}
-            className={`p-1 rounded-full ${
-              currentMonth.getMonth() === new Date().getMonth() &&
-              currentMonth.getFullYear() === new Date().getFullYear()
-                ? "text-gray-300 cursor-not-allowed"
-                : "hover:bg-gray-100 dark:hover:bg-gray-700"
-            }`}
-            disabled={
-              currentMonth.getMonth() === new Date().getMonth() &&
-              currentMonth.getFullYear() === new Date().getFullYear()
-            }
+            className="p-1 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700"
           >
             <ChevronRightIcon className="w-5 h-5" />
           </button>

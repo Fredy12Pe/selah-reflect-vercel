@@ -239,15 +239,6 @@ export default function ReflectionPage({
       setIsLoading(true);
       const parsedDate = parse(date, "yyyy-MM-dd", new Date());
 
-      // Don't allow future dates
-      if (isFuture(parsedDate)) {
-        toast.error("Future dates are not available", {
-          position: "bottom-center",
-        });
-        setIsLoading(false);
-        return false;
-      }
-
       // Fetch devotion data
       const response = await fetch(`/api/devotions/${date}`);
 
@@ -386,12 +377,6 @@ export default function ReflectionPage({
 
   // Function to handle navigation
   const handleDateChange = async (newDate: Date) => {
-    // Prevent navigation to future dates
-    if (isFuture(newDate)) {
-      toast.error("Cannot view future devotions");
-      return;
-    }
-
     // Don't do anything if we're already loading
     if (isLoading) {
       return;
