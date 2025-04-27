@@ -19,7 +19,7 @@ export function initAdmin() {
       // Log all environment variables with sensitive data redacted
       console.log('Environment Variables Available:', Object.keys(process.env)
         .filter(key => key.includes('FIREBASE'))
-        .reduce((obj, key) => {
+        .reduce<Record<string, boolean | string>>((obj, key) => {
           obj[key] = key.includes('KEY') ? '[REDACTED]' : !!process.env[key];
           return obj;
         }, {}));
@@ -105,7 +105,8 @@ export function initAdmin() {
         });
         console.log('Firebase Admin initialized successfully with cert');
         return app;
-      } catch (certError) {
+      } catch (error) {
+        const certError = error as Error;
         console.error('Error initializing with cert:', certError);
         
         // If we still have errors, try one more approach with a hardcoded format
@@ -146,7 +147,8 @@ export function initAdmin() {
               });
               console.log('Firebase Admin initialized successfully with alternative PEM formatting');
               return appRetry;
-            } catch (retryError) {
+            } catch (error) {
+              const retryError = error as Error;
               console.error('Failed alternative PEM formatting approach:', retryError);
               throw retryError;
             }
