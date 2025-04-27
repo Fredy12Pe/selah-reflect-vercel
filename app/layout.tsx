@@ -38,6 +38,9 @@ export default function RootLayout({
   return (
     <html lang="en">
       <head>
+        {/* Pre-initialize Firebase global variables */}
+        <script src="/firebase-setup.js" />
+
         {/* Critical Firebase patches applied before any React code runs */}
         <script src="/firebase-fix.js" />
         <FirebasePatch />
