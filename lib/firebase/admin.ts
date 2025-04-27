@@ -46,35 +46,67 @@ export function initAdmin() {
         );
       }
 
-      // Process the private key with more robust handling
-      // First check if it's already in the correct format
-      if (privateKey && !privateKey.includes('-----BEGIN PRIVATE KEY-----')) {
-        console.log('Private key needs formatting, converting escaped newlines');
+      // Handle various private key formats
+      // Log key format for debugging (first and last few chars)
+      if (privateKey) {
+        console.log('Private key format check:', {
+          length: privateKey.length,
+          startsWith: privateKey.substring(0, 10) + '...',
+          endsWith: '...' + privateKey.substring(privateKey.length - 10),
+          includesBeginMarker: privateKey.includes('-----BEGIN PRIVATE KEY-----'),
+          includesEndMarker: privateKey.includes('-----END PRIVATE KEY-----'),
+          includesEscapedNewlines: privateKey.includes('\\n'),
+          includesActualNewlines: privateKey.includes('\n'),
+          includesQuotes: privateKey.startsWith('"') || privateKey.endsWith('"'),
+        });
+      }
+
+      // Process the private key with aggressive formatting
+      if (privateKey) {
+        // Remove any surrounding quotes
+        if (privateKey.startsWith('"') && privateKey.endsWith('"')) {
+          console.log('Removing surrounding quotes from private key');
+          privateKey = privateKey.slice(1, -1);
+        }
         
-        // Handle JSON stringified version from Vercel
+        // Replace escaped newlines
         if (privateKey.includes('\\n')) {
+          console.log('Replacing \\n with actual newlines in private key');
           privateKey = privateKey.replace(/\\n/g, '\n');
         }
         
-        // Double check if we have the header now
+        // If key doesn't have proper PEM format, add it
         if (!privateKey.includes('-----BEGIN PRIVATE KEY-----')) {
-          console.warn('Private key still doesn\'t have the expected format after replacing newlines');
+          console.log('Adding PEM headers to private key');
+          privateKey = `-----BEGIN PRIVATE KEY-----\n${privateKey}\n-----END PRIVATE KEY-----\n`;
         }
+        
+        // Log final format check
+        console.log('Final private key format check:', {
+          length: privateKey.length,
+          hasBeginMarker: privateKey.includes('-----BEGIN PRIVATE KEY-----'),
+          hasEndMarker: privateKey.includes('-----END PRIVATE KEY-----'),
+          hasNewlines: privateKey.includes('\n'),
+        });
       }
 
       console.log('Initializing Firebase Admin with cert credentials');
       
-      // Initialize the app
-      const app = initializeApp({
-        credential: cert({
-          projectId,
-          clientEmail,
-          privateKey,
-        }),
-      });
-
-      console.log('Firebase Admin initialized successfully');
-      return app;
+      // Initialize the app with cert
+      try {
+        const app = initializeApp({
+          credential: cert({
+            projectId,
+            clientEmail,
+            privateKey,
+          }),
+        });
+        console.log('Firebase Admin initialized successfully with cert');
+        return app;
+      } catch (certError) {
+        console.error('Error initializing with cert:', certError);
+        throw certError;
+      }
     } else {
       console.log('Firebase Admin already initialized');
       return getApps()[0];
@@ -89,6 +121,7 @@ export function initAdmin() {
     // More detailed error message for private key issues
     if (error.message && (
         error.message.includes('private key') || 
+        error.message.includes('PEM') ||
         error.message.includes('DECODER') || 
         error.message.includes('unsupported')
       )) {
@@ -96,6 +129,7 @@ export function initAdmin() {
       console.error('1. Includes the BEGIN/END PRIVATE KEY headers');
       console.error('2. Has proper newlines (not \\n escape sequences)');
       console.error('3. Is not wrapped in extra quotes');
+      console.error('4. Private key value:', process.env.FIREBASE_PRIVATE_KEY ? '[LENGTH: ' + process.env.FIREBASE_PRIVATE_KEY.length + ']' : 'undefined');
     }
     
     throw error;
