@@ -60,7 +60,12 @@ export async function GET(
       );
     }
     
-    // Skip session cookie check if in development mode
+    // TEMPORARY: Skip session cookie check for testing
+    // Remove this and uncomment the original code after debugging
+    const isDev = true; // Force skip auth for testing
+    let userId = 'anonymous';
+    
+    /* Original authentication code - temporarily disabled
     const isDev = process.env.NODE_ENV === 'development';
     let userId = 'anonymous';
     
@@ -97,6 +102,7 @@ export async function GET(
         );
       }
     }
+    */
 
     // Get the devotion using Admin SDK
     console.log('Devotions API: Getting Firestore document...');
