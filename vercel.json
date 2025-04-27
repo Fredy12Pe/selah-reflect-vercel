@@ -1,11 +1,4 @@
 {
   "framework": "nextjs",
-  "buildCommand": "next build",
-  "devCommand": "next dev",
-  "installCommand": "npm install",
-  "cleanUrls": true,
-  "skipBuildCache": true,
-  "github": {
-    "silent": true
-  }
+  "version": 2
 }
