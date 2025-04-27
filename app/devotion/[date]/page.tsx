@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { useAuth } from "@/lib/context/AuthContext";
@@ -11,21 +11,7 @@ import {
   UnsplashImage,
 } from "@/lib/services/unsplashService";
 import DynamicBackground from "@/app/components/DynamicBackground";
-import {
-  format,
-  addDays,
-  subDays,
-  parseISO,
-  isFuture,
-  isToday,
-} from "date-fns";
-import {
-  ChevronLeftIcon,
-  ChevronRightIcon,
-  CalendarIcon,
-} from "@heroicons/react/24/outline";
-import DatePicker from "react-datepicker";
-import "react-datepicker/dist/react-datepicker.css";
+import { format, parseISO } from "date-fns";
 
 interface DevotionData {
   date: string;
@@ -56,10 +42,6 @@ export default function DevotionPage({ params }: { params: { date: string } }) {
   const [devotion, setDevotion] = useState<DevotionData | null>(null);
   const [bibleVerse, setBibleVerse] = useState<BibleVerse | null>(null);
   const [pageLoading, setPageLoading] = useState(true);
-  const [isLoading, setIsLoading] = useState(false);
-  const [showCalendar, setShowCalendar] = useState(false);
-  const calendarRef = useRef<HTMLDivElement>(null);
-  const dateButtonRef = useRef<HTMLButtonElement>(null);
 
   const currentDate = parseISO(params.date);
 
@@ -72,53 +54,18 @@ export default function DevotionPage({ params }: { params: { date: string } }) {
     return `${year}-${month}-${day}`;
   };
 
-  // Function to handle date change navigation
-  const handleDateChange = async (newDate: Date) => {
-    // Prevent navigation to future dates
-    if (isFuture(newDate)) {
-      toast.error("Cannot view future devotions");
-      return;
-    }
-
-    setIsLoading(true);
-    const formattedDate = format(newDate, "yyyy-MM-dd");
-
-    // Navigate to the new date
-    router.push(`/devotion/${formattedDate}`);
-  };
-
-  // Disable next button if current date is today
-  const isNextDisabled = isToday(currentDate) || isFuture(currentDate);
-
-  // Toggle calendar visibility
-  const toggleCalendar = () => {
-    setShowCalendar(!showCalendar);
-  };
-
-  // Handle clicks outside the calendar to close it
-  useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (
-        showCalendar &&
-        calendarRef.current &&
-        !calendarRef.current.contains(event.target as Node) &&
-        dateButtonRef.current &&
-        !dateButtonRef.current.contains(event.target as Node)
-      ) {
-        setShowCalendar(false);
-      }
-    }
-
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-    };
-  }, [showCalendar, calendarRef, dateButtonRef]);
-
   useEffect(() => {
     // If no date is provided or it's invalid, redirect to today's date
     const todayDate = getTodayDate();
     if (!params.date || isNaN(Date.parse(params.date))) {
+      router.replace(`/devotion/${todayDate}`);
+      return;
+    }
+
+    // For the main devotion page, always show today's devotion
+    // This ensures the main page always shows current content
+    // but allows the reflection page to navigate to other dates
+    if (params.date !== todayDate) {
       router.replace(`/devotion/${todayDate}`);
       return;
     }
@@ -225,14 +172,6 @@ export default function DevotionPage({ params }: { params: { date: string } }) {
     return null;
   }
 
-  // Format the date properly using the current date
-  const today = new Date();
-  const formattedDate = new Intl.DateTimeFormat("en-US", {
-    weekday: "long",
-    month: "long",
-    day: "numeric",
-  }).format(today);
-
   const firstName = user?.displayName?.split(" ")[0] || "";
 
   // For debugging
@@ -247,52 +186,6 @@ export default function DevotionPage({ params }: { params: { date: string } }) {
       className="h-screen flex flex-col overflow-hidden"
     >
       <Toaster position="top-center" />
-
-      {/* Date Navigation */}
-      <div className="relative z-10 flex items-center justify-center py-4">
-        <button
-          onClick={() => handleDateChange(subDays(currentDate, 1))}
-          disabled={isLoading}
-          className="absolute left-4 w-10 h-10 flex items-center justify-center rounded-full bg-zinc-800/50
-            hover:bg-zinc-700/50 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-        >
-          <ChevronLeftIcon className="w-6 h-6" />
-        </button>
-
-        <button
-          ref={dateButtonRef}
-          onClick={toggleCalendar}
-          className="px-8 py-2 rounded-full bg-zinc-800/50 hover:bg-zinc-700/50 transition-all flex items-center gap-2"
-        >
-          <span className="text-lg">{format(currentDate, "EEEE, MMMM d")}</span>
-          <CalendarIcon className="w-5 h-5" />
-        </button>
-
-        {showCalendar && (
-          <div ref={calendarRef} className="absolute top-full mt-2 z-50">
-            <DatePicker
-              selected={currentDate}
-              onChange={(date: Date | null) => {
-                setShowCalendar(false);
-                if (date) handleDateChange(date);
-              }}
-              maxDate={new Date()}
-              inline
-              calendarClassName="bg-zinc-800 border-zinc-700 text-white"
-              dayClassName={(_date: Date) => "hover:bg-zinc-700 rounded-full"}
-            />
-          </div>
-        )}
-
-        <button
-          onClick={() => handleDateChange(addDays(currentDate, 1))}
-          disabled={isNextDisabled || isLoading}
-          className="absolute right-4 w-10 h-10 flex items-center justify-center rounded-full bg-zinc-800/50
-            hover:bg-zinc-700/50 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-        >
-          <ChevronRightIcon className="w-6 h-6" />
-        </button>
-      </div>
 
       {/* Content */}
       <div className="relative z-10 flex flex-col h-full">
