@@ -237,6 +237,7 @@ export default function ReflectionPage({
     if (!user) return false;
     setIsLoading(true);
     try {
+      console.log(`Attempting to load devotion for date: ${date}`);
       const devotion = await getDevotionByDate(date);
       console.log("Loaded devotion data:", devotion);
       if (devotion) {
@@ -246,7 +247,12 @@ export default function ReflectionPage({
       return false;
     } catch (error) {
       console.error("Error checking devotion:", error);
-      return false;
+      // If we get a 404, it means the devotion doesn't exist
+      if (error instanceof Error && error.message.includes("not found")) {
+        return false;
+      }
+      // For other errors, we should rethrow to be handled by the caller
+      throw error;
     } finally {
       setIsLoading(false);
     }
@@ -300,16 +306,22 @@ export default function ReflectionPage({
     setIsLoading(true);
     const formattedDate = format(newDate, "yyyy-MM-dd");
 
-    // Check if devotion exists for the new date
-    const exists = await checkAndLoadDevotion(formattedDate);
-    if (!exists) {
-      toast.error("No devotion available for this date");
-      setIsLoading(false);
-      return;
-    }
+    try {
+      // Check if devotion exists for the new date
+      const exists = await checkAndLoadDevotion(formattedDate);
+      if (!exists) {
+        toast.error("No devotion available for this date");
+        setIsLoading(false);
+        return;
+      }
 
-    // Navigate to the new date
-    router.push(`/devotion/${formattedDate}/reflection`);
+      // Navigate to the new date
+      router.push(`/devotion/${formattedDate}/reflection`);
+    } catch (error) {
+      console.error("Error changing date:", error);
+      toast.error("An error occurred. Please try again.");
+      setIsLoading(false);
+    }
   };
 
   // Disable next button if current date is today

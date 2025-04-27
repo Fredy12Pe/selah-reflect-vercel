@@ -29,6 +29,10 @@ export async function getDevotionByDate(date: string): Promise<Devotion | null> 
       if (response.status === 401) {
         throw new Error('You must be signed in to access devotions');
       }
+      if (response.status === 404) {
+        console.log(`No devotion found for date: ${date}`);
+        return null;
+      }
       throw new Error(data.error || 'Failed to fetch devotion');
     }
 
