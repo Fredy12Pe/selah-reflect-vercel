@@ -90,14 +90,32 @@ export async function POST(request: NextRequest) {
         }
 
         // Create a reference to the month document
-        const monthRef = doc(db, 'months', month);
+        const monthRef = doc(db, 'months', month.toLowerCase());
         
-        // Set the month data
-        await setDoc(monthRef, {
-          ...monthData,
+        // Prepare the month data with proper structure
+        const monthDoc = {
+          month: month,
+          hymn: {
+            title: monthData.hymn?.title || '',
+            lyrics: monthData.hymn?.lyrics || []
+          },
           updatedAt: new Date().toISOString(),
           updatedBy: currentUser.email
-        }, { merge: true });
+        };
+
+        // Set the month data
+        await setDoc(monthRef, monthDoc, { merge: true });
+
+        // Save hymn separately in hymns collection
+        if (monthData.hymn) {
+          const hymnRef = doc(db, 'hymns', month.toLowerCase());
+          await setDoc(hymnRef, {
+            ...monthData.hymn,
+            month: month,
+            updatedAt: new Date().toISOString(),
+            updatedBy: currentUser.email
+          }, { merge: true });
+        }
 
         // If there are devotions, create individual devotion documents
         if (monthData.devotions && Array.isArray(monthData.devotions)) {
@@ -105,13 +123,19 @@ export async function POST(request: NextRequest) {
             const devotionId = devotion.date.replace(/,/g, '').replace(/ /g, '-').toLowerCase();
             const devotionRef = doc(db, 'devotions', devotionId);
             
-            await setDoc(devotionRef, {
+            // Prepare the devotion document with proper structure
+            const devotionDoc = {
               ...devotion,
-              month,
-              hymn: monthData.hymn, // Include the hymn with each devotion
+              month: month,
+              hymn: monthData.hymn ? {
+                title: monthData.hymn.title,
+                lyrics: monthData.hymn.lyrics
+              } : null,
               updatedAt: new Date().toISOString(),
               updatedBy: currentUser.email
-            }, { merge: true });
+            };
+
+            await setDoc(devotionRef, devotionDoc, { merge: true });
           }
         }
         
