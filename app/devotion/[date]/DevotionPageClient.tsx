@@ -22,6 +22,33 @@ interface BibleVerse {
   }[];
 }
 
+/**
+ * Helper functions to handle both old and new data formats
+ */
+const getBibleReference = (devotion: any): string => {
+  // Try new format first, then fall back to old format
+  return devotion.bibleText || devotion.scriptureReference || "";
+};
+
+const getReflectionQuestions = (devotion: any): string[] => {
+  // Try new format first
+  if (devotion.reflectionSections && devotion.reflectionSections.length > 0) {
+    return devotion.reflectionSections[0].questions || [];
+  }
+  // Fall back to old format
+  return devotion.reflectionQuestions || [];
+};
+
+const hasReflectionContent = (devotion: any): boolean => {
+  return (
+    (devotion.reflectionSections &&
+      devotion.reflectionSections.length > 0 &&
+      devotion.reflectionSections[0].questions &&
+      devotion.reflectionSections[0].questions.length > 0) ||
+    (devotion.reflectionQuestions && devotion.reflectionQuestions.length > 0)
+  );
+};
+
 export default function DevotionPageClient({ date }: DevotionPageClientProps) {
   const router = useRouter();
   const { user, loading: authLoading } = useAuth();
@@ -89,8 +116,7 @@ export default function DevotionPageClient({ date }: DevotionPageClientProps) {
 
         // Get Bible reference - handle both data formats
         // New format uses bibleText, old format uses scriptureReference
-        const reference =
-          devotionData.bibleText || (devotionData as any).scriptureReference;
+        const reference = getBibleReference(devotionData);
 
         if (reference) {
           console.log("Using reference for Bible API:", reference);
@@ -181,27 +207,13 @@ export default function DevotionPageClient({ date }: DevotionPageClientProps) {
   }
 
   // Get Bible reference for display - handle both data formats
-  const displayReference =
-    bibleVerse?.reference ||
-    devotion.bibleText ||
-    (devotion as any).scriptureReference;
+  const displayReference = getBibleReference(devotion);
 
   // Handle reflection questions from both formats
-  const hasReflectionQuestions =
-    devotion.reflectionSections?.length > 0 ||
-    !!(devotion as any).reflectionQuestions?.length;
+  const hasReflectionQuestions = hasReflectionContent(devotion);
 
   // Get reflection questions - handle both data formats
-  const getReflectionQuestions = () => {
-    if (devotion.reflectionSections && devotion.reflectionSections.length > 0) {
-      return devotion.reflectionSections[0].questions;
-    } else if ((devotion as any).reflectionQuestions) {
-      return (devotion as any).reflectionQuestions;
-    }
-    return [];
-  };
-
-  const reflectionQuestions = getReflectionQuestions();
+  const reflectionQuestions = getReflectionQuestions(devotion);
 
   return (
     <div
