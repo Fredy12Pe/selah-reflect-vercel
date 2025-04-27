@@ -247,7 +247,7 @@ export default function ReflectionPage({
 
         // Handle case when a suggested date is provided
         if (response.status === 404 && errorData.suggestedDate) {
-          toast.info(
+          toast(
             `No devotion found for ${date}. Redirecting to ${errorData.suggestedDate}...`,
             {
               position: "bottom-center",
@@ -266,7 +266,7 @@ export default function ReflectionPage({
 
         // Handle regular not found case
         if (response.status === 404) {
-          toast.info(
+          toast(
             `No devotion available for ${date}. Please try another date.`,
             {
               position: "bottom-center",
@@ -769,9 +769,31 @@ export default function ReflectionPage({
         {isLoading ? (
           <div className="text-center py-8">Loading...</div>
         ) : !devotionData ? (
-          <div className="text-center py-8">
-            <p className="text-xl mb-4">No devotion available for this date.</p>
-            <p>Try selecting a different date or check back later.</p>
+          <div className="flex flex-col items-center justify-center py-8 space-y-12">
+            {/* Hymn of the Month Section */}
+            <div className="w-full max-w-lg bg-black/30 backdrop-blur-md rounded-xl overflow-hidden">
+              <div className="relative h-48 w-full">
+                <Image
+                  src={hymnImage || "/hymn-bg.jpg"}
+                  alt="Hymn background"
+                  fill
+                  className="object-cover"
+                />
+                <div className="absolute inset-0 bg-black/50" />
+                <div className="absolute inset-0 flex flex-col justify-center p-6 text-white">
+                  <h3 className="text-lg text-white/80 mb-2">Hymn of the Month:</h3>
+                  <h2 className="text-3xl font-bold">When I survey the Wondrous Cross</h2>
+                </div>
+              </div>
+            </div>
+
+            {/* No Devotion Message */}
+            <div className="text-center space-y-6">
+              <p className="text-2xl">"No devotion is available for today.</p>
+              <p className="text-xl">
+                New devotions are posted Monday through Friday</p>
+              <p className="text-xl">check back soon!"</p>
+            </div>
           </div>
         ) : (
           <>

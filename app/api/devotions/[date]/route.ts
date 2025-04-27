@@ -80,7 +80,7 @@ export async function GET(
   // Check if date is valid
   try {
     const dateObj = parseISO(params.date);
-  } catch (error) {
+  } catch (error: any) {
     console.error('Devotions API: Invalid date format:', params.date);
     return NextResponse.json(
       { error: 'Invalid date format' },
@@ -166,33 +166,6 @@ export async function GET(
     console.log('Devotions API: Document exists:', devotionDoc.exists);
     if (!devotionDoc.exists) {
       console.log('Devotions API: No devotion found for date:', params.date);
-      
-      // Try to find the most recent available devotion as a fallback
-      try {
-        const dateObj = parseISO(params.date);
-        
-        // Check up to 30 days back for an existing devotion
-        for (let i = 1; i <= 30; i++) {
-          const prevDate = subDays(dateObj, i);
-          const prevDateStr = format(prevDate, 'yyyy-MM-dd');
-          console.log('Devotions API: Trying previous date:', prevDateStr);
-          
-          const prevDevotionDoc = await db.collection('devotions').doc(prevDateStr).get();
-          if (prevDevotionDoc.exists) {
-            console.log('Devotions API: Found devotion for previous date:', prevDateStr);
-            return NextResponse.json(
-              { 
-                error: 'Devotion not found', 
-                message: `No devotion for ${params.date}, but found one for ${prevDateStr}`,
-                suggestedDate: prevDateStr
-              },
-              { status: 404 }
-            );
-          }
-        }
-      } catch (error) {
-        console.error('Devotions API: Error finding previous devotion:', error);
-      }
       
       return NextResponse.json(
         { error: 'Devotion not found' },
