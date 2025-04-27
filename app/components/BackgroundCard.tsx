@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Image from "next/image";
-import { getFallbackImageUrl } from "@/lib/utils/imageUtils";
+import { getDailyDevotionImage } from "@/lib/services/unsplashService";
 
 interface BackgroundCardProps {
   date: string;
@@ -29,31 +29,38 @@ export default function BackgroundCard({
   onClick,
   imageType = "devotion",
 }: BackgroundCardProps) {
-  // Use a direct image URL for reliability - these are known to work
-  const getBackgroundImage = () => {
+  // Use local images as fallback
+  const getLocalImage = () => {
     switch (imageType) {
       case "hymn":
-        return "https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&fit=crop&w=1600&h=900";
+        return "/images/hymn-bg.jpg";
       case "resources":
-        return "https://images.unsplash.com/photo-1472214103451-9374bd1c798e?auto=format&fit=crop&w=1600&h=900";
+        return "/images/resources-bg.jpg";
       default:
-        return "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?auto=format&fit=crop&w=1600&h=900";
+        return "/images/devotion-bg.jpg";
     }
   };
 
   const [backgroundImage, setBackgroundImage] = useState<string>(
-    getBackgroundImage()
+    getLocalImage()
   );
-  const [imageError, setImageError] = useState<boolean>(false);
 
-  // Handle any image errors by falling back to local images
-  const handleImageError = () => {
-    console.log(
-      `BackgroundCard: Image error for ${imageType}, using local fallback`
-    );
-    setImageError(true);
-    setBackgroundImage(getFallbackImageUrl(imageType));
-  };
+  // Fetch image from Unsplash when component mounts
+  useEffect(() => {
+    const fetchImage = async () => {
+      try {
+        const image = await getDailyDevotionImage(date, query);
+        if (image && image !== backgroundImage) {
+          setBackgroundImage(image);
+        }
+      } catch (error) {
+        console.error("Error fetching background image:", error);
+        // Keep using the local image if there's an error
+      }
+    };
+
+    fetchImage();
+  }, [date, query, backgroundImage]);
 
   return (
     <div
@@ -63,15 +70,22 @@ export default function BackgroundCard({
     >
       {/* Background Image */}
       <div className="absolute inset-0 bg-gray-900">
-        <Image
-          src={backgroundImage}
-          alt="Background"
-          fill
-          className="object-cover"
-          sizes="(max-width: 768px) 100vw, 50vw"
-          priority
-          onError={handleImageError}
-        />
+        {backgroundImage.startsWith("http") ? (
+          <img
+            src={backgroundImage}
+            alt="Background"
+            className="w-full h-full object-cover"
+          />
+        ) : (
+          <Image
+            src={backgroundImage}
+            alt="Background"
+            fill
+            className="object-cover"
+            sizes="(max-width: 768px) 100vw, 50vw"
+            priority
+          />
+        )}
       </div>
 
       {/* Content */}

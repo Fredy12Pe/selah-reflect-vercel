@@ -307,19 +307,43 @@ export default function ReflectionPage({
     const formattedDate = format(newDate, "yyyy-MM-dd");
 
     try {
+      console.log(`Attempting date change to: ${formattedDate}`);
+
       // Check if devotion exists for the new date
       const exists = await checkAndLoadDevotion(formattedDate);
       if (!exists) {
-        toast.error("No devotion available for this date");
+        toast.error(
+          `No devotion available for ${format(newDate, "MMMM d, yyyy")}`
+        );
         setIsLoading(false);
         return;
       }
 
       // Navigate to the new date
+      console.log(`Navigating to date: ${formattedDate}`);
       router.push(`/devotion/${formattedDate}/reflection`);
     } catch (error) {
       console.error("Error changing date:", error);
-      toast.error("An error occurred. Please try again.");
+
+      // Provide more specific error messages
+      if (error instanceof Error) {
+        if (error.message.includes("not found")) {
+          toast.error(
+            `No devotion available for ${format(newDate, "MMMM d, yyyy")}`
+          );
+        } else if (
+          error.message.includes("Authentication") ||
+          error.message.includes("signed in")
+        ) {
+          toast.error("Please sign in to view devotions");
+          // Consider redirecting to login page here
+        } else {
+          toast.error(`Error: ${error.message}`);
+        }
+      } else {
+        toast.error("An unexpected error occurred. Please try again.");
+      }
+
       setIsLoading(false);
     }
   };

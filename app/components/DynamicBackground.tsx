@@ -2,7 +2,10 @@
 
 import { useState, useEffect } from "react";
 import Image from "next/image";
-import { getFallbackImageUrl } from "@/lib/utils/imageUtils";
+import {
+  getDailyDevotionImage,
+  getUnsplashAttribution,
+} from "@/lib/services/unsplashService";
 
 interface DynamicBackgroundProps {
   date: string;
@@ -18,8 +21,8 @@ interface DynamicBackgroundProps {
 /**
  * DynamicBackground component
  *
- * Displays a background image from Unsplash based on the date and query
- * Falls back to a local image if the API fails
+ * Displays a background image based on the image type
+ * Fetches images from Unsplash with local fallbacks
  *
  * @param props Component props
  * @returns JSX Element
@@ -34,76 +37,46 @@ export default function DynamicBackground({
   priority = true,
   className = "",
 }: DynamicBackgroundProps) {
-  const unsplashKey = process.env.NEXT_PUBLIC_UNSPLASH_ACCESS_KEY;
-
-  const getUnsplashUrl = () => {
-    if (unsplashKey) {
-      // Create a deterministic seed from the date
-      const dateSeed = date.replace(/-/g, "");
-      return `https://api.unsplash.com/photos/random?query=${query}&orientation=landscape&content_filter=high&client_id=${unsplashKey}&seed=${dateSeed}`;
+  // Use local images as fallback
+  const getLocalImage = () => {
+    switch (imageType) {
+      case "hymn":
+        return "/images/hymn-bg.jpg";
+      case "resources":
+        return "/images/resources-bg.jpg";
+      default:
+        return "/images/devotion-bg.jpg";
     }
-    return null;
-  };
-
-  // Fallback images if Unsplash API fails
-  const getFallbackImage = () => {
-    // Create a simple hash from the date to select different backgrounds
-    const dateHash = date
-      .split("")
-      .reduce((acc, char) => acc + char.charCodeAt(0), 0);
-
-    // Pre-defined set of beautiful landscape images
-    const landscapes = [
-      "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?auto=format&fit=crop&w=2000",
-      "https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05?auto=format&fit=crop&w=2000",
-      "https://images.unsplash.com/photo-1447752875215-b2761acb3c5d?auto=format&fit=crop&w=2000",
-      "https://images.unsplash.com/photo-1472214103451-9374bd1c798e?auto=format&fit=crop&w=2000",
-      "https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&fit=crop&w=2000",
-    ];
-
-    // Select an image based on date hash
-    return landscapes[dateHash % landscapes.length];
   };
 
   const [backgroundImage, setBackgroundImage] = useState<string>(
-    getFallbackImage()
+    getLocalImage()
   );
   const [attribution, setAttribution] = useState<string>("");
-  const [imageError, setImageError] = useState<boolean>(false);
+  const [isUnsplashImage, setIsUnsplashImage] = useState<boolean>(false);
 
+  // Fetch image from Unsplash when component mounts
   useEffect(() => {
     const fetchImage = async () => {
-      const apiUrl = getUnsplashUrl();
-      if (!apiUrl) return;
-
       try {
-        const response = await fetch(apiUrl);
-        if (!response.ok) throw new Error("Failed to fetch from Unsplash");
+        const image = await getDailyDevotionImage(date, query);
+        if (image && image !== backgroundImage) {
+          setBackgroundImage(image);
+          setIsUnsplashImage(true);
 
-        const data = await response.json();
-        setBackgroundImage(data.urls.regular);
-
-        if (showAttribution && data.user) {
-          setAttribution(`Photo by ${data.user.name} on Unsplash`);
+          // Set basic attribution for Unsplash
+          if (showAttribution) {
+            setAttribution(getUnsplashAttribution(image));
+          }
         }
       } catch (error) {
-        console.error("Error fetching Unsplash image:", error);
-        setBackgroundImage(getFallbackImage());
+        console.error("Error fetching background image:", error);
+        // Keep using the local image if there's an error
       }
     };
 
     fetchImage();
-  }, [date, query, showAttribution]);
-
-  const handleImageError = () => {
-    // If image loading fails, use fallback
-    console.log(
-      `DynamicBackground: Image error, using local fallback:`,
-      imageType
-    );
-    setImageError(true);
-    setBackgroundImage(getFallbackImage());
-  };
+  }, [date, query, showAttribution, backgroundImage]);
 
   const overlayStyle = {
     backgroundColor: `rgba(0, 0, 0, ${overlayOpacity})`,
@@ -112,28 +85,36 @@ export default function DynamicBackground({
   return (
     <div className={`relative ${className}`}>
       <div className="absolute inset-0 -z-10 bg-gray-900">
-        <Image
-          src={backgroundImage}
-          alt="Background"
-          fill
-          className="object-cover"
-          priority={priority}
-          sizes="100vw"
-          quality={90}
-          onError={handleImageError}
-        />
-        <div className="absolute inset-0" style={overlayStyle} />
-
-        {/* Attribution */}
-        {showAttribution && attribution && !imageError && (
-          <div className="absolute bottom-1 right-2 text-white/50 text-xs">
-            {attribution}
-          </div>
+        {/* Use a regular img tag for external URLs to avoid Next.js Image optimization issues */}
+        {backgroundImage.startsWith("http") ? (
+          <img
+            src={backgroundImage}
+            alt="Background"
+            className="absolute inset-0 w-full h-full object-cover"
+          />
+        ) : (
+          <Image
+            src={backgroundImage}
+            alt="Background"
+            fill
+            className="object-cover"
+            priority={priority}
+            sizes="100vw"
+            quality={90}
+          />
         )}
+        <div className="absolute inset-0" style={overlayStyle} />
       </div>
 
       {/* Content */}
       {children}
+
+      {/* Attribution */}
+      {showAttribution && isUnsplashImage && attribution && (
+        <div className="absolute bottom-2 right-2 text-xs text-white/70 bg-black/30 px-2 py-1 rounded">
+          {attribution}
+        </div>
+      )}
     </div>
   );
 }

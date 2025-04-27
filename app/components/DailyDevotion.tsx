@@ -3,13 +3,14 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { format } from "date-fns";
-import Image from "next/image";
 import { useAuth } from "@/lib/context/AuthContext";
+import DynamicBackground from "./DynamicBackground";
 
 export default function DailyDevotion() {
   const router = useRouter();
   const { user, loading } = useAuth();
   const [userName, setUserName] = useState<string>("");
+  const today = format(new Date(), "yyyy-MM-dd");
 
   useEffect(() => {
     if (!loading) {
@@ -38,25 +39,14 @@ export default function DailyDevotion() {
   }
 
   return (
-    <div className="min-h-screen">
-      {/* Background Layer */}
-      <div className="fixed inset-0">
-        <div className="absolute inset-0">
-          <Image
-            src="https://images.unsplash.com/photo-1506905925346-21bda4d32df4?auto=format&fit=crop&w=2000"
-            alt="Mountain Background"
-            fill
-            priority
-            sizes="100vw"
-            style={{ objectFit: "cover", zIndex: -1 }}
-          />
-        </div>
-        <div
-          className="absolute inset-0 bg-gradient-to-b from-black/30 to-black/70"
-          style={{ zIndex: 0 }}
-        />
-      </div>
-
+    <DynamicBackground
+      date={today}
+      query="landscape mountains sunshine morning"
+      imageType="devotion"
+      overlayOpacity={0.5}
+      className="min-h-screen"
+      showAttribution={true}
+    >
       {/* Content Layer */}
       <main
         className="relative min-h-screen p-8 flex flex-col items-center"
@@ -113,6 +103,6 @@ export default function DailyDevotion() {
           </div>
         </div>
       </main>
-    </div>
+    </DynamicBackground>
   );
 }

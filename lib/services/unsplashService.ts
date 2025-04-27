@@ -84,12 +84,14 @@ export async function getDailyDevotionImage(
     const dateParam = date.replace(/-/g, '');
     const image = await getRandomBackgroundImage(query, { dateParam });
     
-    if (image) {
+    if (image?.urls?.regular) {
+      // Return direct Unsplash URL without going through Next.js image optimization
       return image.urls.regular;
     }
     
-    // Fallback to direct Unsplash source URL if API call fails
-    return `https://source.unsplash.com/featured/?${encodeURIComponent(query)}&v=${dateParam}`;
+    // If API call fails, use Unsplash Source (which doesn't require API key)
+    const formattedQuery = query.replace(/,/g, '+');
+    return `https://source.unsplash.com/1600x900/?${formattedQuery}&sig=${dateParam}`;
   } catch (error) {
     console.error('Error in getDailyDevotionImage:', error);
     return '/images/background.jpg'; // Fallback to local image
@@ -99,6 +101,9 @@ export async function getDailyDevotionImage(
 /**
  * Generate attribution text for an Unsplash image
  */
-export function getUnsplashAttribution(image: UnsplashImage): string {
-  return `Photo by ${image.user.name} on Unsplash`;
+export function getUnsplashAttribution(imageUrl: string | UnsplashImage): string {
+  if (typeof imageUrl === 'string') {
+    return 'Photo from Unsplash';
+  }
+  return `Photo by ${imageUrl.user.name} on Unsplash`;
 } 
