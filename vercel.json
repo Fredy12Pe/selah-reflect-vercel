@@ -5,6 +5,7 @@
   "devCommand": "next dev",
   "installCommand": "npm install",
   "regions": ["iad1"],
+  "skipBuildCache": true,
   "headers": [
     {
       "source": "/(.*)",
