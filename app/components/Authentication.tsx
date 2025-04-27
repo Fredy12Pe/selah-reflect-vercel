@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useState, useCallback } from "react";
-import { useRouter } from "next/navigation";
+import React, { useState, useCallback, useEffect } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
 import { getFirebaseAuth, getGoogleAuthProvider } from "@/lib/firebase";
 import { signInWithPopup, AuthError } from "firebase/auth";
@@ -29,8 +29,12 @@ const handleAuthError = (error: AuthError) => {
 
 export default function Authentication() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+
+  // Get the 'from' parameter from the URL if it exists
+  const from = searchParams?.get("from") || "/devotion/today";
 
   const setSessionCookie = async (token: string) => {
     try {
@@ -38,15 +42,23 @@ export default function Authentication() {
       document.cookie = cookieValue;
       console.log("Authentication - Setting session cookie:", cookieValue);
 
-      // Verify the cookie was set
+      // Also set the 'session' cookie used by API routes
+      const sessionCookie = `session=${token}; path=/; max-age=2592000; SameSite=Lax`;
+      document.cookie = sessionCookie;
+      console.log(
+        "Authentication - Setting API session cookie:",
+        sessionCookie
+      );
+
+      // Verify the cookies were set
       const cookies = document.cookie.split(";");
-      const sessionCookie = cookies.find((cookie) =>
-        cookie.trim().startsWith("__session=")
+      const hasSessionCookie = cookies.some((cookie) =>
+        cookie.trim().startsWith("session=")
       );
       console.log("Authentication - Current cookies:", cookies);
-      console.log("Authentication - Session cookie found:", sessionCookie);
+      console.log("Authentication - Session cookie found:", hasSessionCookie);
 
-      if (!sessionCookie) {
+      if (!hasSessionCookie) {
         throw new Error("Failed to set session cookie");
       }
     } catch (error) {
@@ -55,10 +67,16 @@ export default function Authentication() {
     }
   };
 
-  const redirectToDevotionPage = useCallback(() => {
-    const today = format(new Date(), "yyyy-MM-dd");
-    router.push(`/devotion/${today}`);
-  }, [router]);
+  const redirectAfterLogin = useCallback(() => {
+    // If 'from' is a valid URL path, redirect there
+    if (from && from !== "/auth/login") {
+      router.push(from);
+    } else {
+      // Otherwise, redirect to today's devotion
+      const today = format(new Date(), "yyyy-MM-dd");
+      router.push(`/devotion/${today}`);
+    }
+  }, [router, from]);
 
   const signInWithGoogle = useCallback(async () => {
     // Ensure we're in browser environment
@@ -103,16 +121,17 @@ export default function Authentication() {
 
       // Wait a moment for the cookie to be set
       setTimeout(() => {
-        redirectToDevotionPage();
+        redirectAfterLogin();
       }, 1000);
     } catch (error) {
       const authError = error as AuthError;
       console.error("Sign-in error:", authError);
-      toast.error(authError.message);
+      setError(handleAuthError(authError));
+      toast.error(handleAuthError(authError));
     } finally {
       setLoading(false);
     }
-  }, [router, redirectToDevotionPage]);
+  }, [router, redirectAfterLogin]);
 
   return (
     <div className="min-h-screen">
