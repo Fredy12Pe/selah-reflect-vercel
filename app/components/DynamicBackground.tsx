@@ -34,8 +34,19 @@ export default function DynamicBackground({
   priority = true,
   className = "",
 }: DynamicBackgroundProps) {
-  // Use direct image URLs for reliability
-  const getBackgroundImage = () => {
+  const unsplashKey = process.env.NEXT_PUBLIC_UNSPLASH_ACCESS_KEY;
+
+  const getUnsplashUrl = () => {
+    if (unsplashKey) {
+      // Create a deterministic seed from the date
+      const dateSeed = date.replace(/-/g, "");
+      return `https://api.unsplash.com/photos/random?query=${query}&orientation=landscape&content_filter=high&client_id=${unsplashKey}&seed=${dateSeed}`;
+    }
+    return null;
+  };
+
+  // Fallback images if Unsplash API fails
+  const getFallbackImage = () => {
     // Create a simple hash from the date to select different backgrounds
     const dateHash = date
       .split("")
@@ -55,10 +66,34 @@ export default function DynamicBackground({
   };
 
   const [backgroundImage, setBackgroundImage] = useState<string>(
-    getBackgroundImage()
+    getFallbackImage()
   );
   const [attribution, setAttribution] = useState<string>("");
   const [imageError, setImageError] = useState<boolean>(false);
+
+  useEffect(() => {
+    const fetchImage = async () => {
+      const apiUrl = getUnsplashUrl();
+      if (!apiUrl) return;
+
+      try {
+        const response = await fetch(apiUrl);
+        if (!response.ok) throw new Error("Failed to fetch from Unsplash");
+
+        const data = await response.json();
+        setBackgroundImage(data.urls.regular);
+
+        if (showAttribution && data.user) {
+          setAttribution(`Photo by ${data.user.name} on Unsplash`);
+        }
+      } catch (error) {
+        console.error("Error fetching Unsplash image:", error);
+        setBackgroundImage(getFallbackImage());
+      }
+    };
+
+    fetchImage();
+  }, [date, query, showAttribution]);
 
   const handleImageError = () => {
     // If image loading fails, use fallback
@@ -67,7 +102,7 @@ export default function DynamicBackground({
       imageType
     );
     setImageError(true);
-    setBackgroundImage(getFallbackImageUrl(imageType));
+    setBackgroundImage(getFallbackImage());
   };
 
   const overlayStyle = {

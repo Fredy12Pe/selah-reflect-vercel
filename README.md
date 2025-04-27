@@ -6,4 +6,19 @@ A personal devotional app for daily reflection.
 
 This project is deployed on Vercel.
 
+### Required Environment Variables
+
+Make sure these environment variables are set in Vercel:
+
+- `NEXT_PUBLIC_FIREBASE_API_KEY`
+- `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN`
+- `NEXT_PUBLIC_FIREBASE_PROJECT_ID`
+- `NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET`
+- `NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID`
+- `NEXT_PUBLIC_FIREBASE_APP_ID`
+- `FIREBASE_CLIENT_EMAIL`
+- `FIREBASE_PRIVATE_KEY`
+- `NEXT_PUBLIC_UNSPLASH_ACCESS_KEY`
+- `NEXT_PUBLIC_GEMINI_API_KEY` (or `GEMINI_API_KEY`)
+
 Last update: 2024-06-17 19:30:00
