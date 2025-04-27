@@ -1,0 +1,35 @@
+# Redirect for Netlify
+# Handle API routes
+/api/*  /.netlify/functions/nextjs-api/:splat  200
+
+# These redirects are only used when a user refreshes a page
+# or accesses a link directly (e.g., sharing a URL)
+
+# Main app routes
+/  /index.html  200
+/auth/*  /index.html  200
+/devotion/*  /index.html  200
+/login  /index.html  200
+/admin/*  /index.html  200
+/hymns  /index.html  200
+/test/*  /index.html  200
+
+# Fallback for any path
+/*  /index.html  200
+
+# Try to resolve specific page chunks if available
+/*      /_next/static/chunks/pages/:splat.js     200 
+
+# Redirect all static assets to have the correct MIME type
+/_next/static/chunks/*.js  /_next/static/chunks/:splat.js 200!
+/_next/static/css/*.css    /_next/static/css/:splat.css 200!
+
+# Ensure firebase JS files have proper headers
+/firebase-fix.js /api/static-js?file=firebase-fix.js 200!
+/firebase-patch.js /api/static-js?file=firebase-patch.js 200!
+/fix-node-modules.js /api/static-js?file=fix-node-modules.js 200!
+/sw.js /api/static-js?file=sw.js 200!
+/workbox-*.js /api/static-js?file=workbox-:splat.js 200!
+
+# Default SPA fallback
+/* /index.html 200 
