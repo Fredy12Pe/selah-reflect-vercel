@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getFirestore } from 'firebase-admin/firestore';
 import { initAdmin } from '@/lib/firebase/admin';
+import { getApps } from 'firebase-admin/app';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -9,8 +10,39 @@ export async function GET(request: NextRequest) {
   try {
     // Initialize Firebase Admin
     console.log('Transform API: Initializing Firebase Admin...');
-    initAdmin();
+    
+    // Try to get existing Firebase app or initialize
+    let firebaseInitialized = false;
+    
+    try {
+      if (getApps().length > 0) {
+        console.log('Transform API: Firebase Admin already initialized');
+        firebaseInitialized = true;
+      } else {
+        console.log('Transform API: Calling initAdmin()');
+        initAdmin();
+        console.log('Transform API: Firebase Admin initialized successfully');
+        firebaseInitialized = true;
+      }
+    } catch (error) {
+      console.error('Transform API: Failed to initialize Firebase Admin:', error);
+      return NextResponse.json({
+        error: 'Failed to initialize Firebase Admin',
+        details: error.message,
+        stack: error.stack
+      }, { status: 500 });
+    }
+    
+    // Get Firestore instance
+    console.log('Transform API: Getting Firestore instance');
     const db = getFirestore();
+    
+    if (!db) {
+      console.error('Transform API: Failed to get Firestore instance');
+      return NextResponse.json({
+        error: 'Failed to get Firestore instance'
+      }, { status: 500 });
+    }
     
     // Get all devotions
     console.log('Transform API: Getting all devotions...');
@@ -30,11 +62,15 @@ export async function GET(request: NextRequest) {
       details: []
     };
     
+    console.log(`Transform API: Found ${devotionsSnapshot.size} devotions`);
+    
     // Process each devotion
     for (const doc of devotionsSnapshot.docs) {
       try {
         const data = doc.data();
         results.processed++;
+        
+        console.log(`Transform API: Processing document ${doc.id}`);
         
         // Check if document needs transformation
         const needsTransform = (
@@ -97,7 +133,8 @@ export async function GET(request: NextRequest) {
         results.details.push({
           id: doc.id,
           status: 'error',
-          error: error.message
+          error: error.message,
+          stack: error.stack
         });
       }
     }
@@ -108,8 +145,21 @@ export async function GET(request: NextRequest) {
     });
   } catch (error: any) {
     console.error('Transform API: Error processing request:', error);
+    console.error('Transform API: Full error details:', {
+      message: error.message,
+      stack: error.stack,
+      code: error.code,
+      name: error.name
+    });
+    
     return NextResponse.json(
-      { error: 'Internal server error', details: error.message },
+      { 
+        error: 'Internal server error', 
+        details: error.message,
+        stack: error.stack,
+        code: error.code,
+        name: error.name
+      },
       { status: 500 }
     );
   }
