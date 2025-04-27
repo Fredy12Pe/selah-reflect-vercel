@@ -253,13 +253,19 @@ export default function ReflectionPage({
         setDevotionData(devotion);
         return true;
       }
-      return false;
+      // No devotion found for this date, but we'll allow navigation to the date
+      // to provide a better user experience
+      setDevotionData(null);
+      toast.error(
+        `No devotion available for this date, but you can still view the page`
+      );
+      return true; // Return true to allow the navigation
     } catch (error) {
       console.error("Error checking devotion:", error);
       // If we get a 404, it means the devotion doesn't exist
       if (error instanceof Error && error.message.includes("not found")) {
         toast.error(`No devotion available for this date`);
-        return false;
+        return true; // Return true to allow the navigation anyway
       }
       // For other errors, show a more user-friendly message
       toast.error("Unable to load devotion. Please try again later.");
@@ -695,6 +701,8 @@ export default function ReflectionPage({
           disabled={isLoading}
           className="absolute left-4 w-10 h-10 flex items-center justify-center rounded-full bg-zinc-800/50
             hover:bg-zinc-700/50 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+          aria-label="Previous day"
+          title="Previous day"
         >
           <ChevronLeftIcon className="w-6 h-6" />
         </button>
@@ -703,6 +711,8 @@ export default function ReflectionPage({
           ref={dateButtonRef}
           onClick={toggleCalendar}
           className="px-8 py-2 rounded-full bg-zinc-800/50 hover:bg-zinc-700/50 transition-all flex items-center gap-2"
+          aria-label="Open calendar"
+          title="Select a date"
         >
           <span className="text-lg">{format(currentDate, "EEEE, MMMM d")}</span>
           <CalendarIcon className="w-5 h-5" />
@@ -735,6 +745,8 @@ export default function ReflectionPage({
           disabled={isNextDisabled || isLoading}
           className="absolute right-4 w-10 h-10 flex items-center justify-center rounded-full bg-zinc-800/50
             hover:bg-zinc-700/50 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+          aria-label="Next day"
+          title="Next day"
         >
           <ChevronRightIcon className="w-6 h-6" />
         </button>
@@ -743,6 +755,11 @@ export default function ReflectionPage({
       <div className="px-4 py-6 space-y-6">
         {isLoading ? (
           <div className="text-center py-8">Loading...</div>
+        ) : !devotionData ? (
+          <div className="text-center py-8">
+            <p className="text-xl mb-4">No devotion available for this date.</p>
+            <p>Try selecting a different date or check back later.</p>
+          </div>
         ) : (
           <>
             {/* Hymn of the Month */}
