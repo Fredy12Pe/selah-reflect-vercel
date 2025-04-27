@@ -156,4 +156,26 @@ export async function getLatestDevotion(): Promise<Devotion | null> {
     console.error('Error getting latest devotion:', error);
     throw new Error('Failed to get latest devotion');
   }
+}
+
+/**
+ * Fetches a list of all available devotion dates from the API
+ * @returns Array of dates in YYYY-MM-DD format
+ */
+export async function getAvailableDates(): Promise<string[]> {
+  try {
+    const response = await fetch('/api/devotions/available-dates', {
+      credentials: 'include',
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to fetch available dates');
+    }
+
+    const data = await response.json();
+    return data.dates || [];
+  } catch (error) {
+    console.error('Error fetching available dates:', error);
+    return [];
+  }
 } 

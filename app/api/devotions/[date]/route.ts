@@ -4,10 +4,10 @@ import { getAuth } from 'firebase-admin/auth';
 import { getFirestore } from 'firebase-admin/firestore';
 import { initAdmin } from '@/lib/firebase/admin';
 import { Devotion } from '@/lib/types/devotion';
-import { isFuture, parseISO } from 'date-fns';
+import { isFuture, parseISO, format, subDays } from 'date-fns';
 
 // Configure this route for static builds
-export const dynamic = 'error';
+export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
 // Add generateStaticParams to make it compatible with static exports
@@ -44,11 +44,14 @@ export async function GET(
   try {
     // Initialize Firebase Admin
     console.log('Devotions API: Initializing Firebase Admin...');
-    let adminInitialized = false;
+    let db;
     
     try {
       initAdmin();
-      adminInitialized = true;
+      db = getFirestore();
+      if (!db) {
+        throw new Error('Failed to get Firestore instance');
+      }
     } catch (error) {
       console.error('Devotions API: Failed to initialize Firebase Admin:', error);
       return NextResponse.json(
@@ -57,53 +60,79 @@ export async function GET(
       );
     }
     
-    if (!adminInitialized) {
-      console.error('Devotions API: Firebase Admin not initialized');
-      return NextResponse.json(
-        { error: 'Server configuration error' },
-        { status: 500 }
-      );
-    }
+    // Skip session cookie check if in development mode
+    const isDev = process.env.NODE_ENV === 'development';
+    let userId = 'anonymous';
     
-    // Get the session cookie
-    const cookieStore = cookies();
-    const sessionCookie = cookieStore.get('session');
-    console.log('Devotions API: Session cookie details:', {
-      present: !!sessionCookie,
-      name: sessionCookie?.name,
-      value: sessionCookie?.value ? '[REDACTED]' : undefined,
-    });
+    if (!isDev) {
+      // Get the session cookie
+      const cookieStore = cookies();
+      const sessionCookie = cookieStore.get('session');
+      console.log('Devotions API: Session cookie details:', {
+        present: !!sessionCookie,
+        name: sessionCookie?.name,
+        value: sessionCookie?.value ? '[REDACTED]' : undefined,
+      });
 
-    if (!sessionCookie?.value) {
-      console.log('Devotions API: No session cookie found');
-      return NextResponse.json(
-        { error: 'Authentication required' },
-        { status: 401 }
-      );
-    }
+      if (!sessionCookie?.value) {
+        console.log('Devotions API: No session cookie found');
+        return NextResponse.json(
+          { error: 'Authentication required' },
+          { status: 401 }
+        );
+      }
 
-    // Verify the session cookie
-    try {
-      console.log('Devotions API: Verifying session cookie...');
-      const auth = getAuth();
-      const decodedClaims = await auth.verifySessionCookie(sessionCookie.value, true);
-      console.log('Devotions API: Session verified for user:', decodedClaims.uid);
-    } catch (error) {
-      console.error('Devotions API: Session verification failed:', error);
-      return NextResponse.json(
-        { error: 'Invalid session' },
-        { status: 401 }
-      );
+      // Verify the session cookie
+      try {
+        console.log('Devotions API: Verifying session cookie...');
+        const auth = getAuth();
+        const decodedClaims = await auth.verifySessionCookie(sessionCookie.value, true);
+        userId = decodedClaims.uid;
+        console.log('Devotions API: Session verified for user:', userId);
+      } catch (error) {
+        console.error('Devotions API: Session verification failed:', error);
+        return NextResponse.json(
+          { error: 'Invalid session' },
+          { status: 401 }
+        );
+      }
     }
 
     // Get the devotion using Admin SDK
     console.log('Devotions API: Getting Firestore document...');
-    const db = getFirestore();
     const devotionDoc = await db.collection('devotions').doc(params.date).get();
 
     console.log('Devotions API: Document exists:', devotionDoc.exists);
     if (!devotionDoc.exists) {
       console.log('Devotions API: No devotion found for date:', params.date);
+      
+      // Try to find the most recent available devotion as a fallback
+      try {
+        const dateObj = parseISO(params.date);
+        
+        // Check up to 30 days back for an existing devotion
+        for (let i = 1; i <= 30; i++) {
+          const prevDate = subDays(dateObj, i);
+          const prevDateStr = format(prevDate, 'yyyy-MM-dd');
+          console.log('Devotions API: Trying previous date:', prevDateStr);
+          
+          const prevDevotionDoc = await db.collection('devotions').doc(prevDateStr).get();
+          if (prevDevotionDoc.exists) {
+            console.log('Devotions API: Found devotion for previous date:', prevDateStr);
+            return NextResponse.json(
+              { 
+                error: 'Devotion not found', 
+                message: `No devotion for ${params.date}, but found one for ${prevDateStr}`,
+                suggestedDate: prevDateStr
+              },
+              { status: 404 }
+            );
+          }
+        }
+      } catch (error) {
+        console.error('Devotions API: Error finding previous devotion:', error);
+      }
+      
       return NextResponse.json(
         { error: 'Devotion not found' },
         { status: 404 }
@@ -117,7 +146,6 @@ export async function GET(
       bibleText: data.bibleText,
       hasReflectionSections: Array.isArray(data.reflectionSections),
       sectionCount: Array.isArray(data.reflectionSections) ? data.reflectionSections.length : 0,
-      firstSectionQuestions: data.reflectionSections?.[0]?.questions,
     });
 
     // Format the response to match the Devotion type

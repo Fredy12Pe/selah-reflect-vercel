@@ -23,12 +23,12 @@ import {
   isToday,
   parseISO,
   isSameDay,
+  parse,
 } from "date-fns";
 import Link from "next/link";
 import Image from "next/image";
 import { useAuth } from "@/lib/context/AuthContext";
-import DatePicker from "react-datepicker";
-import "react-datepicker/dist/react-datepicker.css";
+import DatePicker from "@/app/components/DatePicker";
 import {
   ChevronLeftIcon,
   ChevronRightIcon,
@@ -235,43 +235,77 @@ export default function ReflectionPage({
 
   // Function to check if a devotion exists and load it
   const checkAndLoadDevotion = async (date: string) => {
-    // First validate the date to prevent unnecessary API calls
-    const dateObj = parseISO(date);
-    if (isFuture(dateObj)) {
-      console.warn(`Attempted to load future date: ${date}`);
-      toast.error("Cannot view future devotions");
-      return false;
-    }
-
-    if (!user) return false;
-    setIsLoading(true);
     try {
-      console.log(`Attempting to load devotion for date: ${date}`);
-      const devotion = await getDevotionByDate(date);
-      console.log("Loaded devotion data:", devotion);
-      if (devotion) {
-        setDevotionData(devotion);
-        return true;
+      setIsLoading(true);
+      const parsedDate = parse(date, "yyyy-MM-dd", new Date());
+
+      // Don't allow future dates
+      if (isFuture(parsedDate)) {
+        toast.error("Future dates are not available", {
+          position: "bottom-center",
+        });
+        setIsLoading(false);
+        return false;
       }
-      // No devotion found for this date, but we'll allow navigation to the date
-      // to provide a better user experience
-      setDevotionData(null);
-      toast.error(
-        `No devotion available for this date, but you can still view the page`
-      );
-      return true; // Return true to allow the navigation
-    } catch (error) {
-      console.error("Error checking devotion:", error);
-      // If we get a 404, it means the devotion doesn't exist
-      if (error instanceof Error && error.message.includes("not found")) {
-        toast.error(`No devotion available for this date`);
-        return true; // Return true to allow the navigation anyway
+
+      // Fetch devotion data
+      const response = await fetch(`/api/devotions/${date}`);
+
+      if (!response.ok) {
+        const errorData = await response.json();
+
+        // Handle case when a suggested date is provided
+        if (response.status === 404 && errorData.suggestedDate) {
+          toast.info(
+            `No devotion found for ${date}. Redirecting to ${errorData.suggestedDate}...`,
+            {
+              position: "bottom-center",
+              duration: 3000,
+            }
+          );
+
+          // Wait a moment before redirecting
+          setTimeout(() => {
+            router.push(`/devotion/${errorData.suggestedDate}/reflection`);
+          }, 1500);
+
+          setIsLoading(false);
+          return false;
+        }
+
+        // Handle regular not found case
+        if (response.status === 404) {
+          toast.info(
+            `No devotion available for ${date}. Please try another date.`,
+            {
+              position: "bottom-center",
+            }
+          );
+          setDevotionData(null);
+          setIsLoading(false);
+          return true; // Allow navigation but show empty state
+        }
+
+        // Other errors
+        toast.error(errorData.error || "Failed to load devotion", {
+          position: "bottom-center",
+        });
+
+        setIsLoading(false);
+        return false;
       }
-      // For other errors, show a more user-friendly message
-      toast.error("Unable to load devotion. Please try again later.");
-      return false;
-    } finally {
+
+      const data = await response.json();
+      setDevotionData(data);
       setIsLoading(false);
+      return true;
+    } catch (error) {
+      console.error("Error in checkAndLoadDevotion:", error);
+      toast.error("An error occurred while loading the devotion", {
+        position: "bottom-center",
+      });
+      setIsLoading(false);
+      return false;
     }
   };
 
@@ -721,21 +755,15 @@ export default function ReflectionPage({
         {showCalendar && (
           <div ref={calendarRef} className="absolute top-full mt-2 z-50">
             <DatePicker
-              selected={currentDate}
-              onChange={(date: Date | null) => {
-                setShowCalendar(false);
+              initialDate={currentDate}
+              onDateSelect={(date) => {
                 if (date && !isFuture(date) && !isLoading) {
                   handleDateChange(date);
                 }
               }}
-              maxDate={new Date()}
-              inline
-              calendarClassName="bg-zinc-800 border-zinc-700 text-white"
-              dayClassName={(date: Date) =>
-                isSameDay(date, currentDate)
-                  ? "bg-blue-600 text-white rounded-full"
-                  : "hover:bg-zinc-700 rounded-full"
-              }
+              isOpen={showCalendar}
+              onClose={() => setShowCalendar(false)}
+              highlightAvailableDates={true}
             />
           </div>
         )}
