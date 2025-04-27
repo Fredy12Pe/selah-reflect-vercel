@@ -4,6 +4,7 @@ import { getAuth } from 'firebase-admin/auth';
 import { getFirestore } from 'firebase-admin/firestore';
 import { initAdmin } from '@/lib/firebase/admin';
 import { Devotion } from '@/lib/types/devotion';
+import { isFuture, parseISO } from 'date-fns';
 
 // Configure this route for static builds
 export const dynamic = 'error';
@@ -22,10 +23,47 @@ export async function GET(
 ) {
   console.log('Devotions API: Handling GET request for date:', params.date);
   
+  // Check if date is valid
+  try {
+    const dateObj = parseISO(params.date);
+    if (isFuture(dateObj)) {
+      console.log('Devotions API: Request for future date rejected:', params.date);
+      return NextResponse.json(
+        { error: 'Future dates are not available' },
+        { status: 404 }
+      );
+    }
+  } catch (error) {
+    console.error('Devotions API: Invalid date format:', params.date);
+    return NextResponse.json(
+      { error: 'Invalid date format' },
+      { status: 400 }
+    );
+  }
+  
   try {
     // Initialize Firebase Admin
     console.log('Devotions API: Initializing Firebase Admin...');
-    initAdmin();
+    let adminInitialized = false;
+    
+    try {
+      initAdmin();
+      adminInitialized = true;
+    } catch (error) {
+      console.error('Devotions API: Failed to initialize Firebase Admin:', error);
+      return NextResponse.json(
+        { error: 'Server configuration error' },
+        { status: 500 }
+      );
+    }
+    
+    if (!adminInitialized) {
+      console.error('Devotions API: Firebase Admin not initialized');
+      return NextResponse.json(
+        { error: 'Server configuration error' },
+        { status: 500 }
+      );
+    }
     
     // Get the session cookie
     const cookieStore = cookies();
