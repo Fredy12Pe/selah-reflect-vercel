@@ -12,23 +12,32 @@ export function initAdmin() {
     if (getApps().length === 0) {
       // Check if all required environment variables are present
       // Support both legacy env vars and new FIREBASE_ADMIN_* vars
-      const requiredEnvVars = {
-        projectId: process.env.FIREBASE_PROJECT_ID || process.env.FIREBASE_ADMIN_PROJECT_ID,
-        clientEmail: process.env.FIREBASE_CLIENT_EMAIL || process.env.FIREBASE_ADMIN_CLIENT_EMAIL,
-        privateKey: process.env.FIREBASE_PRIVATE_KEY || process.env.FIREBASE_ADMIN_PRIVATE_KEY,
-      };
+      const projectId = process.env.FIREBASE_PROJECT_ID || process.env.FIREBASE_ADMIN_PROJECT_ID;
+      const clientEmail = process.env.FIREBASE_CLIENT_EMAIL || process.env.FIREBASE_ADMIN_CLIENT_EMAIL;
+      const privateKey = process.env.FIREBASE_PRIVATE_KEY || process.env.FIREBASE_ADMIN_PRIVATE_KEY;
+      
+      // Log all environment variables with sensitive data redacted
+      console.log('Environment Variables Available:', Object.keys(process.env)
+        .filter(key => key.includes('FIREBASE'))
+        .reduce((obj, key) => {
+          obj[key] = key.includes('KEY') ? '[REDACTED]' : !!process.env[key];
+          return obj;
+        }, {}));
 
       // Log the environment variables (excluding sensitive data)
       console.log('Firebase Admin Environment Variables Status:', {
-        projectId: !!requiredEnvVars.projectId,
-        clientEmail: !!requiredEnvVars.clientEmail,
-        privateKey: !!requiredEnvVars.privateKey,
+        projectId: !!projectId,
+        clientEmail: !!clientEmail,
+        privateKey: !!privateKey,
+        projectIdValue: projectId ? projectId.substring(0, 5) + '...' : null,
+        clientEmailValue: clientEmail ? clientEmail.substring(0, 5) + '...' : null,
       });
 
       // Validate all required variables are present
-      const missingVars = Object.entries(requiredEnvVars)
-        .filter(([_, value]) => !value)
-        .map(([key]) => key);
+      const missingVars = [];
+      if (!projectId) missingVars.push('projectId');
+      if (!clientEmail) missingVars.push('clientEmail');
+      if (!privateKey) missingVars.push('privateKey');
 
       if (missingVars.length > 0) {
         throw new Error(
@@ -37,14 +46,14 @@ export function initAdmin() {
       }
 
       // Process the private key
-      const privateKey = requiredEnvVars.privateKey?.replace(/\\n/g, '\n');
+      const formattedPrivateKey = privateKey?.replace(/\\n/g, '\n');
 
       // Initialize the app
       const app = initializeApp({
         credential: cert({
-          projectId: requiredEnvVars.projectId,
-          clientEmail: requiredEnvVars.clientEmail,
-          privateKey: privateKey,
+          projectId,
+          clientEmail,
+          privateKey: formattedPrivateKey,
         }),
       });
 
