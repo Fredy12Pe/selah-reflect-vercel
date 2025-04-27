@@ -22,6 +22,7 @@ import {
   isFuture,
   isToday,
   parseISO,
+  isSameDay,
 } from "date-fns";
 import Link from "next/link";
 import Image from "next/image";
@@ -234,6 +235,14 @@ export default function ReflectionPage({
 
   // Function to check if a devotion exists and load it
   const checkAndLoadDevotion = async (date: string) => {
+    // First validate the date to prevent unnecessary API calls
+    const dateObj = parseISO(date);
+    if (isFuture(dateObj)) {
+      console.warn(`Attempted to load future date: ${date}`);
+      toast.error("Cannot view future devotions");
+      return false;
+    }
+
     if (!user) return false;
     setIsLoading(true);
     try {
@@ -249,10 +258,12 @@ export default function ReflectionPage({
       console.error("Error checking devotion:", error);
       // If we get a 404, it means the devotion doesn't exist
       if (error instanceof Error && error.message.includes("not found")) {
+        toast.error(`No devotion available for this date`);
         return false;
       }
-      // For other errors, we should rethrow to be handled by the caller
-      throw error;
+      // For other errors, show a more user-friendly message
+      toast.error("Unable to load devotion. Please try again later.");
+      return false;
     } finally {
       setIsLoading(false);
     }
@@ -273,19 +284,57 @@ export default function ReflectionPage({
   useEffect(() => {
     const loadImages = async () => {
       try {
-        // Get image for hymn modal
-        const hymn = await getDailyDevotionImage(
-          params.date,
-          "landscape,mountains,sunrise,peaceful"
-        );
-        if (hymn) setHymnImage(hymn);
+        // Create cache keys for the images
+        const hymnCacheKey = `hymnImage_${params.date}`;
+        const resourcesCacheKey = `resourcesImage_${params.date}`;
 
-        // Get image for resources modal
-        const resources = await getDailyDevotionImage(
-          params.date,
-          "landscape,forest,lake,sunset"
-        );
-        if (resources) setResourcesImage(resources);
+        // Try to get cached images first
+        let cachedHymnImage = null;
+        let cachedResourcesImage = null;
+
+        try {
+          cachedHymnImage = sessionStorage.getItem(hymnCacheKey);
+          cachedResourcesImage = sessionStorage.getItem(resourcesCacheKey);
+        } catch (error) {
+          console.warn("Unable to access sessionStorage", error);
+        }
+
+        // If we have cached images, use them
+        if (cachedHymnImage) {
+          setHymnImage(cachedHymnImage);
+        } else {
+          // Get image for hymn modal
+          const hymn = await getDailyDevotionImage(
+            params.date,
+            "landscape,mountains,sunrise,peaceful"
+          );
+          if (hymn) {
+            try {
+              sessionStorage.setItem(hymnCacheKey, hymn);
+            } catch (error) {
+              console.warn("Unable to store in sessionStorage", error);
+            }
+            setHymnImage(hymn);
+          }
+        }
+
+        if (cachedResourcesImage) {
+          setResourcesImage(cachedResourcesImage);
+        } else {
+          // Get image for resources modal
+          const resources = await getDailyDevotionImage(
+            params.date,
+            "landscape,forest,lake,sunset"
+          );
+          if (resources) {
+            try {
+              sessionStorage.setItem(resourcesCacheKey, resources);
+            } catch (error) {
+              console.warn("Unable to store in sessionStorage", error);
+            }
+            setResourcesImage(resources);
+          }
+        }
       } catch (error) {
         console.error("Error loading background images:", error);
         // Keep default images if there's an error
@@ -303,8 +352,17 @@ export default function ReflectionPage({
       return;
     }
 
-    setIsLoading(true);
+    // Don't do anything if we're already loading
+    if (isLoading) {
+      return;
+    }
+
     const formattedDate = format(newDate, "yyyy-MM-dd");
+
+    // Don't reload if it's the same date
+    if (formattedDate === params.date) {
+      return;
+    }
 
     try {
       console.log(`Attempting date change to: ${formattedDate}`);
@@ -312,10 +370,7 @@ export default function ReflectionPage({
       // Check if devotion exists for the new date
       const exists = await checkAndLoadDevotion(formattedDate);
       if (!exists) {
-        toast.error(
-          `No devotion available for ${format(newDate, "MMMM d, yyyy")}`
-        );
-        setIsLoading(false);
+        // The error message is now shown in checkAndLoadDevotion
         return;
       }
 
@@ -324,27 +379,8 @@ export default function ReflectionPage({
       router.push(`/devotion/${formattedDate}/reflection`);
     } catch (error) {
       console.error("Error changing date:", error);
-
-      // Provide more specific error messages
-      if (error instanceof Error) {
-        if (error.message.includes("not found")) {
-          toast.error(
-            `No devotion available for ${format(newDate, "MMMM d, yyyy")}`
-          );
-        } else if (
-          error.message.includes("Authentication") ||
-          error.message.includes("signed in")
-        ) {
-          toast.error("Please sign in to view devotions");
-          // Consider redirecting to login page here
-        } else {
-          toast.error(`Error: ${error.message}`);
-        }
-      } else {
-        toast.error("An unexpected error occurred. Please try again.");
-      }
-
-      setIsLoading(false);
+      // Error handling is now in checkAndLoadDevotion, so this is just a fallback
+      toast.error("An unexpected error occurred. Please try again.");
     }
   };
 
@@ -678,12 +714,18 @@ export default function ReflectionPage({
               selected={currentDate}
               onChange={(date: Date | null) => {
                 setShowCalendar(false);
-                if (date) handleDateChange(date);
+                if (date && !isFuture(date) && !isLoading) {
+                  handleDateChange(date);
+                }
               }}
               maxDate={new Date()}
               inline
               calendarClassName="bg-zinc-800 border-zinc-700 text-white"
-              dayClassName={(_date: Date) => "hover:bg-zinc-700 rounded-full"}
+              dayClassName={(date: Date) =>
+                isSameDay(date, currentDate)
+                  ? "bg-blue-600 text-white rounded-full"
+                  : "hover:bg-zinc-700 rounded-full"
+              }
             />
           </div>
         )}

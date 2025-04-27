@@ -44,23 +44,53 @@ export default function BackgroundCard({
   const [backgroundImage, setBackgroundImage] = useState<string>(
     getLocalImage()
   );
+  const [isLoading, setIsLoading] = useState<boolean>(false);
 
   // Fetch image from Unsplash when component mounts
   useEffect(() => {
-    const fetchImage = async () => {
-      try {
-        const image = await getDailyDevotionImage(date, query);
-        if (image && image !== backgroundImage) {
-          setBackgroundImage(image);
-        }
-      } catch (error) {
-        console.error("Error fetching background image:", error);
-        // Keep using the local image if there's an error
-      }
-    };
+    // Create a cache key to prevent unnecessary fetches
+    const cacheKey = `bgcard_${date}_${query}_${imageType}`;
+    let cachedImage = null;
 
-    fetchImage();
-  }, [date, query, backgroundImage]);
+    // Try to access sessionStorage (might fail in private browsing)
+    try {
+      cachedImage = sessionStorage.getItem(cacheKey);
+    } catch (error) {
+      console.warn("Unable to access sessionStorage", error);
+    }
+
+    // If we have a cached image, use it immediately
+    if (cachedImage) {
+      setBackgroundImage(cachedImage);
+      return;
+    }
+
+    // Otherwise fetch a new image, but only if we're not already loading
+    if (!isLoading) {
+      const fetchImage = async () => {
+        setIsLoading(true);
+        try {
+          const image = await getDailyDevotionImage(date, query);
+          if (image) {
+            // Cache the image for this session
+            try {
+              sessionStorage.setItem(cacheKey, image);
+            } catch (error) {
+              console.warn("Unable to store in sessionStorage", error);
+            }
+            setBackgroundImage(image);
+          }
+        } catch (error) {
+          console.error("Error fetching background image:", error);
+          // Keep using the local image if there's an error
+        } finally {
+          setIsLoading(false);
+        }
+      };
+
+      fetchImage();
+    }
+  }, [date, query, imageType, isLoading]);
 
   return (
     <div
