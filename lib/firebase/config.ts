@@ -4,13 +4,9 @@
  */
 
 import { initializeApp, getApps, FirebaseApp } from 'firebase/app';
-import { getAuth, GoogleAuthProvider, Auth } from 'firebase/auth';
-import { getFirestore, Firestore } from 'firebase/firestore';
+import { getAuth, setPersistence, browserLocalPersistence, Auth } from 'firebase/auth';
+import { getFirestore, Firestore, connectFirestoreEmulator } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
-import { isBrowser, shouldSkipFirebaseInit } from '../utils/environment';
-
-// Define type for storage
-type FirebaseStorage = any;
 
 // Firebase configuration
 const firebaseConfig = {
@@ -20,7 +16,6 @@ const firebaseConfig = {
   storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
   messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
-  measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID,
 };
 
 // Debug log the configuration (but not in production)
@@ -35,99 +30,61 @@ if (process.env.NODE_ENV !== 'production') {
   });
 }
 
-// Safe empty instances for SSR
-const emptyAuth = {} as Auth;
-const emptyFirestore = {} as Firestore;
-const emptyStorage = {} as FirebaseStorage;
-const emptyApp = {} as FirebaseApp;
+// Initialize Firebase
+let app: FirebaseApp;
+let auth: Auth;
+let db: Firestore;
+let storage: any;
 
-// Initialize Firebase instances
-let app: FirebaseApp = emptyApp;
-let auth: Auth = emptyAuth;
-let firestore: Firestore = emptyFirestore;
-let storage: FirebaseStorage = emptyStorage;
-let googleProvider: GoogleAuthProvider | null = null;
-
-if (isBrowser() && !shouldSkipFirebaseInit) {
+// Only initialize Firebase in the browser
+if (typeof window !== 'undefined') {
   try {
-    // Check if Firebase is already initialized
-    if (!getApps().length) {
-      console.log('[Firebase] Initializing Firebase app...');
-      app = initializeApp(firebaseConfig);
-      console.log('[Firebase] App initialized successfully');
-    } else {
-      console.log('[Firebase] Using existing Firebase app');
-      app = getApps()[0];
-    }
-
-    // Initialize Firebase services
-    try {
-      auth = getAuth(app);
-      console.log('[Firebase] Auth initialized');
-    } catch (error) {
-      console.error('[Firebase] Auth initialization error:', error);
-    }
-
-    try {
-      firestore = getFirestore(app);
-      console.log('[Firebase] Firestore initialized');
-    } catch (error) {
-      console.error('[Firebase] Firestore initialization error:', error);
-    }
-
-    try {
-      storage = getStorage(app);
-      console.log('[Firebase] Storage initialized');
-    } catch (error) {
-      console.error('[Firebase] Storage initialization error:', error);
-    }
-
-    try {
-      googleProvider = new GoogleAuthProvider();
-      console.log('[Firebase] Google provider initialized');
-    } catch (error) {
-      console.error('[Firebase] Google provider initialization error:', error);
-    }
-
-    // Add Firebase to window for debugging
-    if (typeof window !== 'undefined') {
-      window.firebase = { app, auth, firestore, storage };
-    }
+    // Initialize or get existing app
+    app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
+    
+    // Initialize Auth with persistence
+    auth = getAuth(app);
+    setPersistence(auth, browserLocalPersistence)
+      .catch((error) => {
+        console.error("Error setting auth persistence:", error);
+      });
+    
+    // Initialize Firestore
+    db = getFirestore(app);
+    
+    // Initialize Storage
+    storage = getStorage(app);
+    
+    console.log('[Firebase] Services initialized successfully');
   } catch (error) {
-    console.error('[Firebase] Global initialization error:', error);
+    console.error('[Firebase] Initialization error:', error);
+    // Provide empty instances on error
+    app = {} as FirebaseApp;
+    auth = {} as Auth;
+    db = {} as Firestore;
+    storage = {};
   }
 } else {
-  console.log('[Firebase] Skipping Firebase initialization in server environment or due to configuration');
+  // Provide empty instances for SSR
+  app = {} as FirebaseApp;
+  auth = {} as Auth;
+  db = {} as Firestore;
+  storage = {};
 }
 
-// Safe access functions
-export const getFirebaseApp = (): FirebaseApp => {
-  if (!isBrowser()) return emptyApp;
-  return app || emptyApp;
-};
+// Configure Firestore
+if (typeof window !== "undefined") {
+  const settings = {
+    experimentalForceLongPolling: true,
+    useFetchStreams: false,
+    cacheSizeBytes: 50 * 1024 * 1024 // 50MB cache size
+  };
+  
+  // @ts-ignore - Type error in settings but it works
+  db.settings(settings);
+}
 
-export const getFirebaseAuth = (): Auth => {
-  if (!isBrowser()) return emptyAuth;
-  return auth || emptyAuth;
-};
-
-export const getFirebaseFirestore = (): Firestore => {
-  if (!isBrowser()) return emptyFirestore;
-  return firestore || emptyFirestore;
-};
-
-export const getFirebaseStorage = (): FirebaseStorage => {
-  if (!isBrowser()) return emptyStorage;
-  return storage || emptyStorage;
-};
-
-export const getGoogleAuthProvider = (): GoogleAuthProvider => {
-  if (!isBrowser() || !googleProvider) return new GoogleAuthProvider();
-  return googleProvider;
-};
-
-// Export firebase instances
-export { app, auth, firestore, storage, googleProvider };
+export { app, auth, db, storage };
 
 // Add TypeScript declaration for debugging
 declare global {
@@ -136,7 +93,7 @@ declare global {
       app: FirebaseApp;
       auth: Auth;
       firestore: Firestore;
-      storage: FirebaseStorage;
+      storage: any;
     };
   }
 } 

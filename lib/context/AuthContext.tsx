@@ -19,7 +19,7 @@ import {
   Auth,
 } from "firebase/auth";
 import { useRouter, usePathname } from "next/navigation";
-import { auth as firebaseAuth } from "../firebase/config";
+import { auth } from "../firebase/config";
 import { setCookie, clearCookie } from "../utils/cookies";
 import { isBrowser } from "../utils/environment";
 
@@ -65,14 +65,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   const setSessionCookie = async (user: User) => {
     try {
       // Get the ID token with force refresh to ensure it's up to date
-      const idToken = await user.getIdToken(true);
+      const idToken = await user.getIdToken(false);
 
       // Set the cookie with the token
       setCookie("session", idToken, {
         path: "/",
         maxAge: 60 * 60 * 24 * 7, // 7 days
-        sameSite: "strict",
+        sameSite: "lax",
         secure: process.env.NODE_ENV === "production",
+        httpOnly: true
       });
 
       console.log("Session cookie set successfully");
@@ -93,24 +94,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   useEffect(() => {
     // Only run in browser environment
     if (!isBrowser()) {
-      console.log(
-        "AuthProvider: Skip auth state listener in server environment"
-      );
+      console.log("AuthProvider: Skip auth state listener in server environment");
       setLoading(false);
       return;
     }
 
+    let authInitialized = false;
+    
     // Safety timeout to prevent infinite loading
     const safetyTimeout = setTimeout(() => {
-      console.warn(
-        "AuthProvider: Safety timeout reached, continuing without auth"
-      );
-      setLoading(false);
-      setInitAttempted(true);
-    }, 8000); // 8 second timeout
+      if (!authInitialized) {
+        console.warn("AuthProvider: Safety timeout reached, continuing without auth");
+        setLoading(false);
+        setInitAttempted(true);
+      }
+    }, 5000);
 
     // Check if auth is available
-    if (!firebaseAuth) {
+    if (!auth || Object.keys(auth).length === 0) {
       console.error("AuthProvider: Firebase Auth is not initialized");
       setLoading(false);
       setError("Firebase authentication is not available");
@@ -124,9 +125,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     try {
       // Set up authentication listener
       const unsubscribe = onAuthStateChanged(
-        firebaseAuth,
+        auth,
         async (authUser) => {
           setLoading(true);
+          authInitialized = true;
 
           try {
             if (authUser) {
@@ -134,7 +136,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
               setUser(authUser);
 
               // Set the session cookie whenever the user is authenticated
-              await setSessionCookie(authUser);
+              // But don't wait for it to complete
+              setSessionCookie(authUser).catch(console.error);
 
               // If on login page and authenticated, redirect to home
               if (pathname === "/auth/login") {
@@ -146,34 +149,30 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
               clearSessionCookie();
 
               // Only redirect to login if on protected route and not already on login page
-              if (
-                pathname &&
-                !pathname.startsWith("/auth/login") &&
-                !pathname.includes("_next") &&
-                !pathname.includes("firebase-fix.js") &&
-                !pathname.includes("firebase-patch.js") &&
-                !pathname.includes("favicon.ico") &&
-                !pathname.includes("manifest.json") &&
-                !pathname.includes("debug.js")
-              ) {
+              const isPublicPath = pathname?.startsWith("/auth/") || 
+                                 pathname?.includes("_next") ||
+                                 pathname?.includes("api/") ||
+                                 pathname === "/";
+              
+              if (pathname && !isPublicPath) {
                 console.log("Redirecting to login from:", pathname);
                 router.push("/auth/login");
               }
             }
           } catch (err) {
             console.error("Error processing auth state:", err);
+            // Don't set error state here to avoid UI disruption
           } finally {
-            clearTimeout(safetyTimeout);
             setLoading(false);
             setInitAttempted(true);
           }
         },
         (error) => {
           console.error("Auth state change error:", error);
-          setError(error.message);
+          // Don't set error state to avoid blocking the UI
           setLoading(false);
-          clearTimeout(safetyTimeout);
           setInitAttempted(true);
+          authInitialized = true;
         }
       );
 
@@ -186,7 +185,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     } catch (err) {
       console.error("Error setting up auth listener:", err);
       setLoading(false);
-      clearTimeout(safetyTimeout);
       setInitAttempted(true);
       return () => {};
     }
@@ -208,10 +206,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       setLoading(true);
       setError(null);
 
-      if (!firebaseAuth) throw new Error("Auth is not initialized");
+      if (!auth || Object.keys(auth).length === 0) {
+        throw new Error("Auth is not initialized");
+      }
 
       const userCredential = await signInWithEmailAndPassword(
-        firebaseAuth,
+        auth,
         email,
         password
       );
@@ -237,10 +237,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       setLoading(true);
       setError(null);
 
-      if (!firebaseAuth) throw new Error("Auth is not initialized");
+      if (!auth || Object.keys(auth).length === 0) {
+        throw new Error("Auth is not initialized");
+      }
 
       const userCredential = await createUserWithEmailAndPassword(
-        firebaseAuth,
+        auth,
         email,
         password
       );
@@ -266,9 +268,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     try {
       setLoading(true);
 
-      if (!firebaseAuth) throw new Error("Auth is not initialized");
+      if (!auth || Object.keys(auth).length === 0) {
+        throw new Error("Auth is not initialized");
+      }
 
-      await signOut(firebaseAuth);
+      await signOut(auth);
       clearSessionCookie();
       setUser(null);
       router.push("/auth/login");
@@ -286,9 +290,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       setLoading(true);
       setError(null);
 
-      if (!firebaseAuth) throw new Error("Auth is not initialized");
+      if (!auth || Object.keys(auth).length === 0) {
+        throw new Error("Auth is not initialized");
+      }
 
-      await sendPasswordResetEmail(firebaseAuth, email);
+      await sendPasswordResetEmail(auth, email);
     } catch (error: any) {
       console.error("Reset password error:", error);
       setError(error.message);
@@ -303,10 +309,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       setLoading(true);
       setError(null);
 
-      if (!firebaseAuth?.currentUser) throw new Error("User not authenticated");
+      if (!auth || Object.keys(auth).length === 0) {
+        throw new Error("Auth is not initialized");
+      }
 
-      await updateProfile(firebaseAuth.currentUser, { displayName });
-      setUser({ ...firebaseAuth.currentUser });
+      const currentUser = auth.currentUser;
+      if (!currentUser) {
+        throw new Error("User not authenticated");
+      }
+
+      await updateProfile(currentUser, { displayName });
+      setUser(currentUser);
     } catch (error: any) {
       console.error("Update profile error:", error);
       setError(error.message);
@@ -324,19 +337,27 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       setLoading(true);
       setError(null);
 
-      if (!firebaseAuth?.currentUser) throw new Error("User not authenticated");
-      if (!firebaseAuth.currentUser.email)
+      if (!auth || Object.keys(auth).length === 0) {
+        throw new Error("Auth is not initialized");
+      }
+
+      const currentUser = auth.currentUser;
+      if (!currentUser) {
+        throw new Error("User not authenticated");
+      }
+      if (!currentUser.email) {
         throw new Error("User email is not available");
+      }
 
       // Re-authenticate the user
       const credential = EmailAuthProvider.credential(
-        firebaseAuth.currentUser.email,
+        currentUser.email,
         currentPassword
       );
-      await reauthenticateWithCredential(firebaseAuth.currentUser, credential);
+      await reauthenticateWithCredential(currentUser, credential);
 
       // Update the password
-      await updatePassword(firebaseAuth.currentUser, newPassword);
+      await updatePassword(currentUser, newPassword);
     } catch (error: any) {
       console.error("Change password error:", error);
       setError(error.message);
