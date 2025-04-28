@@ -38,40 +38,21 @@ export default function Authentication() {
 
   const setSessionCookie = async (token: string) => {
     try {
-      // Set the session cookie with secure attributes
-      const cookieOptions = [
-        'path=/',
-        'max-age=2592000',
-        'SameSite=Strict',
-        process.env.NODE_ENV === 'production' ? 'Secure' : '',
-      ].filter(Boolean).join('; ');
-
-      // Set the session cookie
-      document.cookie = `session=${token}; ${cookieOptions}`;
-      console.log("Authentication - Session cookie set");
-
-      // Verify the cookie was set
-      const cookies = document.cookie.split(';');
-      const hasSessionCookie = cookies.some(cookie => 
-        cookie.trim().startsWith('session=')
-      );
-
-      if (!hasSessionCookie) {
-        throw new Error('Failed to set session cookie');
-      }
-
-      // Make a test request to verify the session
-      const response = await fetch('/api/auth/verify-session', {
-        credentials: 'include',
+      // Use the server-side session endpoint
+      const response = await fetch('/api/auth/session', {
+        method: 'POST',
         headers: {
-          'Authorization': `Bearer ${token}`
-        }
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ idToken: token }),
+        credentials: 'include',
       });
 
       if (!response.ok) {
-        throw new Error('Failed to verify session');
+        throw new Error('Failed to set session');
       }
 
+      console.log("Authentication - Session cookie set via server");
     } catch (error) {
       console.error("Authentication - Error setting session cookie:", error);
       throw error;

@@ -1,51 +1,36 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { getAuth } from 'firebase-admin/auth';
 import { initAdmin } from '@/lib/firebase/admin';
 import { shouldSkipApiRoutes, shouldSkipFirebaseAdmin } from '@/lib/utils/environment';
 
-// Check if we're in build time
-const isBuildTime = shouldSkipApiRoutes || shouldSkipFirebaseAdmin;
-
-export async function GET(request: NextRequest) {
-  // Return mock response during build time
-  if (isBuildTime) {
-    console.log('Skipping verify API route execution during build');
-    return NextResponse.json({ 
-      status: 'success', 
-      uid: 'mock-user-id',
-      note: 'Build time mock response'
-    });
-  }
-
+export async function GET() {
   try {
+    // Skip verification in development if configured
+    if (shouldSkipApiRoutes === true || shouldSkipFirebaseAdmin === true) {
+      console.log('Verify API: Skipping verification in development');
+      return NextResponse.json({ status: 'success', verified: true });
+    }
+
     // Initialize Firebase Admin
     initAdmin();
-
-    // Get the session cookie
-    const cookieStore = cookies();
-    const sessionCookie = cookieStore.get('session')?.value;
+    const auth = getAuth();
+    const sessionCookie = cookies().get('session')?.value;
 
     if (!sessionCookie) {
-      return NextResponse.json(
-        { error: 'No session cookie found' },
-        { status: 401 }
-      );
+      return NextResponse.json({ status: 'error', verified: false }, { status: 401 });
     }
 
     // Verify the session cookie
-    const auth = getAuth();
     const decodedClaims = await auth.verifySessionCookie(sessionCookie, true);
-
+    
     return NextResponse.json({
       status: 'success',
-      uid: decodedClaims.uid,
+      verified: true,
+      uid: decodedClaims.uid
     });
-  } catch (error: any) {
-    console.error('Session verification error:', error);
-    return NextResponse.json(
-      { error: 'Invalid session' },
-      { status: 401 }
-    );
+  } catch (error) {
+    console.error('Verify endpoint error:', error);
+    return NextResponse.json({ status: 'error', verified: false }, { status: 401 });
   }
 } 

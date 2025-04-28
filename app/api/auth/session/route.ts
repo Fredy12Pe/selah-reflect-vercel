@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getAuth } from 'firebase-admin/auth';
 import { initAdmin } from '@/lib/firebase/admin';
 import { shouldSkipApiRoutes, shouldSkipFirebaseAdmin } from '@/lib/utils/environment';
+import { cookies } from 'next/headers';
 
 // Session duration: 5 days
 const SESSION_DURATION = 60 * 60 * 24 * 5;
@@ -41,20 +42,18 @@ export async function POST(request: NextRequest) {
 
     // Create a session cookie
     console.log('Session API: Creating session cookie');
-    const sessionCookie = await auth.createSessionCookie(idToken, {
-      expiresIn: SESSION_DURATION * 1000, // Convert to milliseconds for Firebase
-    });
+    const expiresIn = 60 * 60 * 24 * 30 * 1000; // 30 days
+    const sessionCookie = await auth.createSessionCookie(idToken, { expiresIn });
     console.log('Session API: Session cookie created');
 
-    // Set cookie headers
-    const cookieOptions = [
-      `session=${sessionCookie}`,
-      `Max-Age=${SESSION_DURATION}`,
-      'Path=/',
-      'HttpOnly',
-      process.env.NODE_ENV === 'production' ? 'Secure' : '',
-      'SameSite=Lax'
-    ].filter(Boolean).join('; ');
+    // Set the cookie with secure attributes
+    cookies().set('session', sessionCookie, {
+      maxAge: expiresIn,
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      path: '/',
+    });
 
     // Create response with cookie header
     const response = new NextResponse(
@@ -63,12 +62,11 @@ export async function POST(request: NextRequest) {
         status: 200,
         headers: {
           'Content-Type': 'application/json',
-          'Set-Cookie': cookieOptions,
         },
       }
     );
 
-    console.log('Session API: Cookie header set:', cookieOptions.replace(sessionCookie, '[REDACTED]'));
+    console.log('Session API: Cookie header set:', sessionCookie.replace(sessionCookie, '[REDACTED]'));
     return response;
   } catch (error: any) {
     console.error('Session API Error:', error);
