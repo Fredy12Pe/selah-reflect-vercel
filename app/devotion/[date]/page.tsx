@@ -145,7 +145,9 @@ export default function DevotionPage({ params }: { params: { date: string } }) {
           }
         } else {
           console.log("No devotion found for date:", params.date);
-          toast.error("No devotion available for this date");
+          // Redirect to reflection page when no devotion is found
+          router.replace(`/devotion/${params.date}/reflection`);
+          return;
         }
       } catch (error) {
         console.error("Error fetching data:", error);

@@ -353,21 +353,10 @@ export default function ReflectionPage({
     }
 
     try {
-      console.log(`Attempting date change to: ${formattedDate}`);
-
-      // Check if devotion exists for the new date
-      const exists = await getDevotionByDate(formattedDate);
-      if (!exists) {
-        // The error message is now shown in checkAndLoadDevotion
-        return;
-      }
-
-      // Navigate to the new date
       console.log(`Navigating to date: ${formattedDate}`);
       router.push(`/devotion/${formattedDate}/reflection`);
     } catch (error) {
       console.error("Error changing date:", error);
-      // Error handling is now in checkAndLoadDevotion, so this is just a fallback
       toast.error("An unexpected error occurred. Please try again.");
     }
   };
@@ -745,7 +734,7 @@ export default function ReflectionPage({
                 <div className="absolute inset-0 bg-black/50" />
                 <div className="absolute inset-0 flex flex-col justify-center p-6 text-white">
                   <h3 className="text-lg text-white/80 mb-2">Hymn of the Month:</h3>
-                  <h2 className="text-3xl font-bold">{hymn?.title || "Loading hymn..."}</h2>
+                  <h2 className="text-3xl font-bold">{hymn?.title || "When I survey the Wondrous Cross"}</h2>
                 </div>
               </div>
             </div>
