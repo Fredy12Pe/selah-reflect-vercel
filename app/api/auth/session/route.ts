@@ -5,20 +5,17 @@ import { shouldSkipApiRoutes, shouldSkipFirebaseAdmin } from '@/lib/utils/enviro
 import { cookies } from 'next/headers';
 
 // Session duration: 5 days
-const SESSION_DURATION = 60 * 60 * 24 * 5;
-
-// Check if we're in build time
-const isBuildTime = shouldSkipApiRoutes || shouldSkipFirebaseAdmin;
+const SESSION_DURATION = 60 * 60 * 24 * 5 * 1000; // in milliseconds
 
 export async function POST(request: NextRequest) {
-  // Return mock response during build time
-  if (isBuildTime) {
-    console.log('Skipping session API route execution during build');
-    return NextResponse.json({ status: 'success', note: 'Build time mock response' });
-  }
-
   console.log('Session API: Starting session creation');
   try {
+    // Skip in development if configured
+    if (shouldSkipApiRoutes === true || shouldSkipFirebaseAdmin === true) {
+      console.log('Session API: Skipping in development mode');
+      return NextResponse.json({ status: 'success', note: 'Development mode' });
+    }
+
     // Initialize Firebase Admin
     console.log('Session API: Initializing Firebase Admin');
     initAdmin();
@@ -42,42 +39,39 @@ export async function POST(request: NextRequest) {
 
     // Create a session cookie
     console.log('Session API: Creating session cookie');
-    const expiresIn = 60 * 60 * 24 * 30 * 1000; // 30 days
-    const sessionCookie = await auth.createSessionCookie(idToken, { expiresIn });
+    const sessionCookie = await auth.createSessionCookie(idToken, { expiresIn: SESSION_DURATION });
     console.log('Session API: Session cookie created');
 
-    // Set the cookie with secure attributes
-    cookies().set('session', sessionCookie, {
-      maxAge: expiresIn,
+    // Set the cookie
+    const cookieStore = cookies();
+    cookieStore.set('session', sessionCookie, {
+      maxAge: SESSION_DURATION / 1000, // Convert to seconds
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
+      sameSite: 'lax', // Changed from 'strict' to 'lax' for better compatibility
       path: '/',
     });
 
-    // Create response with cookie header
-    const response = new NextResponse(
-      JSON.stringify({ status: 'success' }),
-      {
-        status: 200,
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      }
-    );
-
-    console.log('Session API: Cookie header set:', sessionCookie.replace(sessionCookie, '[REDACTED]'));
-    return response;
+    return NextResponse.json({ status: 'success' });
   } catch (error: any) {
     console.error('Session API Error:', error);
-    console.error('Error details:', {
-      message: error.message,
-      code: error.code,
-      stack: error.stack,
-    });
+    
+    // More specific error handling
+    if (error.code === 'auth/id-token-expired') {
+      return NextResponse.json(
+        { error: 'ID token has expired' },
+        { status: 401 }
+      );
+    } else if (error.code === 'auth/invalid-id-token') {
+      return NextResponse.json(
+        { error: 'Invalid ID token' },
+        { status: 401 }
+      );
+    }
+    
     return NextResponse.json(
       { error: 'Failed to create session' },
-      { status: 401 }
+      { status: 500 }
     );
   }
 } 

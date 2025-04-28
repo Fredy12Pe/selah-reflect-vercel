@@ -38,7 +38,6 @@ export default function Authentication() {
 
   const setSessionCookie = async (token: string) => {
     try {
-      // Use the server-side session endpoint
       const response = await fetch('/api/auth/session', {
         method: 'POST',
         headers: {
@@ -48,11 +47,14 @@ export default function Authentication() {
         credentials: 'include',
       });
 
+      const data = await response.json();
+
       if (!response.ok) {
-        throw new Error('Failed to set session');
+        throw new Error(data.error || 'Failed to set session');
       }
 
-      console.log("Authentication - Session cookie set via server");
+      console.log("Authentication - Session cookie set successfully");
+      return true;
     } catch (error) {
       console.error("Authentication - Error setting session cookie:", error);
       throw error;
@@ -84,21 +86,18 @@ export default function Authentication() {
     }
     lastSignInAttempt = now;
 
-    const auth = getFirebaseAuth();
-    const provider = getGoogleAuthProvider();
-
-    if (!auth || !provider) {
-      const error = "Authentication service is not available. Please try again later.";
-      console.error("Firebase auth or provider is not initialized");
-      setError(error);
-      toast.error(error);
-      return;
-    }
-
     try {
       setLoading(true);
       setError("");
 
+      const auth = getFirebaseAuth();
+      const provider = getGoogleAuthProvider();
+
+      if (!auth || !provider) {
+        throw new Error("Authentication service is not available");
+      }
+
+      // Sign in with popup
       const result = await signInWithPopup(auth, provider);
       
       // Get a fresh token
@@ -113,10 +112,10 @@ export default function Authentication() {
       // Redirect after successful login
       redirectAfterLogin();
     } catch (error) {
-      const authError = error as AuthError;
-      console.error("Sign-in error:", authError);
-      setError(handleAuthError(authError));
-      toast.error(handleAuthError(authError));
+      console.error("Sign-in error:", error);
+      const errorMessage = error instanceof Error ? error.message : handleAuthError(error as AuthError);
+      setError(errorMessage);
+      toast.error(errorMessage);
     } finally {
       setLoading(false);
     }
