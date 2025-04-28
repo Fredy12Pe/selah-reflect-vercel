@@ -1,10 +1,41 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getFirebaseDb } from '@/lib/firebase/firebase';
-import { doc, setDoc, collection } from 'firebase/firestore';
-import { getFirebaseAuth } from '@/lib/firebase/firebase';
+import { getFirestore } from 'firebase-admin/firestore';
+import { initializeApp, getApps, cert } from 'firebase-admin/app';
 
 // Authorized admin emails
 const ADMIN_EMAILS = ['fredypedro3@gmail.com']; 
+
+// Initialize Firebase Admin
+const initializeFirebaseAdmin = () => {
+  if (getApps().length > 0) {
+    return getApps()[0];
+  }
+
+  const projectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
+  const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
+  let privateKey = process.env.FIREBASE_PRIVATE_KEY || '';
+
+  if (!projectId || !clientEmail || !privateKey) {
+    throw new Error('Missing Firebase Admin credentials');
+  }
+
+  // Handle private key formatting
+  if (privateKey.startsWith('"') && privateKey.endsWith('"')) {
+    privateKey = JSON.parse(privateKey);
+  }
+  
+  if (privateKey.includes('\\n')) {
+    privateKey = privateKey.replace(/\\n/g, '\n');
+  }
+
+  return initializeApp({
+    credential: cert({
+      projectId,
+      clientEmail,
+      privateKey
+    })
+  });
+};
 
 // Types for the data structure
 interface ReflectionSection {
@@ -50,29 +81,9 @@ interface UploadData {
 
 export async function POST(request: NextRequest) {
   try {
-    // Verify authentication and authorization
-    const auth = getFirebaseAuth();
-    if (!auth) {
-      return NextResponse.json(
-        { error: 'Firebase Auth not initialized' },
-        { status: 500 }
-      );
-    }
-    
-    const currentUser = auth.currentUser;
-    if (!currentUser || !currentUser.email) {
-      return NextResponse.json(
-        { error: 'Authentication required' },
-        { status: 401 }
-      );
-    }
-    
-    if (!ADMIN_EMAILS.includes(currentUser.email)) {
-      return NextResponse.json(
-        { error: 'Unauthorized access' },
-        { status: 403 }
-      );
-    }
+    // Initialize Firebase Admin
+    const app = initializeFirebaseAdmin();
+    const db = getFirestore(app);
 
     // Get the request data
     const data = await request.json() as UploadData;
@@ -82,15 +93,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: 'Invalid data format' },
         { status: 400 }
-      );
-    }
-
-    // Initialize Firebase
-    const db = getFirebaseDb();
-    if (!db) {
-      return NextResponse.json(
-        { error: 'Database connection error' },
-        { status: 500 }
       );
     }
 
@@ -109,68 +111,52 @@ export async function POST(request: NextRequest) {
         const normalizedMonthKey = monthKey.toLowerCase();
 
         // Create a reference to the month document
-        const monthRef = doc(db, 'months', normalizedMonthKey);
+        const monthRef = db.collection('months').doc(normalizedMonthKey);
         
         // Save month data (without hymn to avoid duplication)
         const monthDoc = {
           month: monthData.month,
           updatedAt: new Date().toISOString(),
-          updatedBy: currentUser.email
+          updatedBy: ADMIN_EMAILS[0] // Use admin email since we're using admin SDK
         };
 
-        await setDoc(monthRef, monthDoc, { merge: true });
+        await monthRef.set(monthDoc, { merge: true });
 
-        // Save hymn separately in hymns collection with proper structure
+        // Save hymn separately in hymns collection
         if (monthData.hymn && monthData.hymn.title && monthData.hymn.lyrics) {
           try {
-            const hymnRef = doc(db, 'hymns', normalizedMonthKey);
+            const hymnRef = db.collection('hymns').doc(normalizedMonthKey);
             
             // Log the hymn data for debugging
             console.log(`Processing hymn for month ${normalizedMonthKey}:`, {
               title: monthData.hymn.title,
               lyricsLength: monthData.hymn.lyrics.length,
-              hasAuthor: !!monthData.hymn.author,
-              authorType: typeof monthData.hymn.author
+              hasAuthor: !!monthData.hymn.author
             });
             
-            // Create hymn document without optional fields first
+            // Create base hymn document
             const hymnDoc = {
               title: monthData.hymn.title,
               lyrics: monthData.hymn.lyrics,
               monthId: normalizedMonthKey,
               updatedAt: new Date().toISOString(),
-              updatedBy: currentUser.email
+              updatedBy: ADMIN_EMAILS[0]
             };
 
-            // Only add author if it exists and is not undefined
-            if (monthData.hymn.author && typeof monthData.hymn.author === 'string') {
-              console.log(`Adding author for hymn ${normalizedMonthKey}`);
-              await setDoc(hymnRef, { ...hymnDoc, author: monthData.hymn.author }, { merge: true });
-            } else {
-              console.log(`Saving hymn ${normalizedMonthKey} without author`);
-              await setDoc(hymnRef, hymnDoc, { merge: true });
-            }
+            await hymnRef.set(hymnDoc, { merge: true });
+            console.log(`Successfully saved hymn for ${normalizedMonthKey}`);
           } catch (error) {
             console.error(`Error saving hymn for ${normalizedMonthKey}:`, error);
-            throw new Error(`Failed to save hymn for ${normalizedMonthKey}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+            throw error;
           }
-        } else {
-          console.warn(`Skipping hymn for ${normalizedMonthKey} due to missing required fields:`, {
-            hasHymn: !!monthData.hymn,
-            hasTitle: !!(monthData.hymn && monthData.hymn.title),
-            hasLyrics: !!(monthData.hymn && monthData.hymn.lyrics)
-          });
         }
 
         // Save devotions
         if (monthData.devotions && Array.isArray(monthData.devotions)) {
           for (const devotion of monthData.devotions) {
-            // Format the date to be consistent (lowercase, no spaces)
             const devotionId = devotion.date.toLowerCase().replace(/,/g, '').replace(/ /g, '-');
-            const devotionRef = doc(db, 'devotions', devotionId);
+            const devotionRef = db.collection('devotions').doc(devotionId);
             
-            // Transform reflectionSections into flat reflectionQuestions array
-            // Handle empty reflection sections gracefully
             const reflectionQuestions = (devotion.reflectionSections || []).reduce((acc: string[], section) => {
               if (section && Array.isArray(section.questions)) {
                 return [...acc, ...section.questions];
@@ -185,22 +171,22 @@ export async function POST(request: NextRequest) {
               bibleText: devotion.bibleText,
               content: `Reflection on ${devotion.bibleText}`,
               scriptureReference: devotion.bibleText,
-              scriptureText: "",  // This will be filled in later if needed
+              scriptureText: "",
               title: `${devotion.bibleText} - ${devotion.date}`,
               reflectionQuestions,
               createdAt: timestamp,
-              createdBy: currentUser.email,
+              createdBy: ADMIN_EMAILS[0],
               updatedAt: timestamp,
-              updatedBy: currentUser.email
+              updatedBy: ADMIN_EMAILS[0]
             };
 
-            await setDoc(devotionRef, devotionDoc, { merge: true });
+            await devotionRef.set(devotionDoc, { merge: true });
           }
         }
         
         successCount++;
       } catch (error) {
-        console.error(`Error saving month ${monthKey}:`, error);
+        console.error(`Error processing month ${monthKey}:`, error);
         errorItems.push({ 
           month: monthKey, 
           error: error instanceof Error ? error.message : 'Unknown error'
