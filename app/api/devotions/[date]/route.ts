@@ -90,24 +90,42 @@ export async function GET(
       );
     }
 
-    // Get the session cookie
-    const cookieStore = cookies();
-    const sessionCookie = cookieStore.get('session');
-
     // Check authentication
     let isAuthenticated = false;
-    if (sessionCookie?.value) {
+    const auth = getAuth();
+
+    // First try Bearer token
+    const authHeader = request.headers.get('authorization');
+    if (authHeader?.startsWith('Bearer ')) {
       try {
-        const auth = getAuth();
-        await auth.verifySessionCookie(sessionCookie.value, true);
+        const idToken = authHeader.split('Bearer ')[1];
+        await auth.verifyIdToken(idToken);
         isAuthenticated = true;
       } catch (error) {
-        console.error('Session verification failed:', error);
+        console.error('Token verification failed:', error);
       }
     }
 
-    // Allow access in development or if authenticated
-    if (!isAuthenticated && process.env.NODE_ENV !== 'development') {
+    // If token auth failed, try session cookie
+    if (!isAuthenticated) {
+      const cookieStore = cookies();
+      const sessionCookie = cookieStore.get('session');
+      if (sessionCookie?.value) {
+        try {
+          await auth.verifySessionCookie(sessionCookie.value, true);
+          isAuthenticated = true;
+        } catch (error) {
+          console.error('Session verification failed:', error);
+        }
+      }
+    }
+
+    // Allow access in development
+    if (process.env.NODE_ENV === 'development') {
+      isAuthenticated = true;
+    }
+
+    if (!isAuthenticated) {
       return NextResponse.json(
         { error: 'You must be signed in to access devotions' },
         { status: 401 }

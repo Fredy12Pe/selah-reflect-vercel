@@ -114,12 +114,15 @@ export default function DevotionPageClient({ date }: DevotionPageClientProps) {
         setLoading(true);
         setError(null);
         
+        // Get a fresh token
+        const token = await user.getIdToken(true);
+        
         const response = await fetch(`/api/devotions/${date}`, {
           credentials: 'include',
           signal: controller.signal,
           headers: {
             'Cache-Control': 'no-cache',
-            'Authorization': `Bearer ${await user.getIdToken()}`
+            'Authorization': `Bearer ${token}`
           }
         });
 
@@ -131,16 +134,15 @@ export default function DevotionPageClient({ date }: DevotionPageClientProps) {
             return;
           }
           if (response.status === 401) {
-            // Try to refresh the token first
+            // Try to refresh the token and retry
             try {
-              await user.getIdToken(true); // Force refresh the token
-              // Retry the request with the new token
+              const newToken = await user.getIdToken(true);
               const retryResponse = await fetch(`/api/devotions/${date}`, {
                 credentials: 'include',
                 signal: controller.signal,
                 headers: {
                   'Cache-Control': 'no-cache',
-                  'Authorization': `Bearer ${await user.getIdToken()}`
+                  'Authorization': `Bearer ${newToken}`
                 }
               });
               
