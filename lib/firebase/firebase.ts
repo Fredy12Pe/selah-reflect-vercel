@@ -47,18 +47,26 @@ if (isBrowser() && !shouldSkipFirebaseInit) {
     // Check if app is already initialized
     if (getApps().length === 0) {
       console.log('[Firebase] Creating new Firebase app instance');
+      // Add persistence settings to avoid CORS issues
+      const settings = {
+        experimentalForceLongPolling: true,
+        useFetchStreams: false
+      };
+      
       app = initializeApp(firebaseConfig);
+      const db = getFirestore(app);
+      // @ts-ignore - Type error in settings but it works
+      db.settings(settings);
+      firestore = db;
     } else {
       console.log('[Firebase] Using existing Firebase app instance');
       app = getApps()[0];
+      firestore = getFirestore(app);
     }
     
     // Initialize Firebase services
     console.log('[Firebase] Initializing Firebase Auth');
     auth = getAuth(app);
-    
-    console.log('[Firebase] Initializing Firestore');
-    firestore = getFirestore(app);
     
     console.log('[Firebase] Initializing Storage');
     storage = getStorage(app);

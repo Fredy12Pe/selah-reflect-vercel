@@ -261,32 +261,43 @@ export default function ReflectionPage({
         const monthStr = format(currentDate, 'MMMM').toLowerCase();
         const db = getFirebaseDb();
         if (db) {
-          const hymnRef = doc(db, 'hymns', monthStr);
-          const hymnSnap = await getDoc(hymnRef);
-          if (hymnSnap.exists()) {
-            setHymn(hymnSnap.data() as Hymn);
+          try {
+            const hymnRef = doc(db, 'hymns', monthStr);
+            const hymnSnap = await getDoc(hymnRef);
+            if (hymnSnap.exists()) {
+              setHymn(hymnSnap.data() as Hymn);
+            }
+          } catch (error) {
+            console.error('Error fetching hymn:', error);
+            // Don't fail the whole load if hymn fails
           }
         }
 
         // Fetch devotion data
-        const devotion = await getDevotionByDate(params.date);
-        // Even if devotion is null or has notFound flag, we still set it
-        // This allows us to show appropriate UI for missing devotions
-        setDevotionData(devotion);
+        try {
+          const devotion = await getDevotionByDate(params.date);
+          // Even if devotion is null or has notFound flag, we still set it
+          // This allows us to show appropriate UI for missing devotions
+          setDevotionData(devotion);
+        } catch (error) {
+          console.error('Error fetching devotion:', error);
+          toast.error('Failed to load devotion');
+        }
       } catch (error) {
-        console.error('Error fetching data:', error);
+        console.error('Error in fetchData:', error);
         toast.error('Failed to load data');
       } finally {
         setIsLoading(false);
       }
     };
 
-    if (user) {
+    // Only fetch if we have a user and we're not already loading
+    if (user && !isLoading) {
       fetchData();
     }
   }, [params.date, user, currentDate, router]);
 
-  // Load background images for modals from Unsplash
+  // Load background images for modals from Unsplash with error handling
   useEffect(() => {
     const loadImages = async () => {
       try {
@@ -305,44 +316,53 @@ export default function ReflectionPage({
           console.warn("Unable to access sessionStorage", error);
         }
 
-        // If we have cached images, use them
+        // Load hymn image
         if (cachedHymnImage) {
           setHymnImage(cachedHymnImage);
         } else {
-          // Get image for hymn modal
-          const hymn = await getDailyDevotionImage(
-            params.date,
-            "landscape,mountains,sunrise,peaceful"
-          );
-          if (hymn) {
-            try {
-              sessionStorage.setItem(hymnCacheKey, hymn);
-            } catch (error) {
-              console.warn("Unable to store in sessionStorage", error);
+          try {
+            const hymn = await getDailyDevotionImage(
+              params.date,
+              "landscape,mountains,sunrise,peaceful"
+            );
+            if (hymn) {
+              setHymnImage(hymn);
+              try {
+                sessionStorage.setItem(hymnCacheKey, hymn);
+              } catch (error) {
+                console.warn("Unable to store hymn image in sessionStorage", error);
+              }
             }
-            setHymnImage(hymn);
+          } catch (error) {
+            console.error("Error loading hymn image:", error);
+            // Keep default image on error
           }
         }
 
+        // Load resources image
         if (cachedResourcesImage) {
           setResourcesImage(cachedResourcesImage);
         } else {
-          // Get image for resources modal
-          const resources = await getDailyDevotionImage(
-            params.date,
-            "landscape,forest,lake,sunset"
-          );
-          if (resources) {
-            try {
-              sessionStorage.setItem(resourcesCacheKey, resources);
-            } catch (error) {
-              console.warn("Unable to store in sessionStorage", error);
+          try {
+            const resources = await getDailyDevotionImage(
+              params.date,
+              "landscape,forest,lake,sunset"
+            );
+            if (resources) {
+              setResourcesImage(resources);
+              try {
+                sessionStorage.setItem(resourcesCacheKey, resources);
+              } catch (error) {
+                console.warn("Unable to store resources image in sessionStorage", error);
+              }
             }
-            setResourcesImage(resources);
+          } catch (error) {
+            console.error("Error loading resources image:", error);
+            // Keep default image on error
           }
         }
       } catch (error) {
-        console.error("Error loading background images:", error);
+        console.error("Error in loadImages:", error);
         // Keep default images if there's an error
       }
     };
