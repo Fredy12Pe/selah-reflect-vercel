@@ -24,7 +24,7 @@ interface DevotionData {
   }[];
 }
 
-const ADMIN_EMAILS = ["fredy12pe@gmail.com"];
+const ADMIN_EMAILS = ["fredy12pe@gmail.com", "fredypedro3@gmail.com"];
 
 export default function BulkUploadDevotions() {
   const [jsonData, setJsonData] = useState<string | null>(null);
