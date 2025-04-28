@@ -16,11 +16,20 @@ interface Devotion {
   date: string;
   bibleText: string;
   reflectionSections: ReflectionSection[];
-  content?: string;
-  prayer?: string;
-  scriptureReference?: string;
-  scriptureText?: string;
-  title?: string;
+}
+
+interface ProcessedDevotion {
+  date: string;
+  bibleText: string;
+  content: string;
+  scriptureReference: string;
+  scriptureText: string;
+  title: string;
+  reflectionQuestions: string[];
+  createdAt: string;
+  createdBy: string;
+  updatedAt: string;
+  updatedBy: string;
 }
 
 interface Hymn {
@@ -127,21 +136,24 @@ export async function POST(request: NextRequest) {
             const devotionId = devotion.date.replace(/,/g, '').replace(/ /g, '-').toLowerCase();
             const devotionRef = doc(db, 'devotions', devotionId);
             
-            // Format the title based on the bibleText and date
-            const formattedTitle = `${devotion.bibleText} - ${devotion.date}`;
+            // Transform reflectionSections into flat reflectionQuestions array
+            const reflectionQuestions = devotion.reflectionSections.reduce((acc: string[], section) => {
+              return [...acc, ...section.questions];
+            }, []);
             
-            const devotionDoc = {
-              ...devotion,
-              month: monthData.month,
-              hymn: monthData.hymn,
-              title: formattedTitle,
+            const timestamp = new Date().toISOString();
+            
+            const devotionDoc: ProcessedDevotion = {
+              date: devotion.date,
+              bibleText: devotion.bibleText,
               content: `Reflection on ${devotion.bibleText}`,
-              prayer: "Prayer for understanding and application",
               scriptureReference: devotion.bibleText,
               scriptureText: "",
-              createdAt: new Date().toISOString(),
+              title: `${devotion.bibleText} - ${devotion.date}`,
+              reflectionQuestions,
+              createdAt: timestamp,
               createdBy: currentUser.email,
-              updatedAt: new Date().toISOString(),
+              updatedAt: timestamp,
               updatedBy: currentUser.email
             };
 
