@@ -106,8 +106,10 @@ export async function POST(request: NextRequest) {
           throw new Error(`Invalid data structure for month: ${monthKey}`);
         }
 
+        const normalizedMonthKey = monthKey.toLowerCase();
+
         // Create a reference to the month document
-        const monthRef = doc(db, 'months', monthKey.toLowerCase());
+        const monthRef = doc(db, 'months', normalizedMonthKey);
         
         // Save month data (without hymn to avoid duplication)
         const monthDoc = {
@@ -120,12 +122,12 @@ export async function POST(request: NextRequest) {
 
         // Save hymn separately in hymns collection with proper structure
         if (monthData.hymn && monthData.hymn.title && monthData.hymn.lyrics) {
-          const hymnRef = doc(db, 'hymns', monthKey.toLowerCase());
+          const hymnRef = doc(db, 'hymns', normalizedMonthKey);
           const hymnDoc = {
             title: monthData.hymn.title,
             lyrics: monthData.hymn.lyrics,
             author: monthData.hymn.author || 'Unknown',
-            monthId: monthKey.toLowerCase(),
+            monthId: normalizedMonthKey,
             updatedAt: new Date().toISOString(),
             updatedBy: currentUser.email
           };
@@ -135,12 +137,17 @@ export async function POST(request: NextRequest) {
         // Save devotions
         if (monthData.devotions && Array.isArray(monthData.devotions)) {
           for (const devotion of monthData.devotions) {
-            const devotionId = devotion.date.replace(/,/g, '').replace(/ /g, '-').toLowerCase();
+            // Format the date to be consistent (lowercase, no spaces)
+            const devotionId = devotion.date.toLowerCase().replace(/,/g, '').replace(/ /g, '-');
             const devotionRef = doc(db, 'devotions', devotionId);
             
             // Transform reflectionSections into flat reflectionQuestions array
-            const reflectionQuestions = devotion.reflectionSections.reduce((acc: string[], section) => {
-              return [...acc, ...section.questions];
+            // Handle empty reflection sections gracefully
+            const reflectionQuestions = (devotion.reflectionSections || []).reduce((acc: string[], section) => {
+              if (section && Array.isArray(section.questions)) {
+                return [...acc, ...section.questions];
+              }
+              return acc;
             }, []);
             
             const timestamp = new Date().toISOString();
@@ -150,7 +157,7 @@ export async function POST(request: NextRequest) {
               bibleText: devotion.bibleText,
               content: `Reflection on ${devotion.bibleText}`,
               scriptureReference: devotion.bibleText,
-              scriptureText: "",
+              scriptureText: "",  // This will be filled in later if needed
               title: `${devotion.bibleText} - ${devotion.date}`,
               reflectionQuestions,
               createdAt: timestamp,
