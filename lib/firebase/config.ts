@@ -5,13 +5,8 @@
 
 import { initializeApp, getApps, FirebaseApp } from 'firebase/app';
 import { getAuth, setPersistence, browserLocalPersistence, Auth } from 'firebase/auth';
-import { getFirestore, Firestore } from 'firebase/firestore';
+import { getFirestore, Firestore, connectFirestoreEmulator } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
-import type { FirebaseStorage } from 'firebase/storage';
-import { isBrowser, shouldSkipFirebaseInit } from '../utils/environment';
-
-// Define type for storage
-type FirebaseStorage = any;
 
 // Firebase configuration
 const firebaseConfig = {
@@ -35,25 +30,47 @@ if (process.env.NODE_ENV !== 'production') {
   });
 }
 
-// Safe empty instances for SSR
-const emptyAuth = {} as Auth;
-const emptyFirestore = {} as Firestore;
-const emptyStorage = {} as FirebaseStorage;
-const emptyApp = {} as FirebaseApp;
+// Initialize Firebase
+let app: FirebaseApp;
+let auth: Auth;
+let db: Firestore;
+let storage: any;
 
-// Initialize Firebase instances
-let app: FirebaseApp = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
-
-// Initialize Auth with persistence
-const auth: Auth = getAuth(app);
-setPersistence(auth, browserLocalPersistence)
-  .catch((error) => {
-    console.error("Error setting auth persistence:", error);
-  });
-
-// Initialize Firestore with settings
-const db: Firestore = getFirestore(app);
-const storage = getStorage(app);
+// Only initialize Firebase in the browser
+if (typeof window !== 'undefined') {
+  try {
+    // Initialize or get existing app
+    app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
+    
+    // Initialize Auth with persistence
+    auth = getAuth(app);
+    setPersistence(auth, browserLocalPersistence)
+      .catch((error) => {
+        console.error("Error setting auth persistence:", error);
+      });
+    
+    // Initialize Firestore
+    db = getFirestore(app);
+    
+    // Initialize Storage
+    storage = getStorage(app);
+    
+    console.log('[Firebase] Services initialized successfully');
+  } catch (error) {
+    console.error('[Firebase] Initialization error:', error);
+    // Provide empty instances on error
+    app = {} as FirebaseApp;
+    auth = {} as Auth;
+    db = {} as Firestore;
+    storage = {};
+  }
+} else {
+  // Provide empty instances for SSR
+  app = {} as FirebaseApp;
+  auth = {} as Auth;
+  db = {} as Firestore;
+  storage = {};
+}
 
 // Configure Firestore
 if (typeof window !== "undefined") {
@@ -67,28 +84,6 @@ if (typeof window !== "undefined") {
   db.settings(settings);
 }
 
-// Safe access functions
-export const getFirebaseApp = (): FirebaseApp => {
-  if (!isBrowser()) return emptyApp;
-  return app || emptyApp;
-};
-
-export const getFirebaseAuth = (): Auth => {
-  if (!isBrowser()) return emptyAuth;
-  return auth || emptyAuth;
-};
-
-export const getFirebaseFirestore = (): Firestore => {
-  if (!isBrowser()) return emptyFirestore;
-  return db || emptyFirestore;
-};
-
-export const getFirebaseStorage = (): FirebaseStorage => {
-  if (!isBrowser()) return emptyStorage;
-  return storage || emptyStorage;
-};
-
-// Export firebase instances
 export { app, auth, db, storage };
 
 // Add TypeScript declaration for debugging
@@ -98,7 +93,7 @@ declare global {
       app: FirebaseApp;
       auth: Auth;
       firestore: Firestore;
-      storage: FirebaseStorage;
+      storage: any;
     };
   }
 } 

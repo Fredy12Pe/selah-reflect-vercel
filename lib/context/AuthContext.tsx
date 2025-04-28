@@ -19,7 +19,7 @@ import {
   Auth,
 } from "firebase/auth";
 import { useRouter, usePathname } from "next/navigation";
-import { auth as firebaseAuth } from "../firebase/config";
+import { auth } from "../firebase/config";
 import { setCookie, clearCookie } from "../utils/cookies";
 import { isBrowser } from "../utils/environment";
 
@@ -108,10 +108,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         setLoading(false);
         setInitAttempted(true);
       }
-    }, 5000); // Reduced to 5 seconds
+    }, 5000);
 
     // Check if auth is available
-    if (!firebaseAuth) {
+    if (!auth || Object.keys(auth).length === 0) {
       console.error("AuthProvider: Firebase Auth is not initialized");
       setLoading(false);
       setError("Firebase authentication is not available");
@@ -125,7 +125,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     try {
       // Set up authentication listener
       const unsubscribe = onAuthStateChanged(
-        firebaseAuth,
+        auth,
         async (authUser) => {
           setLoading(true);
           authInitialized = true;
@@ -206,10 +206,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       setLoading(true);
       setError(null);
 
-      if (!firebaseAuth) throw new Error("Auth is not initialized");
+      if (!auth || Object.keys(auth).length === 0) {
+        throw new Error("Auth is not initialized");
+      }
 
       const userCredential = await signInWithEmailAndPassword(
-        firebaseAuth,
+        auth,
         email,
         password
       );
@@ -235,10 +237,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       setLoading(true);
       setError(null);
 
-      if (!firebaseAuth) throw new Error("Auth is not initialized");
+      if (!auth || Object.keys(auth).length === 0) {
+        throw new Error("Auth is not initialized");
+      }
 
       const userCredential = await createUserWithEmailAndPassword(
-        firebaseAuth,
+        auth,
         email,
         password
       );
@@ -264,9 +268,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     try {
       setLoading(true);
 
-      if (!firebaseAuth) throw new Error("Auth is not initialized");
+      if (!auth || Object.keys(auth).length === 0) {
+        throw new Error("Auth is not initialized");
+      }
 
-      await signOut(firebaseAuth);
+      await signOut(auth);
       clearSessionCookie();
       setUser(null);
       router.push("/auth/login");
@@ -284,9 +290,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       setLoading(true);
       setError(null);
 
-      if (!firebaseAuth) throw new Error("Auth is not initialized");
+      if (!auth || Object.keys(auth).length === 0) {
+        throw new Error("Auth is not initialized");
+      }
 
-      await sendPasswordResetEmail(firebaseAuth, email);
+      await sendPasswordResetEmail(auth, email);
     } catch (error: any) {
       console.error("Reset password error:", error);
       setError(error.message);
@@ -301,10 +309,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       setLoading(true);
       setError(null);
 
-      if (!firebaseAuth?.currentUser) throw new Error("User not authenticated");
+      if (!auth || Object.keys(auth).length === 0) {
+        throw new Error("Auth is not initialized");
+      }
 
-      await updateProfile(firebaseAuth.currentUser, { displayName });
-      setUser({ ...firebaseAuth.currentUser });
+      const currentUser = auth.currentUser;
+      if (!currentUser) {
+        throw new Error("User not authenticated");
+      }
+
+      await updateProfile(currentUser, { displayName });
+      setUser(currentUser);
     } catch (error: any) {
       console.error("Update profile error:", error);
       setError(error.message);
@@ -322,19 +337,27 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       setLoading(true);
       setError(null);
 
-      if (!firebaseAuth?.currentUser) throw new Error("User not authenticated");
-      if (!firebaseAuth.currentUser.email)
+      if (!auth || Object.keys(auth).length === 0) {
+        throw new Error("Auth is not initialized");
+      }
+
+      const currentUser = auth.currentUser;
+      if (!currentUser) {
+        throw new Error("User not authenticated");
+      }
+      if (!currentUser.email) {
         throw new Error("User email is not available");
+      }
 
       // Re-authenticate the user
       const credential = EmailAuthProvider.credential(
-        firebaseAuth.currentUser.email,
+        currentUser.email,
         currentPassword
       );
-      await reauthenticateWithCredential(firebaseAuth.currentUser, credential);
+      await reauthenticateWithCredential(currentUser, credential);
 
       // Update the password
-      await updatePassword(firebaseAuth.currentUser, newPassword);
+      await updatePassword(currentUser, newPassword);
     } catch (error: any) {
       console.error("Change password error:", error);
       setError(error.message);
