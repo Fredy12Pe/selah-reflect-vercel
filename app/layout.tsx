@@ -43,6 +43,7 @@ export default function RootLayout({
 
         {/* Critical Firebase patches applied before any React code runs */}
         <script src="/firebase-init-fix.js" />
+        <script src="/firebase-auth-fix.js" />
         <script src="/firebase-fix.js" />
         <FirebasePatch />
         <script src="/firebase-patch.js" async />

@@ -97,14 +97,46 @@ if (isBrowser() && !shouldSkipFirebaseInit) {
 // Safe accessor functions with proper guards
 export const getFirebaseAuth = (): Auth | null => {
   if (!isBrowser() || shouldSkipFirebaseInit) {
+    console.log('[Firebase] Skipping getFirebaseAuth in non-browser environment');
     return null;
   }
   
   try {
-    if (auth && Object.keys(auth).length === 0) {
-      app = getApps().length > 0 ? getApps()[0] : initializeApp(firebaseConfig);
-      auth = getAuth(app);
+    // Check if auth is already initialized
+    if (auth && typeof auth.onAuthStateChanged === 'function') {
+      console.log('[Firebase] Using existing Auth instance');
+      return auth;
     }
+    
+    // Create a new instance if needed
+    console.log('[Firebase] Creating new Auth instance');
+    if (Object.keys(auth).length === 0 || !auth.onAuthStateChanged) {
+      // Check if we have an app
+      if (!app || Object.keys(app).length === 0) {
+        console.log('[Firebase] Initializing app for Auth');
+        app = getApps().length > 0 ? getApps()[0] : initializeApp(firebaseConfig);
+      }
+      
+      // Get auth from the app
+      auth = getAuth(app);
+      
+      // Handle edge case where auth might still be empty
+      if (!auth || !auth.onAuthStateChanged) {
+        console.error('[Firebase] Failed to get valid Auth instance');
+        // Create a mock Auth object as fallback
+        const mockAuth = {
+          currentUser: null,
+          onAuthStateChanged: (callback: any) => {
+            console.log('[Firebase] Using mock onAuthStateChanged');
+            setTimeout(() => callback(null), 10);
+            return () => {}; // Unsubscribe function
+          }
+        } as unknown as Auth;
+        
+        return mockAuth;
+      }
+    }
+    
     return auth;
   } catch (error) {
     console.error('[Firebase] Error getting Auth:', error);
