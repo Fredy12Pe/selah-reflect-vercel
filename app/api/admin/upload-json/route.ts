@@ -7,19 +7,20 @@ import { getFirebaseAuth } from '@/lib/firebase/firebase';
 const ADMIN_EMAILS = ['fredypedro3@gmail.com']; 
 
 // Types for the data structure
+interface ReflectionSection {
+  passage: string;
+  questions: string[];
+}
+
 interface Devotion {
   date: string;
   bibleText: string;
-  reflectionSections: Array<{
-    passage: string;
-    questions: string[];
-  }>;
+  reflectionSections: ReflectionSection[];
 }
 
 interface Hymn {
   title: string;
   lyrics: string[];
-  author?: string;
 }
 
 interface MonthData {
@@ -93,48 +94,38 @@ export async function POST(request: NextRequest) {
         // Create a reference to the month document
         const monthRef = doc(db, 'months', month.toLowerCase());
         
-        // Prepare the month data with proper structure
+        // Save month data
         const monthDoc = {
-          month: month,
-          hymn: {
-            title: monthData.hymn?.title || '',
-            lyrics: monthData.hymn?.lyrics || []
-          },
+          month: monthData.month,
+          hymn: monthData.hymn,
           updatedAt: new Date().toISOString(),
           updatedBy: currentUser.email
         };
 
-        // Set the month data
         await setDoc(monthRef, monthDoc, { merge: true });
 
         // Save hymn separately in hymns collection
         if (monthData.hymn) {
           const hymnRef = doc(db, 'hymns', month.toLowerCase());
-          await setDoc(hymnRef, {
-            title: monthData.hymn.title || '',
-            lyrics: monthData.hymn.lyrics || [],
-            author: monthData.hymn.author || 'Unknown',
-            month: month,
+          const hymnDoc = {
+            ...monthData.hymn,
+            month: monthData.month,
             updatedAt: new Date().toISOString(),
             updatedBy: currentUser.email
-          }, { merge: true });
+          };
+          await setDoc(hymnRef, hymnDoc, { merge: true });
         }
 
-        // If there are devotions, create individual devotion documents
+        // Save devotions
         if (monthData.devotions && Array.isArray(monthData.devotions)) {
           for (const devotion of monthData.devotions) {
             const devotionId = devotion.date.replace(/,/g, '').replace(/ /g, '-').toLowerCase();
             const devotionRef = doc(db, 'devotions', devotionId);
             
-            // Prepare the devotion document with proper structure
             const devotionDoc = {
               ...devotion,
-              month: month,
-              hymn: monthData.hymn ? {
-                title: monthData.hymn.title || '',
-                lyrics: monthData.hymn.lyrics || [],
-                author: monthData.hymn.author || 'Unknown'
-              } : null,
+              month: monthData.month,
+              hymn: monthData.hymn,
               updatedAt: new Date().toISOString(),
               updatedBy: currentUser.email
             };
