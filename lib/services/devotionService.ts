@@ -33,10 +33,12 @@ export async function getDevotionByDate(date: string): Promise<Devotion | null> 
     
     const response = await fetch(`${baseUrl}/api/devotions/${date}`, {
       credentials: 'include',
+      headers: {
+        'Cache-Control': 'no-cache',
+      },
     });
 
     if (!response.ok) {
-      const data = await response.json();
       if (response.status === 401) {
         throw new Error('You must be signed in to access devotions');
       }
@@ -44,14 +46,20 @@ export async function getDevotionByDate(date: string): Promise<Devotion | null> 
         console.log(`No devotion found for date: ${date}`);
         return null;
       }
-      throw new Error(data.error || 'Failed to fetch devotion');
+      const data = await response.json().catch(() => ({ error: 'Failed to fetch devotion' }));
+      throw new Error(data.error || `Failed to fetch devotion: ${response.statusText}`);
     }
 
     const devotionData = await response.json();
     return devotionData as Devotion;
   } catch (error: any) {
     console.error('Error fetching devotion:', error);
-    throw error;
+    // Only rethrow authentication and permission errors
+    if (error.message.includes('sign in') || error.message.includes('permission')) {
+      throw error;
+    }
+    // For other errors, return null to prevent infinite retries
+    return null;
   }
 }
 

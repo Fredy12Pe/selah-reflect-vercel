@@ -62,12 +62,19 @@ export default function DevotionPageClient({ date }: DevotionPageClientProps) {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!authLoading && !user) {
+    // Don't do anything while auth is loading
+    if (authLoading) return;
+
+    // If no user and auth is done loading, redirect to login
+    if (!user) {
       router.push("/auth/login");
       return;
     }
 
+    let mounted = true;
+
     async function fetchBibleVerse(reference: string) {
+      if (!mounted) return null;
       try {
         console.log("Client: Fetching Bible verse for reference:", reference);
         const response = await fetch(
@@ -81,6 +88,7 @@ export default function DevotionPageClient({ date }: DevotionPageClientProps) {
         }
 
         const data = await response.json();
+        if (!mounted) return null;
         console.log("Client: Bible API response:", data);
 
         if (!data.verses || data.verses.length === 0) {
@@ -88,16 +96,13 @@ export default function DevotionPageClient({ date }: DevotionPageClientProps) {
           return null;
         }
 
-        // Format the verses from the API response
-        const verses = data.verses.map((v: any) => ({
-          verse: v.verse,
-          text: v.text.trim(),
-        }));
-
         return {
           text: data.text,
           reference: data.reference,
-          verses,
+          verses: data.verses.map((v: any) => ({
+            verse: v.verse,
+            text: v.text.trim(),
+          })),
         };
       } catch (error) {
         console.error("Error fetching Bible verse:", error);
@@ -106,51 +111,53 @@ export default function DevotionPageClient({ date }: DevotionPageClientProps) {
     }
 
     async function loadDevotion() {
+      if (!mounted) return;
       try {
         setLoading(true);
         setError(null);
         console.log("Loading devotion for date:", date);
         const devotionData = await getDevotionByDate(date);
+        if (!mounted) return;
         console.log("Devotion data:", devotionData);
+        
         if (!devotionData) {
-          setError("No devotion found for this date");
+          router.replace(`/devotion/${date}/reflection`);
           return;
         }
+        
         setDevotion(devotionData);
 
-        // Get Bible reference - handle both data formats
-        // New format uses bibleText, old format uses scriptureReference
         const reference = getBibleReference(devotionData);
-
         if (reference) {
           console.log("Using reference for Bible API:", reference);
           const verse = await fetchBibleVerse(reference);
-          if (verse) {
+          if (mounted && verse) {
             console.log("Successfully fetched Bible verses:", verse);
             setBibleVerse(verse);
-          } else {
-            console.error("Failed to fetch Bible verses for:", reference);
           }
-        } else {
-          console.error("No Bible reference found in devotion data");
         }
       } catch (err: any) {
+        if (!mounted) return;
         console.error("Error loading devotion:", err);
-        if (err.message.includes("permission")) {
-          setError("Please sign in again to access devotions");
-          // Clear auth state and redirect to login
+        const errorMessage = err.message || "Failed to load devotion";
+        
+        if (errorMessage.includes("permission") || errorMessage.includes("sign in")) {
           router.push("/auth/login");
         } else {
-          setError(err.message || "Failed to load devotion");
+          setError(errorMessage);
         }
       } finally {
-        setLoading(false);
+        if (mounted) {
+          setLoading(false);
+        }
       }
     }
 
-    if (user) {
-      loadDevotion();
-    }
+    loadDevotion();
+
+    return () => {
+      mounted = false;
+    };
   }, [date, user, authLoading, router]);
 
   if (authLoading || loading) {
