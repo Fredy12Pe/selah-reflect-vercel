@@ -374,16 +374,23 @@ export default function ReflectionPage({
   // Disable next button if current date is today
   const isNextDisabled = isToday(currentDate) || isFuture(currentDate);
 
-  // Get the first two questions from all sections
-  const getFirstTwoQuestions = () => {
+  // Get all questions from all sections
+  const getAllQuestions = () => {
     if (!devotionData?.reflectionSections?.length) {
       console.log("No reflection sections found");
       return [];
     }
 
-    const firstSection = devotionData.reflectionSections[0];
-    console.log("First reflection section:", firstSection);
-    return firstSection.questions.slice(0, 2);
+    return devotionData.reflectionSections.reduce((acc: string[], section) => {
+      return acc.concat(section.questions || []);
+    }, []);
+  };
+
+  // Get the first two questions from all sections
+  const getFirstTwoQuestions = () => {
+    const allQuestions = getAllQuestions();
+    console.log("All questions:", allQuestions);
+    return allQuestions.slice(0, 2);
   };
 
   // Get the current questions

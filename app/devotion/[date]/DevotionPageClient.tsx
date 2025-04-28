@@ -33,20 +33,24 @@ const getBibleReference = (devotion: any): string => {
 const getReflectionQuestions = (devotion: any): string[] => {
   // Try new format first
   if (devotion.reflectionSections && devotion.reflectionSections.length > 0) {
-    return devotion.reflectionSections[0].questions || [];
+    // Flatten all questions from all sections
+    return devotion.reflectionSections.reduce((acc: string[], section: any) => {
+      return acc.concat(section.questions || []);
+    }, []);
   }
   // Fall back to old format
   return devotion.reflectionQuestions || [];
 };
 
 const hasReflectionContent = (devotion: any): boolean => {
-  return (
-    (devotion.reflectionSections &&
-      devotion.reflectionSections.length > 0 &&
-      devotion.reflectionSections[0].questions &&
-      devotion.reflectionSections[0].questions.length > 0) ||
-    (devotion.reflectionQuestions && devotion.reflectionQuestions.length > 0)
-  );
+  // Check new format
+  if (devotion.reflectionSections) {
+    return devotion.reflectionSections.some(
+      (section: any) => section.questions && section.questions.length > 0
+    );
+  }
+  // Check old format
+  return Array.isArray(devotion.reflectionQuestions) && devotion.reflectionQuestions.length > 0;
 };
 
 export default function DevotionPageClient({ date }: DevotionPageClientProps) {

@@ -11,6 +11,13 @@ export interface Devotion {
   month?: string;
   updatedAt?: string;
   updatedBy?: string;
+  // Legacy fields for backward compatibility
+  scriptureReference?: string;
+  scriptureText?: string;
+  title?: string;
+  content?: string;
+  prayer?: string;
+  reflectionQuestions?: string[];
 }
 
 export interface Hymn {
@@ -23,6 +30,22 @@ export interface Hymn {
   updatedBy?: string;
 }
 
+export interface MonthData {
+  month: string;
+  hymn: {
+    title: string;
+    lyrics: string[];
+    author?: string;
+  };
+  devotions: Array<{
+    date: string;
+    bibleText: string;
+    reflectionSections: Array<{
+      questions: string[];
+    }>;
+  }>;
+}
+
 export interface Meta {
   hymns: { [month: string]: Hymn };
 }
@@ -31,4 +54,8 @@ export interface DevotionInput {
   date: string;
   bibleText: string;
   reflectionSections: ReflectionSection[];
+}
+
+export interface UploadData {
+  [month: string]: MonthData;
 } 

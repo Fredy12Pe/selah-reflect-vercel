@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getFirestore } from 'firebase-admin/firestore';
 import { initializeApp, getApps, cert } from 'firebase-admin/app';
+import { Devotion, Hymn, ReflectionSection } from '@/lib/types/devotion';
 
 // Authorized admin emails
 const ADMIN_EMAILS = ['fredypedro3@gmail.com']; 
@@ -37,45 +38,20 @@ const initializeFirebaseAdmin = () => {
   });
 };
 
-// Types for the data structure
-interface ReflectionSection {
-  passage: string;
-  questions: string[];
-}
-
-interface Devotion {
-  date: string;
-  bibleText: string;
-  reflectionSections: ReflectionSection[];
-}
-
-interface ProcessedDevotion {
-  date: string;
-  dateKey: string;
-  month: string;
-  monthId: string;
-  bibleText: string;
-  content: string;
-  scriptureReference: string;
-  scriptureText: string;
-  title: string;
-  reflectionQuestions: string[];
-  createdAt: string;
-  createdBy: string;
-  updatedAt: string;
-  updatedBy: string;
-}
-
-interface Hymn {
-  title: string;
-  lyrics: string[];
-  author?: string;
-}
-
 interface MonthData {
   month: string;
-  hymn: Hymn;
-  devotions: Devotion[];
+  hymn: {
+    title: string;
+    lyrics: string[];
+    author?: string;
+  };
+  devotions: Array<{
+    date: string;
+    bibleText: string;
+    reflectionSections: Array<{
+      questions: string[];
+    }>;
+  }>;
 }
 
 interface UploadData {
@@ -99,8 +75,8 @@ function getDateKey(dateStr: string): string {
   const monthNum = months[month] || '01';
   const dayNum = day.padStart(2, '0');
   
-  // Use current year since it's not in the input
-  const year = new Date().getFullYear();
+  // Use 2025 as the year for future dates
+  const year = '2025';
   
   return `${year}-${monthNum}-${dayNum}`;
 }
@@ -185,36 +161,40 @@ export async function POST(request: NextRequest) {
           });
 
           for (const devotion of sortedDevotions) {
-            // Create a chronological ID using the date
-            const dateKey = getDateKey(devotion.date);
-            
-            // Use the dateKey directly as the document ID
-            const devotionRef = db.collection('devotions').doc(dateKey);
-            
-            // Format reflection sections properly
-            const reflectionSections = devotion.reflectionSections || [];
-            
-            // Create the devotion document with the correct structure
-            const devotionDoc = {
-              id: dateKey,
-              date: dateKey,
-              bibleText: devotion.bibleText,
-              reflectionSections: reflectionSections.map(section => ({
-                questions: section.questions || []
-              })),
-              monthId: normalizedMonthKey,
-              month: monthData.month,
-              updatedAt: new Date().toISOString(),
-              updatedBy: ADMIN_EMAILS[0]
-            };
+            try {
+              // Create a chronological ID using the date
+              const dateKey = getDateKey(devotion.date);
+              console.log('Processing devotion for date:', dateKey);
+              
+              // Use the dateKey directly as the document ID
+              const devotionRef = db.collection('devotions').doc(dateKey);
+              
+              // Create the devotion document with the correct structure
+              const devotionDoc = {
+                id: dateKey,
+                date: dateKey,
+                bibleText: devotion.bibleText,
+                reflectionSections: devotion.reflectionSections.map(section => ({
+                  questions: section.questions || []
+                })),
+                monthId: normalizedMonthKey,
+                month: monthData.month,
+                updatedAt: new Date().toISOString(),
+                updatedBy: ADMIN_EMAILS[0]
+              };
 
-            await devotionRef.set(devotionDoc, { merge: true });
-            console.log(`Successfully saved devotion for ${dateKey}`);
-            successCount++;
+              await devotionRef.set(devotionDoc);
+              console.log(`Successfully saved devotion for ${dateKey}`);
+              successCount++;
+            } catch (error) {
+              console.error(`Error saving devotion for date ${devotion.date}:`, error);
+              errorItems.push({
+                month: `${monthKey} - ${devotion.date}`,
+                error: error instanceof Error ? error.message : 'Unknown error'
+              });
+            }
           }
         }
-        
-        successCount++;
       } catch (error) {
         console.error(`Error processing month ${monthKey}:`, error);
         errorItems.push({ 
@@ -227,7 +207,7 @@ export async function POST(request: NextRequest) {
     // Return the results
     return NextResponse.json({
       success: true,
-      message: `Successfully processed ${successCount} months with ${errorItems.length} errors`,
+      message: `Successfully processed ${successCount} devotions with ${errorItems.length} errors`,
       errorItems: errorItems.length > 0 ? errorItems : undefined
     });
 

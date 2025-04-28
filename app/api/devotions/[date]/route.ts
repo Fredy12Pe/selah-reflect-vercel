@@ -24,13 +24,6 @@ const initializeFirebaseAdmin = () => {
     return getApps()[0];
   }
 
-  // Ensure we log environment variable presence without exposing sensitive data
-  console.log('Firebase environment variables status:', {
-    FIREBASE_PROJECT_ID: !!process.env.FIREBASE_PROJECT_ID,
-    FIREBASE_CLIENT_EMAIL: !!process.env.FIREBASE_CLIENT_EMAIL,
-    FIREBASE_PRIVATE_KEY: !!process.env.FIREBASE_PRIVATE_KEY?.length,
-  });
-
   // Get direct access to environment variables
   const projectId = process.env.FIREBASE_PROJECT_ID;
   const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
@@ -41,11 +34,6 @@ const initializeFirebaseAdmin = () => {
   if (!clientEmail) console.error('FIREBASE_CLIENT_EMAIL is missing');
   if (!privateKey) console.error('FIREBASE_PRIVATE_KEY is missing');
 
-  // Show partial values for verification without exposing full credentials
-  if (projectId) console.log('FIREBASE_PROJECT_ID starts with:', projectId.substring(0, 5));
-  if (clientEmail) console.log('FIREBASE_CLIENT_EMAIL starts with:', clientEmail.substring(0, 5));
-  if (privateKey) console.log('FIREBASE_PRIVATE_KEY length:', privateKey.length);
-
   // Ensure private key is properly formatted with newlines
   if (privateKey && !privateKey.includes('-----BEGIN PRIVATE KEY-----')) {
     if (privateKey.includes('\\n')) {
@@ -55,7 +43,6 @@ const initializeFirebaseAdmin = () => {
   }
 
   try {
-    // Use hardcoded values as a last resort for debugging
     const app = initializeApp({
       credential: cert({
         projectId: projectId || 'selah-reflect-app',
@@ -63,10 +50,10 @@ const initializeFirebaseAdmin = () => {
         privateKey: privateKey || '-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n'
       })
     });
-    console.log('Firebase Admin initialized successfully with direct credentials');
+    console.log('Firebase Admin initialized successfully');
     return app;
   } catch (error) {
-    console.error('Error initializing Firebase Admin directly:', error);
+    console.error('Error initializing Firebase Admin:', error);
     throw error;
   }
 };
@@ -99,7 +86,12 @@ export async function GET(
         initAdmin();
         console.log('Admin initialized with initAdmin function');
       } catch (error) {
-        console.log('initAdmin failed, falling back to direct initialization');
+        if (error instanceof Error) {
+          console.log('initAdmin failed:', error.message);
+        } else {
+          console.log('initAdmin failed with unknown error');
+        }
+        console.log('Falling back to direct initialization');
         initializeFirebaseAdmin();
       }
 
@@ -185,9 +177,21 @@ export async function GET(
     // Format the response to match the Devotion type
     const formattedData: Devotion = {
       id: devotionDoc.id,
-      date: data.date,
-      bibleText: data.bibleText,
-      reflectionSections: data.reflectionSections || []
+      date: data.date || devotionDoc.id,
+      bibleText: data.bibleText || data.scriptureReference || '',
+      reflectionSections: data.reflectionSections || 
+        (data.reflectionQuestions ? [{ questions: data.reflectionQuestions }] : []),
+      monthId: data.monthId,
+      month: data.month,
+      updatedAt: data.updatedAt,
+      updatedBy: data.updatedBy,
+      // Include legacy fields if they exist
+      scriptureReference: data.scriptureReference,
+      scriptureText: data.scriptureText,
+      title: data.title,
+      content: data.content,
+      prayer: data.prayer,
+      reflectionQuestions: data.reflectionQuestions
     };
 
     return NextResponse.json(formattedData);
