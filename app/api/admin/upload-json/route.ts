@@ -19,6 +19,7 @@ interface Devotion {
 interface Hymn {
   title: string;
   lyrics: string[];
+  author?: string;
 }
 
 interface MonthData {
@@ -110,7 +111,9 @@ export async function POST(request: NextRequest) {
         if (monthData.hymn) {
           const hymnRef = doc(db, 'hymns', month.toLowerCase());
           await setDoc(hymnRef, {
-            ...monthData.hymn,
+            title: monthData.hymn.title || '',
+            lyrics: monthData.hymn.lyrics || [],
+            author: monthData.hymn.author || 'Unknown',
             month: month,
             updatedAt: new Date().toISOString(),
             updatedBy: currentUser.email
@@ -128,8 +131,9 @@ export async function POST(request: NextRequest) {
               ...devotion,
               month: month,
               hymn: monthData.hymn ? {
-                title: monthData.hymn.title,
-                lyrics: monthData.hymn.lyrics
+                title: monthData.hymn.title || '',
+                lyrics: monthData.hymn.lyrics || [],
+                author: monthData.hymn.author || 'Unknown'
               } : null,
               updatedAt: new Date().toISOString(),
               updatedBy: currentUser.email
