@@ -187,36 +187,30 @@ export async function POST(request: NextRequest) {
           for (const devotion of sortedDevotions) {
             // Create a chronological ID using the date
             const dateKey = getDateKey(devotion.date);
-            const devotionId = `${dateKey}-${normalizedMonthKey}`;
-            const devotionRef = db.collection('devotions').doc(devotionId);
             
-            const reflectionQuestions = (devotion.reflectionSections || []).reduce((acc: string[], section) => {
-              if (section && Array.isArray(section.questions)) {
-                return [...acc, ...section.questions];
-              }
-              return acc;
-            }, []);
+            // Use the dateKey directly as the document ID
+            const devotionRef = db.collection('devotions').doc(dateKey);
             
-            const timestamp = new Date().toISOString();
+            // Format reflection sections properly
+            const reflectionSections = devotion.reflectionSections || [];
             
-            const devotionDoc: ProcessedDevotion = {
-              date: devotion.date,
-              dateKey: dateKey, // Add sortable date for queries
-              month: monthData.month,
-              monthId: normalizedMonthKey,
+            // Create the devotion document with the correct structure
+            const devotionDoc = {
+              id: dateKey,
+              date: dateKey,
               bibleText: devotion.bibleText,
-              content: `Reflection on ${devotion.bibleText}`,
-              scriptureReference: devotion.bibleText,
-              scriptureText: "",
-              title: `${devotion.bibleText} - ${devotion.date}`,
-              reflectionQuestions,
-              createdAt: timestamp,
-              createdBy: ADMIN_EMAILS[0],
-              updatedAt: timestamp,
+              reflectionSections: reflectionSections.map(section => ({
+                questions: section.questions || []
+              })),
+              monthId: normalizedMonthKey,
+              month: monthData.month,
+              updatedAt: new Date().toISOString(),
               updatedBy: ADMIN_EMAILS[0]
             };
 
             await devotionRef.set(devotionDoc, { merge: true });
+            console.log(`Successfully saved devotion for ${dateKey}`);
+            successCount++;
           }
         }
         
