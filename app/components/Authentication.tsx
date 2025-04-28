@@ -38,29 +38,40 @@ export default function Authentication() {
 
   const setSessionCookie = async (token: string) => {
     try {
-      const cookieValue = `__session=${token}; path=/; max-age=2592000; SameSite=Lax`;
-      document.cookie = cookieValue;
-      console.log("Authentication - Setting session cookie:", cookieValue);
+      // Set the session cookie with secure attributes
+      const cookieOptions = [
+        'path=/',
+        'max-age=2592000',
+        'SameSite=Strict',
+        process.env.NODE_ENV === 'production' ? 'Secure' : '',
+      ].filter(Boolean).join('; ');
 
-      // Also set the 'session' cookie used by API routes
-      const sessionCookie = `session=${token}; path=/; max-age=2592000; SameSite=Lax`;
-      document.cookie = sessionCookie;
-      console.log(
-        "Authentication - Setting API session cookie:",
-        sessionCookie
-      );
+      // Set the session cookie
+      document.cookie = `session=${token}; ${cookieOptions}`;
+      console.log("Authentication - Session cookie set");
 
-      // Verify the cookies were set
-      const cookies = document.cookie.split(";");
-      const hasSessionCookie = cookies.some((cookie) =>
-        cookie.trim().startsWith("session=")
+      // Verify the cookie was set
+      const cookies = document.cookie.split(';');
+      const hasSessionCookie = cookies.some(cookie => 
+        cookie.trim().startsWith('session=')
       );
-      console.log("Authentication - Current cookies:", cookies);
-      console.log("Authentication - Session cookie found:", hasSessionCookie);
 
       if (!hasSessionCookie) {
-        throw new Error("Failed to set session cookie");
+        throw new Error('Failed to set session cookie');
       }
+
+      // Make a test request to verify the session
+      const response = await fetch('/api/auth/verify-session', {
+        credentials: 'include',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to verify session');
+      }
+
     } catch (error) {
       console.error("Authentication - Error setting session cookie:", error);
       throw error;
@@ -96,8 +107,7 @@ export default function Authentication() {
     const provider = getGoogleAuthProvider();
 
     if (!auth || !provider) {
-      const error =
-        "Authentication service is not available. Please try again later.";
+      const error = "Authentication service is not available. Please try again later.";
       console.error("Firebase auth or provider is not initialized");
       setError(error);
       toast.error(error);
@@ -108,21 +118,19 @@ export default function Authentication() {
       setLoading(true);
       setError("");
 
-      // TypeScript assertion to inform TypeScript that these are not null
-      // We've already checked above
       const result = await signInWithPopup(auth, provider);
-
-      // Get the ID token and set the session cookie
+      
+      // Get a fresh token
       const token = await result.user.getIdToken(true);
+      
+      // Set the session cookie
       await setSessionCookie(token);
 
       console.log("Successfully signed in:", result.user.email);
       toast.success("Successfully signed in!");
 
-      // Wait a moment for the cookie to be set
-      setTimeout(() => {
-        redirectAfterLogin();
-      }, 1000);
+      // Redirect after successful login
+      redirectAfterLogin();
     } catch (error) {
       const authError = error as AuthError;
       console.error("Sign-in error:", authError);
@@ -131,7 +139,7 @@ export default function Authentication() {
     } finally {
       setLoading(false);
     }
-  }, [router, redirectAfterLogin]);
+  }, [redirectAfterLogin]);
 
   return (
     <div className="min-h-screen">
