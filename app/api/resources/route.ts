@@ -232,12 +232,14 @@ export async function POST(req: Request) {
   return safelyHandleRequest(async () => {
     try {
       // Parse request body
-      const { passage } = await req.json();
+      const body = await req.json();
+      // Support both 'passage' and 'verse' parameters for backward compatibility
+      const passage = body.passage || body.verse;
       
       // Validate inputs
       if (!passage) {
         return NextResponse.json(
-          { error: 'Missing required field: passage' },
+          { error: 'Missing required field: passage or verse' },
           { status: 400 }
         );
       }

@@ -429,7 +429,9 @@ export default function ReflectionPage({
     try {
       console.log(
         "[DEBUG] Generating reflection for question:",
-        question.trim()
+        question.trim(),
+        "and verse:",
+        devotionData.bibleText
       );
 
       const response = await fetch("/api/reflection", {
@@ -443,13 +445,18 @@ export default function ReflectionPage({
         }),
       });
 
-      const data = await response.json();
-
       if (!response.ok) {
-        throw new Error(data.error || "Failed to generate reflection");
+        const errorData = await response.json().catch(() => ({ error: "Server error" }));
+        throw new Error(errorData.error || `Server error: ${response.status}`);
       }
 
+      const data = await response.json();
       console.log("[DEBUG] Received reflection:", data.reflection);
+      
+      if (!data.reflection) {
+        throw new Error("Received empty reflection from API");
+      }
+      
       setAiReflection(data.reflection);
 
       // Get existing reflections from localStorage
@@ -497,29 +504,19 @@ export default function ReflectionPage({
         // Store updated array back to localStorage
         const jsonToStore = JSON.stringify(existingReflections);
         console.log("[DEBUG] Storing to localStorage:", jsonToStore);
-        localStorage.setItem(storageKey, jsonToStore);
-
-        // Verify the storage worked
-        const verifyStored = localStorage.getItem(storageKey);
-        console.log(
-          "[DEBUG] Verification - data in localStorage after save:",
-          verifyStored
-        );
-
-        // Update the state with all reflections (for internal tracking only)
-        console.log("[DEBUG] Updating state with all reflections");
+        
+        try {
+          localStorage.setItem(storageKey, jsonToStore);
+          console.log("[DEBUG] Successfully saved to localStorage");
+        } catch (error) {
+          console.error("[DEBUG] Error saving to localStorage:", error);
+        }
       }
     } catch (error) {
-      console.error("[DEBUG] Error generating AI reflection:", error);
-      setAiError(
-        error instanceof Error
-          ? error.message
-          : "Something went wrong. Please try again."
-      );
+      console.error("Error generating reflection:", error);
+      setAiError(error instanceof Error ? error.message : "Failed to generate reflection");
     } finally {
       setIsAiLoading(false);
-      // Clear question input but keep the answer displayed
-      setQuestion("");
     }
   };
 
@@ -563,10 +560,28 @@ export default function ReflectionPage({
 
     setIsFetchingBibleVerse(true);
     try {
-      console.log("Fetching Bible verse for reference:", reference);
+      // Clean and normalize the reference
+      let cleanReference = reference.trim()
+        // Remove any non-alphanumeric characters except spaces, colons, and hyphens
+        .replace(/[^\w\s:-]/g, '')
+        // Ensure proper spacing around colons
+        .replace(/(\d):(\d)/g, '$1 : $2')
+        // Normalize spaces
+        .replace(/\s+/g, ' ');
+        
+      // Special case handling for common formats
+      const match = cleanReference.match(/^(\w+)\s+(\d+)\s*:\s*(\d+)(?:\s*-\s*(\d+))?/);
+      if (match) {
+        const [_, book, chapter, startVerse, endVerse] = match;
+        cleanReference = endVerse 
+          ? `${book} ${chapter}:${startVerse}-${endVerse}`
+          : `${book} ${chapter}:${startVerse}`;
+      }
+      
+      console.log("Fetching Bible verse for reference:", cleanReference);
       const response = await fetch(
         `https://bible-api.com/${encodeURIComponent(
-          reference
+          cleanReference
         )}?verse_numbers=true`
       );
 
@@ -578,7 +593,7 @@ export default function ReflectionPage({
       console.log("Bible API response:", data);
 
       if (!data.verses || data.verses.length === 0) {
-        console.error("No verses found for reference:", reference);
+        console.error("No verses found for reference:", cleanReference);
         return null;
       }
 
@@ -619,7 +634,7 @@ export default function ReflectionPage({
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          verse: reference,
+          passage: reference,
         }),
       });
 
