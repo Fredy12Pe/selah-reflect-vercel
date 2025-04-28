@@ -55,8 +55,22 @@ if (isBrowser() && !shouldSkipFirebaseInit) {
       
       app = initializeApp(firebaseConfig);
       const db = getFirestore(app);
-      // @ts-ignore - Type error in settings but it works
-      db.settings(settings);
+      
+      // Apply settings safely with error handling
+      try {
+        // Check if settings method exists before calling it
+        if (db && typeof (db as any).settings === 'function') {
+          // @ts-ignore - Type error in settings but it works
+          db.settings(settings);
+          console.log('[Firebase] Firestore settings applied successfully');
+        } else {
+          console.warn('[Firebase] Firestore settings not applied: db.settings is not a function');
+        }
+      } catch (settingError) {
+        console.error('[Firebase] Error applying Firestore settings:', settingError);
+        // Continue without settings - app will use defaults
+      }
+      
       firestore = db;
     } else {
       console.log('[Firebase] Using existing Firebase app instance');

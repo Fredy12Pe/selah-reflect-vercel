@@ -74,14 +74,25 @@ if (typeof window !== 'undefined') {
 
 // Configure Firestore
 if (typeof window !== "undefined") {
-  const settings = {
-    experimentalForceLongPolling: true,
-    useFetchStreams: false,
-    cacheSizeBytes: 50 * 1024 * 1024 // 50MB cache size
-  };
-  
-  // @ts-ignore - Type error in settings but it works
-  db.settings(settings);
+  try {
+    // Only apply settings if db is properly initialized and has the settings method
+    if (db && typeof db.settings === 'function') {
+      const settings = {
+        experimentalForceLongPolling: true,
+        useFetchStreams: false,
+        cacheSizeBytes: 50 * 1024 * 1024 // 50MB cache size
+      };
+      
+      // @ts-ignore - Type error in settings but it works
+      db.settings(settings);
+      console.log('[Firebase] Firestore settings applied successfully');
+    } else {
+      console.warn('[Firebase] Firestore settings not applied: db.settings is not a function');
+    }
+  } catch (error) {
+    console.error('[Firebase] Error applying Firestore settings:', error);
+    // Continue without settings - app will use defaults
+  }
 }
 
 export { app, auth, db, storage };
