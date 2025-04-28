@@ -1,12 +1,9 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useAuth } from "@/lib/context/AuthContext";
-import { getFirebaseDb } from "@/lib/firebase/firebase";
-import { doc, setDoc } from "firebase/firestore";
 import { toast, Toaster } from "react-hot-toast";
 import { useRouter } from "next/navigation";
-import { safeDoc, safeSetDoc } from "@/lib/utils/firebase-helpers";
 
 interface MonthData {
   month: string;
@@ -27,26 +24,13 @@ interface DevotionData {
   }[];
 }
 
-interface TransformedDevotion {
-  date: string;
-  title: string;
-  scriptureReference: string;
-  scriptureText: string;
-  content: string;
-  prayer: string;
-  reflectionQuestions: string[];
-}
+const ADMIN_EMAILS = ["fredy12pe@gmail.com"];
 
 export default function BulkUploadDevotions() {
+  const [jsonData, setJsonData] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
   const { user, loading } = useAuth();
   const router = useRouter();
-  const [uploading, setUploading] = useState(false);
-  const [jsonData, setJsonData] = useState<string>("");
-  const ADMIN_EMAILS = ["fredypedro3@gmail.com"];
-
-  useEffect(() => {
-    console.log("Auth state:", { user, loading });
-  }, [user, loading]);
 
   if (loading) {
     return (
@@ -81,13 +65,28 @@ export default function BulkUploadDevotions() {
       reader.onload = (event) => {
         try {
           const data = event.target?.result as string;
-          // Validate JSON format
+          // Validate JSON format and structure
           const parsedData = JSON.parse(data);
-          if (typeof parsedData !== "object") {
-            toast.error("Invalid JSON format");
+          if (!Array.isArray(parsedData)) {
+            toast.error("Invalid JSON format: Expected an array of months");
+            return;
+          }
+          // Validate each month's structure
+          const isValid = parsedData.every((month: MonthData) => {
+            return (
+              month.month &&
+              month.hymn &&
+              month.hymn.title &&
+              Array.isArray(month.hymn.lyrics) &&
+              Array.isArray(month.devotions)
+            );
+          });
+          if (!isValid) {
+            toast.error("Invalid data structure in JSON");
             return;
           }
           setJsonData(data);
+          toast.success("JSON file validated successfully");
         } catch (error) {
           console.error("Error parsing JSON:", error);
           toast.error("Invalid JSON format");
@@ -95,72 +94,6 @@ export default function BulkUploadDevotions() {
       };
       reader.readAsText(file);
     }
-  };
-
-  const transformDevotion = (devotion: DevotionData): TransformedDevotion => {
-    try {
-      // Extract date in YYYY-MM-DD format
-      const dateParts = devotion.date.split(", ");
-      if (dateParts.length < 2) {
-        console.error("Invalid date format:", devotion.date);
-        throw new Error(`Invalid date format: ${devotion.date}`);
-      }
-
-      const monthDay = dateParts[1].split(" ");
-      if (monthDay.length < 2) {
-        console.error("Invalid month/day format:", dateParts[1]);
-        throw new Error(`Invalid month/day format: ${dateParts[1]}`);
-      }
-
-      const month = monthDay[0];
-      const day = monthDay[1];
-      const year = new Date().getFullYear();
-      const formattedDate = `${year}-${getMonthNumber(month)}-${day.padStart(
-        2,
-        "0"
-      )}`;
-
-      // Combine all questions into one array
-      const allQuestions = devotion.reflectionSections.flatMap((section) => {
-        if (!Array.isArray(section.questions)) {
-          console.warn("Invalid questions format in section:", section);
-          return [];
-        }
-        return section.questions;
-      });
-
-      return {
-        date: formattedDate,
-        title: `${devotion.bibleText} - ${devotion.date}`,
-        scriptureReference: devotion.bibleText,
-        scriptureText: "", // You might want to fetch this from an API
-        content: `Reflection on ${devotion.bibleText}`,
-        prayer: "Prayer for understanding and application",
-        reflectionQuestions: allQuestions,
-      };
-    } catch (error) {
-      console.error("Error transforming devotion:", error);
-      console.error("Devotion data:", devotion);
-      throw error;
-    }
-  };
-
-  const getMonthNumber = (month: string): string => {
-    const months: { [key: string]: string } = {
-      January: "01",
-      February: "02",
-      March: "03",
-      April: "04",
-      May: "05",
-      June: "06",
-      July: "07",
-      August: "08",
-      September: "09",
-      October: "10",
-      November: "11",
-      December: "12",
-    };
-    return months[month] || "01";
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -172,80 +105,26 @@ export default function BulkUploadDevotions() {
 
     try {
       setUploading(true);
-      const parsedData = JSON.parse(jsonData);
-      const db = getFirebaseDb();
-      let successCount = 0;
-      let errorCount = 0;
+      const response = await fetch('/api/admin/upload-json', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: jsonData,
+      });
 
-      // Process each month
-      for (const [month, monthData] of Object.entries(parsedData)) {
-        try {
-          const data = monthData as MonthData;
-          console.log(`Processing month: ${month}`);
-
-          // Save hymn data
-          try {
-            console.log(`Saving hymn for ${data.month}`);
-            const hymnRef = safeDoc("hymns", data.month.toLowerCase());
-            await safeSetDoc(hymnRef, {
-              title: data.hymn.title,
-              lyrics: data.hymn.lyrics,
-              author: data.hymn.author,
-              updatedAt: new Date().toISOString(),
-            });
-            successCount++;
-            console.log(`Successfully saved hymn for ${data.month}`);
-          } catch (error) {
-            console.error(`Error saving hymn for ${data.month}:`, error);
-            errorCount++;
-          }
-
-          // Process and save each devotion
-          for (const devotion of data.devotions) {
-            try {
-              console.log(`Processing devotion for date: ${devotion.date}`);
-              const transformedDevotion = transformDevotion(devotion);
-              const devotionRef = safeDoc(
-                "devotions",
-                transformedDevotion.date
-              );
-              await safeSetDoc(devotionRef, {
-                ...transformedDevotion,
-                createdAt: new Date().toISOString(),
-                updatedAt: new Date().toISOString(),
-                createdBy: user.email,
-              });
-              successCount++;
-              console.log(
-                `Successfully saved devotion for ${transformedDevotion.date}`
-              );
-            } catch (error) {
-              console.error(
-                `Error saving devotion for date ${devotion.date}:`,
-                error
-              );
-              console.error("Devotion data:", devotion);
-              errorCount++;
-            }
-          }
-        } catch (error) {
-          console.error(`Error processing month ${month}:`, error);
-          console.error("Month data:", monthData);
-          errorCount++;
-        }
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to upload data');
       }
 
-      toast.success(
-        `Upload complete! ${successCount} items uploaded successfully. ${errorCount} errors occurred.`
-      );
-      setJsonData("");
+      const result = await response.json();
+      toast.success('Data uploaded successfully!');
+      console.log('Upload result:', result);
+      
     } catch (error) {
-      console.error("Error processing JSON:", error);
-      toast.error(
-        error instanceof Error
-          ? error.message
-          : "Failed to process JSON file. Please check the format."
-      );
+      console.error('Error uploading data:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to upload data');
     } finally {
       setUploading(false);
     }
