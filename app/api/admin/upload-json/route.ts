@@ -16,6 +16,11 @@ interface Devotion {
   date: string;
   bibleText: string;
   reflectionSections: ReflectionSection[];
+  content?: string;
+  prayer?: string;
+  scriptureReference?: string;
+  scriptureText?: string;
+  title?: string;
 }
 
 interface Hymn {
@@ -84,15 +89,15 @@ export async function POST(request: NextRequest) {
     let errorItems: Array<{ month: string; error: string }> = [];
 
     // Process each month in the data object
-    for (const [month, monthData] of Object.entries(data)) {
+    for (const [monthKey, monthData] of Object.entries(data)) {
       try {
         // Validate month data structure
         if (!monthData || typeof monthData !== 'object') {
-          throw new Error(`Invalid data structure for month: ${month}`);
+          throw new Error(`Invalid data structure for month: ${monthKey}`);
         }
 
         // Create a reference to the month document
-        const monthRef = doc(db, 'months', month.toLowerCase());
+        const monthRef = doc(db, 'months', monthKey.toLowerCase());
         
         // Save month data
         const monthDoc = {
@@ -106,7 +111,7 @@ export async function POST(request: NextRequest) {
 
         // Save hymn separately in hymns collection
         if (monthData.hymn) {
-          const hymnRef = doc(db, 'hymns', month.toLowerCase());
+          const hymnRef = doc(db, 'hymns', monthKey.toLowerCase());
           const hymnDoc = {
             ...monthData.hymn,
             month: monthData.month,
@@ -122,10 +127,20 @@ export async function POST(request: NextRequest) {
             const devotionId = devotion.date.replace(/,/g, '').replace(/ /g, '-').toLowerCase();
             const devotionRef = doc(db, 'devotions', devotionId);
             
+            // Format the title based on the bibleText and date
+            const formattedTitle = `${devotion.bibleText} - ${devotion.date}`;
+            
             const devotionDoc = {
               ...devotion,
               month: monthData.month,
               hymn: monthData.hymn,
+              title: formattedTitle,
+              content: `Reflection on ${devotion.bibleText}`,
+              prayer: "Prayer for understanding and application",
+              scriptureReference: devotion.bibleText,
+              scriptureText: "",
+              createdAt: new Date().toISOString(),
+              createdBy: currentUser.email,
               updatedAt: new Date().toISOString(),
               updatedBy: currentUser.email
             };
@@ -136,9 +151,9 @@ export async function POST(request: NextRequest) {
         
         successCount++;
       } catch (error) {
-        console.error(`Error saving month ${month}:`, error);
+        console.error(`Error saving month ${monthKey}:`, error);
         errorItems.push({ 
-          month, 
+          month: monthKey, 
           error: error instanceof Error ? error.message : 'Unknown error'
         });
       }
