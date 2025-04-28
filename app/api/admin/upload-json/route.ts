@@ -122,16 +122,44 @@ export async function POST(request: NextRequest) {
 
         // Save hymn separately in hymns collection with proper structure
         if (monthData.hymn && monthData.hymn.title && monthData.hymn.lyrics) {
-          const hymnRef = doc(db, 'hymns', normalizedMonthKey);
-          const hymnDoc = {
-            title: monthData.hymn.title,
-            lyrics: monthData.hymn.lyrics,
-            author: monthData.hymn.author || 'Unknown',
-            monthId: normalizedMonthKey,
-            updatedAt: new Date().toISOString(),
-            updatedBy: currentUser.email
-          };
-          await setDoc(hymnRef, hymnDoc, { merge: true });
+          try {
+            const hymnRef = doc(db, 'hymns', normalizedMonthKey);
+            
+            // Log the hymn data for debugging
+            console.log(`Processing hymn for month ${normalizedMonthKey}:`, {
+              title: monthData.hymn.title,
+              lyricsLength: monthData.hymn.lyrics.length,
+              hasAuthor: !!monthData.hymn.author,
+              authorType: typeof monthData.hymn.author
+            });
+            
+            // Create hymn document without optional fields first
+            const hymnDoc = {
+              title: monthData.hymn.title,
+              lyrics: monthData.hymn.lyrics,
+              monthId: normalizedMonthKey,
+              updatedAt: new Date().toISOString(),
+              updatedBy: currentUser.email
+            };
+
+            // Only add author if it exists and is not undefined
+            if (monthData.hymn.author && typeof monthData.hymn.author === 'string') {
+              console.log(`Adding author for hymn ${normalizedMonthKey}`);
+              await setDoc(hymnRef, { ...hymnDoc, author: monthData.hymn.author }, { merge: true });
+            } else {
+              console.log(`Saving hymn ${normalizedMonthKey} without author`);
+              await setDoc(hymnRef, hymnDoc, { merge: true });
+            }
+          } catch (error) {
+            console.error(`Error saving hymn for ${normalizedMonthKey}:`, error);
+            throw new Error(`Failed to save hymn for ${normalizedMonthKey}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+          }
+        } else {
+          console.warn(`Skipping hymn for ${normalizedMonthKey} due to missing required fields:`, {
+            hasHymn: !!monthData.hymn,
+            hasTitle: !!(monthData.hymn && monthData.hymn.title),
+            hasLyrics: !!(monthData.hymn && monthData.hymn.lyrics)
+          });
         }
 
         // Save devotions
