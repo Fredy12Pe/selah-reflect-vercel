@@ -12,26 +12,61 @@ const initializeFirebaseAdmin = () => {
   // Get environment variables
   const projectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
   const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
-  const privateKey = process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n');
+  let privateKey = process.env.FIREBASE_PRIVATE_KEY || '';
 
   // Log environment variable status (without exposing values)
   console.log('Firebase Admin environment variables status:', {
     projectId: !!projectId,
     clientEmail: !!clientEmail,
-    privateKey: !!privateKey
+    privateKey: !!privateKey,
+    privateKeyLength: privateKey.length
   });
 
   if (!projectId || !clientEmail || !privateKey) {
     throw new Error('Missing Firebase Admin credentials');
   }
 
-  return initializeApp({
-    credential: cert({
-      projectId,
-      clientEmail,
-      privateKey
-    })
-  });
+  // Handle private key formatting
+  try {
+    // If the key is JSON stringified, parse it
+    if (privateKey.startsWith('"') && privateKey.endsWith('"')) {
+      privateKey = JSON.parse(privateKey);
+    }
+    
+    // Replace literal \n with newlines if they exist
+    if (privateKey.includes('\\n')) {
+      privateKey = privateKey.replace(/\\n/g, '\n');
+    }
+
+    // Ensure the key has the correct header and footer
+    if (!privateKey.includes('-----BEGIN PRIVATE KEY-----')) {
+      privateKey = `-----BEGIN PRIVATE KEY-----\n${privateKey}\n-----END PRIVATE KEY-----\n`;
+    }
+
+    console.log('Private key format:', {
+      hasHeader: privateKey.includes('-----BEGIN PRIVATE KEY-----'),
+      hasFooter: privateKey.includes('-----END PRIVATE KEY-----'),
+      containsNewlines: privateKey.includes('\n'),
+      length: privateKey.length
+    });
+  } catch (error) {
+    console.error('Error formatting private key:', error);
+    throw error;
+  }
+
+  // Initialize Firebase Admin
+  try {
+    return initializeApp({
+      credential: cert({
+        projectId,
+        clientEmail,
+        privateKey
+      })
+    });
+  } catch (error) {
+    console.error('Error initializing Firebase Admin:', error);
+    throw error;
+  }
 };
 
 export async function GET(request: NextRequest) {
@@ -48,7 +83,14 @@ export async function GET(request: NextRequest) {
         envVars: {
           projectId: !!process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
           clientEmail: !!process.env.FIREBASE_CLIENT_EMAIL,
-          privateKey: !!process.env.FIREBASE_PRIVATE_KEY
+          privateKey: !!process.env.FIREBASE_PRIVATE_KEY,
+          privateKeyFormat: process.env.FIREBASE_PRIVATE_KEY ? {
+            startsWithQuote: process.env.FIREBASE_PRIVATE_KEY.startsWith('"'),
+            endsWithQuote: process.env.FIREBASE_PRIVATE_KEY.endsWith('"'),
+            containsHeader: process.env.FIREBASE_PRIVATE_KEY.includes('-----BEGIN PRIVATE KEY-----'),
+            containsFooter: process.env.FIREBASE_PRIVATE_KEY.includes('-----END PRIVATE KEY-----'),
+            length: process.env.FIREBASE_PRIVATE_KEY.length
+          } : null
         }
       });
     }
