@@ -35,6 +35,7 @@ interface ProcessedDevotion {
 interface Hymn {
   title: string;
   lyrics: string[];
+  author?: string;
 }
 
 interface MonthData {
@@ -108,22 +109,23 @@ export async function POST(request: NextRequest) {
         // Create a reference to the month document
         const monthRef = doc(db, 'months', monthKey.toLowerCase());
         
-        // Save month data
+        // Save month data (without hymn to avoid duplication)
         const monthDoc = {
           month: monthData.month,
-          hymn: monthData.hymn,
           updatedAt: new Date().toISOString(),
           updatedBy: currentUser.email
         };
 
         await setDoc(monthRef, monthDoc, { merge: true });
 
-        // Save hymn separately in hymns collection
-        if (monthData.hymn) {
+        // Save hymn separately in hymns collection with proper structure
+        if (monthData.hymn && monthData.hymn.title && monthData.hymn.lyrics) {
           const hymnRef = doc(db, 'hymns', monthKey.toLowerCase());
           const hymnDoc = {
-            ...monthData.hymn,
-            month: monthData.month,
+            title: monthData.hymn.title,
+            lyrics: monthData.hymn.lyrics,
+            author: monthData.hymn.author || 'Unknown',
+            monthId: monthKey.toLowerCase(),
             updatedAt: new Date().toISOString(),
             updatedBy: currentUser.email
           };
