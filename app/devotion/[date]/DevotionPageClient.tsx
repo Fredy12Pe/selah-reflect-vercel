@@ -67,7 +67,7 @@ export default function DevotionPageClient({ date }: DevotionPageClientProps) {
 
     // If no user and auth is done loading, redirect to login
     if (!user) {
-      router.push("/auth/login");
+      router.replace("/auth/login");
       return;
     }
 
@@ -109,7 +109,7 @@ export default function DevotionPageClient({ date }: DevotionPageClientProps) {
     }
 
     async function loadDevotion() {
-      if (!mounted) return;
+      if (!mounted || !user) return;
       try {
         setLoading(true);
         setError(null);
@@ -118,11 +118,12 @@ export default function DevotionPageClient({ date }: DevotionPageClientProps) {
           credentials: 'include',
           signal: controller.signal,
           headers: {
-            'Cache-Control': 'no-cache'
+            'Cache-Control': 'no-cache',
+            'Authorization': `Bearer ${await user.getIdToken()}`
           }
         });
 
-        if (!mounted) return;
+        if (!mounted || !user) return;
 
         if (!response.ok) {
           if (response.status === 404) {
@@ -130,8 +131,39 @@ export default function DevotionPageClient({ date }: DevotionPageClientProps) {
             return;
           }
           if (response.status === 401) {
-            router.push("/auth/login");
-            return;
+            // Try to refresh the token first
+            try {
+              await user.getIdToken(true); // Force refresh the token
+              // Retry the request with the new token
+              const retryResponse = await fetch(`/api/devotions/${date}`, {
+                credentials: 'include',
+                signal: controller.signal,
+                headers: {
+                  'Cache-Control': 'no-cache',
+                  'Authorization': `Bearer ${await user.getIdToken()}`
+                }
+              });
+              
+              if (!retryResponse.ok) {
+                throw new Error('Authentication failed');
+              }
+              
+              const devotionData = await retryResponse.json();
+              if (!mounted) return;
+              setDevotion(devotionData);
+              
+              const reference = getBibleReference(devotionData);
+              if (reference) {
+                const verse = await fetchBibleVerse(reference);
+                if (mounted && verse) {
+                  setBibleVerse(verse);
+                }
+              }
+              return;
+            } catch (error) {
+              router.replace("/auth/login");
+              return;
+            }
           }
           throw new Error(`Failed to fetch devotion: ${response.statusText}`);
         }
@@ -155,8 +187,8 @@ export default function DevotionPageClient({ date }: DevotionPageClientProps) {
         console.error("Error loading devotion:", err);
         const errorMessage = err.message || "Failed to load devotion";
         
-        if (errorMessage.includes("permission") || errorMessage.includes("sign in")) {
-          router.push("/auth/login");
+        if (errorMessage.includes("Authentication failed") || errorMessage.includes("sign in")) {
+          router.replace("/auth/login");
         } else {
           setError(errorMessage);
         }
@@ -167,7 +199,9 @@ export default function DevotionPageClient({ date }: DevotionPageClientProps) {
       }
     }
 
-    loadDevotion();
+    if (user) {
+      loadDevotion();
+    }
 
     return () => {
       mounted = false;

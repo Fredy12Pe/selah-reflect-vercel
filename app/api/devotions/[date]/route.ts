@@ -63,24 +63,19 @@ export async function GET(
   request: NextRequest,
   { params }: { params: { date: string } }
 ) {
-  console.log('Devotions API: Handling GET request for date:', params.date);
-  
-  // Check if date is valid
   try {
-    const dateObj = parseISO(params.date);
-  } catch (error: any) {
-    console.error('Devotions API: Invalid date format:', params.date);
-    return NextResponse.json(
-      { error: 'Invalid date format' },
-      { status: 400 }
-    );
-  }
-  
-  try {
-    // Initialize Firebase Admin
-    console.log('Devotions API: Initializing Firebase Admin...');
-    let db;
+    // Check if date is valid
+    try {
+      const dateObj = parseISO(params.date);
+    } catch (error: any) {
+      return NextResponse.json(
+        { error: 'Invalid date format' },
+        { status: 400 }
+      );
+    }
     
+    // Initialize Firebase Admin
+    let db;
     try {
       initAdmin();
       db = getFirestore();
@@ -88,41 +83,35 @@ export async function GET(
         throw new Error('Failed to get Firestore instance');
       }
     } catch (error) {
-      console.error('Devotions API: Failed to initialize Firebase Admin:', error);
+      console.error('Failed to initialize Firebase Admin:', error);
       return NextResponse.json(
         { error: 'Server configuration error' },
         { status: 500 }
       );
     }
-    
-    const isDev = process.env.NODE_ENV === 'development';
-    let userId = 'anonymous';
-    
-    if (!isDev) {
-      // Get the session cookie
-      const cookieStore = cookies();
-      const sessionCookie = cookieStore.get('session');
 
-      if (!sessionCookie?.value) {
-        console.log('Devotions API: No session cookie found');
-        return NextResponse.json(
-          { error: 'Authentication required' },
-          { status: 401 }
-        );
-      }
+    // Get the session cookie
+    const cookieStore = cookies();
+    const sessionCookie = cookieStore.get('session');
 
-      // Verify the session cookie
+    // Check authentication
+    let isAuthenticated = false;
+    if (sessionCookie?.value) {
       try {
         const auth = getAuth();
-        const decodedClaims = await auth.verifySessionCookie(sessionCookie.value, true);
-        userId = decodedClaims.uid;
+        await auth.verifySessionCookie(sessionCookie.value, true);
+        isAuthenticated = true;
       } catch (error) {
-        console.error('Devotions API: Session verification failed:', error);
-        return NextResponse.json(
-          { error: 'Invalid session' },
-          { status: 401 }
-        );
+        console.error('Session verification failed:', error);
       }
+    }
+
+    // Allow access in development or if authenticated
+    if (!isAuthenticated && process.env.NODE_ENV !== 'development') {
+      return NextResponse.json(
+        { error: 'You must be signed in to access devotions' },
+        { status: 401 }
+      );
     }
 
     // Get the devotion using Admin SDK
@@ -148,7 +137,6 @@ export async function GET(
       month: data.month,
       updatedAt: data.updatedAt,
       updatedBy: data.updatedBy,
-      // Include legacy fields if they exist
       scriptureReference: data.scriptureReference,
       scriptureText: data.scriptureText,
       title: data.title,
@@ -158,21 +146,22 @@ export async function GET(
     };
 
     // Return response with caching headers
-    return NextResponse.json(formattedData, {
-      headers: {
-        'Cache-Control': 'public, s-maxage=3600, stale-while-revalidate=86400',
-      },
+    const headers = new Headers({
+      'Cache-Control': 'public, s-maxage=3600, stale-while-revalidate=86400',
     });
 
+    // Add CORS headers
+    headers.set('Access-Control-Allow-Credentials', 'true');
+    headers.set('Access-Control-Allow-Origin', request.headers.get('origin') || '*');
+    headers.set('Access-Control-Allow-Methods', 'GET, OPTIONS');
+    headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+
+    return NextResponse.json(formattedData, { headers });
+
   } catch (error: any) {
-    console.error('Devotions API: Error processing request:', error);
-    console.error('Error details:', {
-      message: error.message,
-      code: error.code,
-      stack: error.stack,
-    });
+    console.error('Error processing request:', error);
     return NextResponse.json(
-      { error: 'Internal server error', details: error.message },
+      { error: 'Internal server error' },
       { status: 500 }
     );
   }
