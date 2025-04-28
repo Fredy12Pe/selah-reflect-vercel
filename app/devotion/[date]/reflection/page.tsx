@@ -41,6 +41,8 @@ import { toast } from "react-hot-toast";
 import { getDailyDevotionImage } from "@/lib/services/unsplashService";
 import DynamicBackground from "@/app/components/DynamicBackground";
 import BackgroundCard from "@/app/components/BackgroundCard";
+import { doc, getDoc } from "firebase/firestore";
+import { getFirebaseDb } from "@/lib/firebase/firebase";
 
 // Bible verse interface
 interface BibleVerse {
@@ -139,23 +141,30 @@ const getReflectionStorageKey = (dateString: string) => {
   return `aiReflection_${dateString}`;
 };
 
+interface Hymn {
+  title: string;
+  lyrics: Array<{ lineNumber: number; text: string }>;
+  author?: string;
+}
+
 export default function ReflectionPage({
   params,
 }: {
   params: { date: string };
 }) {
   const router = useRouter();
-  const { user } = useAuth();
-  const [isLoading, setIsLoading] = useState(false);
-  const [showCalendar, setShowCalendar] = useState(false);
+  const { user, loading } = useAuth();
   const [devotionData, setDevotionData] = useState<Devotion | null>(null);
+  const [hymn, setHymn] = useState<Hymn | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [hymnImage, setHymnImage] = useState<string>("/hymn-bg.jpg");
+  const [showCalendar, setShowCalendar] = useState(false);
   const currentDate = parseISO(params.date);
   const today = new Date();
   const calendarRef = useRef<HTMLDivElement>(null);
   const dateButtonRef = useRef<HTMLButtonElement>(null);
 
   // Image states
-  const [hymnImage, setHymnImage] = useState("/hymn-bg.jpg");
   const [resourcesImage, setResourcesImage] = useState("/resources-bg.jpg");
 
   // AI reflection states
@@ -233,83 +242,37 @@ export default function ReflectionPage({
     },
   ];
 
-  // Function to check if a devotion exists and load it
-  const checkAndLoadDevotion = async (date: string) => {
-    try {
-      setIsLoading(true);
-      const parsedDate = parse(date, "yyyy-MM-dd", new Date());
-
-      // Fetch devotion data
-      const response = await fetch(`/api/devotions/${date}`);
-
-      if (!response.ok) {
-        const errorData = await response.json();
-
-        // Handle case when a suggested date is provided
-        if (response.status === 404 && errorData.suggestedDate) {
-          toast(
-            `No devotion found for ${date}. Redirecting to ${errorData.suggestedDate}...`,
-            {
-              position: "bottom-center",
-              duration: 3000,
-            }
-          );
-
-          // Wait a moment before redirecting
-          setTimeout(() => {
-            router.push(`/devotion/${errorData.suggestedDate}/reflection`);
-          }, 1500);
-
-          setIsLoading(false);
-          return false;
-        }
-
-        // Handle regular not found case
-        if (response.status === 404) {
-          toast(
-            `No devotion available for ${date}. Please try another date.`,
-            {
-              position: "bottom-center",
-            }
-          );
-          setDevotionData(null);
-          setIsLoading(false);
-          return true; // Allow navigation but show empty state
-        }
-
-        // Other errors
-        toast.error(errorData.error || "Failed to load devotion", {
-          position: "bottom-center",
-        });
-
-        setIsLoading(false);
-        return false;
-      }
-
-      const data = await response.json();
-      setDevotionData(data);
-      setIsLoading(false);
-      return true;
-    } catch (error) {
-      console.error("Error in checkAndLoadDevotion:", error);
-      toast.error("An error occurred while loading the devotion", {
-        position: "bottom-center",
-      });
-      setIsLoading(false);
-      return false;
-    }
-  };
-
-  // Load devotion data on mount and when date changes
   useEffect(() => {
-    console.log("Loading devotion for date:", params.date);
-    checkAndLoadDevotion(params.date);
+    const fetchData = async () => {
+      try {
+        setIsLoading(true);
+        
+        // Fetch hymn data
+        const monthStr = format(currentDate, 'MMMM').toLowerCase();
+        const db = getFirebaseDb();
+        if (db) {
+          const hymnRef = doc(db, 'hymns', monthStr);
+          const hymnSnap = await getDoc(hymnRef);
+          if (hymnSnap.exists()) {
+            setHymn(hymnSnap.data() as Hymn);
+          }
+        }
 
-    // Reset AI reflection state when navigating to a different date
-    setAiReflection("");
-    setQuestion("");
-    setAiError("");
-  }, [params.date, user]);
+        // Fetch devotion data
+        const devotion = await getDevotionByDate(params.date);
+        setDevotionData(devotion);
+      } catch (error) {
+        console.error('Error fetching data:', error);
+        toast.error('Failed to load data');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    if (user) {
+      fetchData();
+    }
+  }, [params.date, user, currentDate]);
 
   // Load background images for modals from Unsplash
   useEffect(() => {
@@ -393,7 +356,7 @@ export default function ReflectionPage({
       console.log(`Attempting date change to: ${formattedDate}`);
 
       // Check if devotion exists for the new date
-      const exists = await checkAndLoadDevotion(formattedDate);
+      const exists = await getDevotionByDate(formattedDate);
       if (!exists) {
         // The error message is now shown in checkAndLoadDevotion
         return;
@@ -782,7 +745,7 @@ export default function ReflectionPage({
                 <div className="absolute inset-0 bg-black/50" />
                 <div className="absolute inset-0 flex flex-col justify-center p-6 text-white">
                   <h3 className="text-lg text-white/80 mb-2">Hymn of the Month:</h3>
-                  <h2 className="text-3xl font-bold">When I survey the Wondrous Cross</h2>
+                  <h2 className="text-3xl font-bold">{hymn?.title || "Loading hymn..."}</h2>
                 </div>
               </div>
             </div>

@@ -169,7 +169,44 @@ export default function DevotionPage({ params }: { params: { date: string } }) {
   }
 
   if (!devotion) {
-    return null;
+    return (
+      <DynamicBackground
+        date={params.date}
+        query="landscape mountains sunset forest"
+        showAttribution={true}
+        overlayOpacity={0.7}
+        className="h-screen flex flex-col overflow-hidden"
+      >
+        <Toaster position="top-center" />
+
+        {/* Content */}
+        <div className="relative z-10 flex flex-col h-full">
+          {/* Header Section */}
+          <div className="flex-none p-6">
+            <div className="max-w-lg mx-auto pt-12 space-y-1">
+              <h1 className="text-5xl font-bold text-white">
+                {format(currentDate, "EEEE")},
+                <br />
+                {format(currentDate, "MMMM d")}
+              </h1>
+              <p className="text-xl text-white/90">
+                Have a blessed day{user ? `, ${user.displayName?.split(" ")[0] || ""}` : ""}!
+              </p>
+            </div>
+          </div>
+
+          {/* No Devotion Message */}
+          <div className="flex-1 mt-12 bg-black/50 backdrop-blur-md rounded-t-3xl flex flex-col items-center justify-center text-white text-center p-8">
+            <div className="space-y-6">
+              <p className="text-2xl">"No devotion is available for today.</p>
+              <p className="text-xl">
+                New devotions are posted Monday through Friday</p>
+              <p className="text-xl">check back soon!"</p>
+            </div>
+          </div>
+        </div>
+      </DynamicBackground>
+    );
   }
 
   const firstName = user?.displayName?.split(" ")[0] || "";
