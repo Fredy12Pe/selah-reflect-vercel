@@ -691,120 +691,356 @@ export default function ReflectionPage({
   }
 
   return (
-    <div className="min-h-screen bg-black/90">
-      <div className="container mx-auto px-4 py-12 text-white">
-        <div className="max-w-3xl mx-auto space-y-12">
-          {/* Date Navigation */}
-          <div className="flex items-center justify-between">
-            <button
-              onClick={() => handleDateChange(subDays(currentDate, 1))}
-              className="p-2 hover:bg-white/10 rounded-lg transition-colors"
-            >
-              <ChevronLeftIcon className="w-6 h-6" />
-            </button>
-            
-            <div className="relative">
-              <button
-                ref={dateButtonRef}
-                onClick={toggleCalendar}
-                className="flex items-center space-x-2 px-4 py-2 bg-white/10 rounded-lg hover:bg-white/20 transition-colors"
-              >
-                <CalendarIcon className="w-5 h-5" />
-                <span>{format(currentDate, "MMMM d, yyyy")}</span>
-              </button>
-              
-              {showCalendar && (
+    <div className="min-h-screen bg-black">
+      <div className="max-w-md mx-auto px-4 py-6">
+        {/* Date Navigation - Updated to match mockup */}
+        <div className="flex items-center justify-between bg-zinc-900 rounded-full px-4 py-2 mb-8">
+          <button
+            onClick={() => handleDateChange(subDays(currentDate, 1))}
+            className="p-2"
+          >
+            <ChevronLeftIcon className="w-6 h-6" />
+          </button>
+          
+          <button
+            ref={dateButtonRef}
+            onClick={toggleCalendar}
+            className="text-lg font-medium"
+          >
+            {format(currentDate, "EEEE, MMMM d")}
+          </button>
+          
+          <button
+            onClick={() => handleDateChange(addDays(currentDate, 1))}
+            disabled={isNextDisabled}
+            className={`p-2 ${isNextDisabled ? 'opacity-50' : ''}`}
+          >
+            <ChevronRightIcon className="w-6 h-6" />
+          </button>
+        </div>
+
+        {showCalendar && (
+          <div
+            ref={calendarRef}
+            className="absolute top-20 left-1/2 -translate-x-1/2 z-50 bg-zinc-900 p-4 rounded-2xl shadow-xl border border-zinc-800"
+          >
+            <DatePicker
+              initialDate={currentDate}
+              onDateSelect={(date: Date | null) => {
+                if (date) {
+                  handleDateChange(date);
+                  setShowCalendar(false);
+                }
+              }}
+              isOpen={showCalendar}
+              onClose={() => setShowCalendar(false)}
+            />
+          </div>
+        )}
+
+        {/* Hymn Section - Updated to match mockup */}
+        {hymn && (
+          <div
+            onClick={() => setShowHymnModal(true)}
+            className="relative overflow-hidden rounded-2xl mb-8 cursor-pointer"
+          >
+            <div className="absolute inset-0 bg-gradient-to-b from-black/40 to-black/90 z-10" />
+            <Image
+              src={hymnImage}
+              alt="Hymn background"
+              width={800}
+              height={300}
+              className="object-cover w-full h-32"
+            />
+            <div className="absolute inset-0 z-20 p-4">
+              <p className="text-sm font-medium text-white/80 mb-1">Hymn of the Month:</p>
+              <h2 className="text-xl font-semibold">{hymn.title}</h2>
+            </div>
+          </div>
+        )}
+
+        {/* Scripture Section */}
+        {devotionData?.bibleText && (
+          <div 
+            onClick={handleOpenScriptureModal}
+            className="bg-zinc-900 rounded-2xl p-4 mb-8 cursor-pointer"
+          >
+            <h2 className="text-sm font-medium text-white/80 mb-1">Today's Scripture</h2>
+            <p className="text-xl font-semibold">{devotionData.bibleText}</p>
+          </div>
+        )}
+
+        {/* Reflection Questions */}
+        {!showNoDevotionContent && reflectionQuestions.length > 0 && (
+          <div className="mb-8">
+            <h2 className="text-lg font-semibold mb-4">Reflection Questions</h2>
+            <div className="space-y-4">
+              {reflectionQuestions.map((question, index) => (
                 <div
-                  ref={calendarRef}
-                  className="absolute top-full mt-2 z-50 bg-black/95 p-4 rounded-lg shadow-xl border border-white/10"
+                  key={index}
+                  className="bg-zinc-900 rounded-2xl p-4"
                 >
-                  <DatePicker
-                    initialDate={currentDate}
-                    onDateSelect={(date: Date | null) => {
-                      if (date) {
-                        handleDateChange(date);
-                        setShowCalendar(false);
-                      }
-                    }}
-                    isOpen={showCalendar}
-                    onClose={() => setShowCalendar(false)}
+                  <p className="text-base mb-3">{question}</p>
+                  <textarea
+                    className="w-full bg-black rounded-xl p-3 text-white placeholder-white/50 focus:outline-none focus:ring-1 focus:ring-white/20"
+                    rows={3}
+                    placeholder="Write your reflection here..."
                   />
                 </div>
-              )}
+              ))}
             </div>
-            
-            <button
-              onClick={() => handleDateChange(addDays(currentDate, 1))}
-              className="p-2 hover:bg-white/10 rounded-lg transition-colors"
-            >
-              <ChevronRightIcon className="w-6 h-6" />
-            </button>
           </div>
+        )}
 
-          {/* Hymn of the Month Section */}
-          {hymn && (
-            <div
-              className="relative overflow-hidden rounded-xl cursor-pointer group"
-              onClick={() => setShowHymnModal(true)}
-            >
-              <div className="absolute inset-0 bg-gradient-to-b from-black/40 to-black/90 z-10" />
-              <Image
-                src={hymnImage}
-                alt="Hymn background"
-                width={1200}
-                height={400}
-                className="object-cover w-full h-48"
-              />
-              <div className="absolute inset-0 z-20 p-6 flex flex-col justify-end">
-                <h2 className="text-2xl font-semibold mb-2">
-                  Hymn of the Month
-                </h2>
-                <p className="text-lg text-white/90">{hymn.title}</p>
+        {/* AI Reflection Section */}
+        {!showNoDevotionContent && (
+          <div className="mb-8">
+            <h2 className="text-lg font-semibold mb-4">Reflect with AI</h2>
+            <div className="bg-zinc-900 rounded-2xl p-4">
+              <div className="flex items-center space-x-2 mb-4">
+                <input
+                  type="text"
+                  value={question}
+                  onChange={(e) => setQuestion(e.target.value)}
+                  onKeyPress={handleReflectionKeyPress}
+                  placeholder="Ask questions about today's text..."
+                  className="flex-1 bg-black rounded-full px-4 py-2 text-white placeholder-white/50 focus:outline-none focus:ring-1 focus:ring-white/20"
+                />
+                <button
+                  onClick={handleReflectionGeneration}
+                  disabled={isAiLoading || !question.trim()}
+                  className="p-2 rounded-full bg-white/10 hover:bg-white/20 disabled:opacity-50 disabled:hover:bg-white/10"
+                >
+                  <ArrowRightIcon className="w-5 h-5" />
+                </button>
               </div>
-              <div className="absolute inset-0 bg-white/20 opacity-0 group-hover:opacity-100 transition-opacity z-30" />
-            </div>
-          )}
-
-          {/* Main Content */}
-          {showNoDevotionContent ? (
-            <div className="bg-black/30 backdrop-blur-sm rounded-xl p-6 space-y-4">
-              <h2 className="text-2xl font-semibold">No Devotion Available</h2>
-              <p className="text-lg text-white/90">
-                There is no devotion available for this date yet. You can still:
-              </p>
-              <ul className="list-disc list-inside space-y-2 text-white/80">
-                <li>Read and meditate on the hymn of the month above</li>
-                <li>Navigate to a different date using the calendar</li>
-                <li>Come back later when content is available</li>
-              </ul>
-            </div>
-          ) : (
-            <>
-              {/* Reflection Questions */}
-              {reflectionQuestions.length > 0 && (
-                <div className="space-y-6">
-                  {reflectionQuestions.map((question, index) => (
-                    <div
-                      key={index}
-                      className="bg-black/30 backdrop-blur-sm rounded-xl p-6"
-                    >
-                      <p className="text-lg mb-4">{question}</p>
-                      <textarea
-                        className="w-full bg-black/30 rounded-lg p-4 text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-white/20"
-                        rows={4}
-                        placeholder="Write your reflection here..."
-                      />
-                    </div>
-                  ))}
+              {isAiLoading && (
+                <div className="flex justify-center py-4">
+                  <div className="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin" />
                 </div>
               )}
-            </>
-          )}
-        </div>
+              {aiError && (
+                <p className="text-red-400 text-sm mb-4">{aiError}</p>
+              )}
+              {aiReflection && (
+                <div className="bg-black/50 rounded-xl p-4">
+                  <p className="text-white/90">{aiReflection}</p>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Resources Section */}
+        {!showNoDevotionContent && devotionData?.bibleText && (
+          <div
+            onClick={handleOpenResourcesModal}
+            className="relative overflow-hidden rounded-2xl cursor-pointer"
+          >
+            <div className="absolute inset-0 bg-gradient-to-b from-black/40 to-black/90 z-10" />
+            <Image
+              src={resourcesImage}
+              alt="Resources background"
+              width={800}
+              height={300}
+              className="object-cover w-full h-32"
+            />
+            <div className="absolute inset-0 z-20 p-4">
+              <h2 className="text-xl font-semibold mb-1">Resources for today's text</h2>
+              <p className="text-sm text-white/80">Bible Commentaries, Videos, and Podcasts</p>
+            </div>
+          </div>
+        )}
+
+        {/* No Devotion Content */}
+        {showNoDevotionContent && (
+          <div className="bg-zinc-900 rounded-2xl p-6 space-y-4">
+            <h2 className="text-xl font-semibold">No Devotion Available</h2>
+            <p className="text-white/80">
+              There is no devotion available for this date yet. You can:
+            </p>
+            <ul className="list-disc list-inside space-y-2 text-white/70 ml-4">
+              <li>Read and meditate on the hymn of the month above</li>
+              <li>Navigate to a different date using the calendar</li>
+              <li>Come back later when content is available</li>
+            </ul>
+          </div>
+        )}
       </div>
 
       {/* Modals */}
-      {/* ... existing modals code ... */}
+      {/* Hymn Modal */}
+      {showHymnModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div 
+            className={`fixed inset-0 bg-black/50 ${isHymnModalClosing ? 'animate-fade-out' : 'animate-fade-in'}`}
+            onClick={closeHymnModal}
+          />
+          <div className={`relative w-full max-w-lg mx-4 bg-white rounded-lg shadow-xl ${isHymnModalClosing ? 'animate-slide-down' : 'animate-slide-up'}`}>
+            <div className="relative h-48">
+              <Image
+                src={hymnImage}
+                alt="Hymn background"
+                fill
+                className="object-cover"
+              />
+              <div className="absolute inset-0 bg-gradient-to-b from-black/40 to-black/90" />
+              <div className="absolute inset-0 p-6 flex flex-col justify-end">
+                <p className="text-sm font-medium text-white/80 mb-1">Hymn of the Month</p>
+                <h2 className="text-2xl font-semibold">{hymn?.title}</h2>
+              </div>
+            </div>
+            <div className="p-6 space-y-6">
+              {hymnLyrics.map((verse, index) => (
+                <div key={index} className="space-y-2">
+                  <p className="text-sm font-medium text-white/60">Verse {verse.verse}</p>
+                  {verse.lines.map((line, lineIndex) => (
+                    <p key={lineIndex} className="text-lg">{line}</p>
+                  ))}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Scripture Modal */}
+      {showScriptureModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div 
+            className={`fixed inset-0 bg-black/50 ${isScriptureModalClosing ? 'animate-fade-out' : 'animate-fade-in'}`}
+            onClick={closeScriptureModal}
+          />
+          <div className={`relative w-full max-w-lg mx-4 bg-white rounded-lg shadow-xl ${isScriptureModalClosing ? 'animate-slide-down' : 'animate-slide-up'}`}>
+            <div className="p-6">
+              <h2 className="text-sm font-medium text-white/80 mb-1">Today's Scripture</h2>
+              <p className="text-xl font-semibold mb-6">{devotionData?.bibleText}</p>
+              
+              {isFetchingBibleVerse ? (
+                <div className="flex justify-center py-8">
+                  <div className="w-8 h-8 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                </div>
+              ) : bibleVerse ? (
+                <div className="space-y-4">
+                  {bibleVerse.verses.map((verse) => (
+                    <div key={verse.verse} className="flex">
+                      <span className="text-white/40 mr-4">{verse.verse}</span>
+                      <p>{verse.text}</p>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-white/60">Failed to load Bible verses</p>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Resources Modal */}
+      {showResourcesModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div 
+            className={`fixed inset-0 bg-black/50 ${isResourcesModalClosing ? 'animate-fade-out' : 'animate-fade-in'}`}
+            onClick={closeResourcesModal}
+          />
+          <div className={`relative w-full max-w-lg mx-4 bg-white rounded-lg shadow-xl ${isResourcesModalClosing ? 'animate-slide-down' : 'animate-slide-up'}`}>
+            <div className="relative h-48">
+              <Image
+                src={resourcesImage}
+                alt="Resources background"
+                fill
+                className="object-cover"
+              />
+              <div className="absolute inset-0 bg-gradient-to-b from-black/40 to-black/90" />
+              <div className="absolute inset-0 p-6 flex flex-col justify-end">
+                <h2 className="text-2xl font-semibold mb-1">Resources</h2>
+                <p className="text-white/80">For {devotionData?.bibleText}</p>
+              </div>
+            </div>
+            
+            <div className="p-6">
+              {isFetchingResources ? (
+                <div className="flex justify-center py-8">
+                  <div className="w-8 h-8 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                </div>
+              ) : resourcesError ? (
+                <p className="text-red-400">{resourcesError}</p>
+              ) : resources ? (
+                <div className="space-y-8">
+                  {/* Commentaries */}
+                  {resources.commentaries && resources.commentaries.length > 0 && (
+                    <div>
+                      <h3 className="text-lg font-semibold mb-4">Bible Commentaries</h3>
+                      <div className="space-y-4">
+                        {resources.commentaries.map((item, index) => (
+                          <a
+                            key={index}
+                            href={isValidUrl(item.url) ? item.url : getFallbackUrl(item.type, item.title)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="block bg-black/30 rounded-xl p-4 hover:bg-black/50 transition-colors"
+                          >
+                            <h4 className="font-medium mb-1">{item.title}</h4>
+                            {item.author && (
+                              <p className="text-sm text-white/60 mb-2">by {item.author}</p>
+                            )}
+                            <p className="text-sm text-white/80">{item.description}</p>
+                          </a>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Videos */}
+                  {resources.videos && resources.videos.length > 0 && (
+                    <div>
+                      <h3 className="text-lg font-semibold mb-4">Videos</h3>
+                      <div className="space-y-4">
+                        {resources.videos.map((item, index) => (
+                          <a
+                            key={index}
+                            href={isValidUrl(item.url) ? item.url : getFallbackUrl(item.type, item.title)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="block bg-black/30 rounded-xl p-4 hover:bg-black/50 transition-colors"
+                          >
+                            <h4 className="font-medium mb-2">{item.title}</h4>
+                            <p className="text-sm text-white/80">{item.description}</p>
+                          </a>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Podcasts */}
+                  {resources.podcasts && resources.podcasts.length > 0 && (
+                    <div>
+                      <h3 className="text-lg font-semibold mb-4">Podcasts</h3>
+                      <div className="space-y-4">
+                        {resources.podcasts.map((item, index) => (
+                          <a
+                            key={index}
+                            href={isValidUrl(item.url) ? item.url : getFallbackUrl(item.type, item.title)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="block bg-black/30 rounded-xl p-4 hover:bg-black/50 transition-colors"
+                          >
+                            <h4 className="font-medium mb-2">{item.title}</h4>
+                            <p className="text-sm text-white/80">{item.description}</p>
+                          </a>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <p className="text-white/60">No resources available</p>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

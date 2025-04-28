@@ -65,15 +65,19 @@ export async function GET(
 ) {
   try {
     // Check if date is valid
+    let dateObj;
     try {
-      const dateObj = parseISO(params.date);
+      dateObj = parseISO(params.date);
+      if (isNaN(dateObj.getTime())) {
+        throw new Error('Invalid date');
+      }
     } catch (error: any) {
       return NextResponse.json(
         { error: 'Invalid date format' },
         { status: 400 }
       );
     }
-    
+
     // Initialize Firebase Admin
     let db;
     try {
@@ -136,10 +140,18 @@ export async function GET(
     const devotionDoc = await db.collection('devotions').doc(params.date).get();
 
     if (!devotionDoc.exists) {
-      return NextResponse.json(
-        { error: 'Devotion not found' },
-        { status: 404 }
-      );
+      // Return a structured response for missing devotions
+      return NextResponse.json({
+        id: params.date,
+        date: params.date,
+        bibleText: '',
+        reflectionSections: [],
+        monthId: format(dateObj, 'MMMM').toLowerCase(),
+        month: format(dateObj, 'MMMM'),
+        title: 'No Devotion Available',
+        content: 'No devotion is available for this date.',
+        notFound: true
+      }, { status: 200 });
     }
 
     const data = devotionDoc.data() as Devotion;
@@ -151,8 +163,8 @@ export async function GET(
       bibleText: data.bibleText || data.scriptureReference || '',
       reflectionSections: data.reflectionSections || 
         (data.reflectionQuestions ? [{ questions: data.reflectionQuestions }] : []),
-      monthId: data.monthId,
-      month: data.month,
+      monthId: data.monthId || format(dateObj, 'MMMM').toLowerCase(),
+      month: data.month || format(dateObj, 'MMMM'),
       updatedAt: data.updatedAt,
       updatedBy: data.updatedBy,
       scriptureReference: data.scriptureReference,

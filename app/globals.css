@@ -45,41 +45,63 @@ body {
 }
 
 /* Animation for modal fade in */
-@keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 /* Animation for modal fade out */
-@keyframes fadeOut {
-  from { opacity: 1; }
-  to { opacity: 0; }
+@keyframes fade-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
 }
 
 /* Animation for modal slide in */
-@keyframes slideIn {
-  from { transform: translateY(100%); }
-  to { transform: translateY(0); }
+@keyframes slide-up {
+  from {
+    transform: translateY(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
 }
 
 /* Animation for modal slide out */
-@keyframes slideOut {
-  from { transform: translateY(0); }
-  to { transform: translateY(100%); }
+@keyframes slide-down {
+  from {
+    transform: translateY(0);
+    opacity: 1;
+  }
+  to {
+    transform: translateY(100%);
+    opacity: 0;
+  }
 }
 
-.animate-fadein {
-  animation: fadeIn 0.3s ease-in-out forwards;
-}
-
-.animate-fadeout {
-  animation: fadeOut 0.3s ease-in-out forwards;
-}
-
-.animate-slidein {
-  animation: slideIn 0.3s ease-in-out forwards;
-}
-
-.animate-slideout {
-  animation: slideOut 0.3s ease-in-out forwards;
+@layer utilities {
+  .animate-fade-in {
+    animation: fade-in 0.2s ease-out;
+  }
+  
+  .animate-fade-out {
+    animation: fade-out 0.2s ease-out;
+  }
+  
+  .animate-slide-up {
+    animation: slide-up 0.3s ease-out;
+  }
+  
+  .animate-slide-down {
+    animation: slide-down 0.3s ease-out;
+  }
 } 
