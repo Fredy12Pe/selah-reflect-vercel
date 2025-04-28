@@ -3,8 +3,8 @@
 import React, { useState, useCallback, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
-import { getFirebaseAuth, getGoogleAuthProvider } from "@/lib/firebase";
-import { signInWithPopup, AuthError } from "firebase/auth";
+import { signInWithGoogle, GoogleAuthProvider } from "@/lib/firebase/authHelper";
+import { AuthError } from "firebase/auth";
 import toast, { Toaster } from "react-hot-toast";
 import { format } from "date-fns";
 import { isBrowser } from "@/lib/utils/environment";
@@ -72,7 +72,7 @@ export default function Authentication() {
     }
   }, [router, from]);
 
-  const signInWithGoogle = useCallback(async () => {
+  const handleSignIn = useCallback(async () => {
     // Ensure we're in browser environment
     if (!isBrowser) {
       console.log("Authentication skipped during build/SSR");
@@ -90,15 +90,12 @@ export default function Authentication() {
       setLoading(true);
       setError("");
 
-      const auth = getFirebaseAuth();
-      const provider = getGoogleAuthProvider();
-
-      if (!auth || !provider) {
-        throw new Error("Authentication service is not available");
+      // Use the helper function to sign in with Google
+      const result = await signInWithGoogle();
+      
+      if (!result.user) {
+        throw new Error("Authentication failed - no user returned");
       }
-
-      // Sign in with popup
-      const result = await signInWithPopup(auth, provider);
       
       // Get a fresh token
       const token = await result.user.getIdToken(true);
@@ -167,7 +164,7 @@ export default function Authentication() {
           )}
 
           <button
-            onClick={signInWithGoogle}
+            onClick={handleSignIn}
             disabled={loading}
             className="group w-full bg-white/10 hover:bg-white/20 text-white py-4 px-6 rounded-2xl backdrop-blur-sm transition-all duration-300 flex items-center justify-center space-x-3 disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-white/50"
             aria-label="Sign in with Google"
