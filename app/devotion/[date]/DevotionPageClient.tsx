@@ -67,20 +67,21 @@ export default function DevotionPageClient({ date }: DevotionPageClientProps) {
     if (!authLoading) {
       setAuthInitialized(true);
       if (!user) {
-        router.replace(`/auth/login?from=/devotion/${date}`);
+        // Only redirect if we're not already on the login page
+        const currentPath = window.location.pathname;
+        if (!currentPath.includes('/auth/login')) {
+          router.replace(`/auth/login?from=/devotion/${date}`);
+        }
       }
     }
   }, [authLoading, user, router, date]);
 
   useEffect(() => {
     // Don't do anything until auth is initialized
-    if (!authInitialized) return;
-
-    // If no user after auth is initialized, we'll handle it in the auth effect
-    if (!user) return;
+    if (!authInitialized || !user) return;
 
     let mounted = true;
-    let controller = new AbortController();
+    const controller = new AbortController();
 
     async function fetchBibleVerse(reference: string) {
       if (!mounted) return null;
@@ -137,12 +138,8 @@ export default function DevotionPageClient({ date }: DevotionPageClientProps) {
         if (!mounted || !user) return;
 
         if (!response.ok) {
-          if (response.status === 404) {
-            router.replace(`/devotion/${date}/reflection`);
-            return;
-          }
           if (response.status === 401) {
-            // Try to refresh the token and retry
+            // Try to refresh the token and retry once
             try {
               const newToken = await user.getIdToken(true);
               const retryResponse = await fetch(`/api/devotions/${date}`, {
@@ -160,6 +157,13 @@ export default function DevotionPageClient({ date }: DevotionPageClientProps) {
               
               const devotionData = await retryResponse.json();
               if (!mounted) return;
+              
+              if (devotionData.notFound) {
+                // Use router.push instead of replace to prevent loops
+                router.push(`/devotion/${date}/reflection`);
+                return;
+              }
+              
               setDevotion(devotionData);
               
               const reference = getBibleReference(devotionData);
@@ -171,7 +175,9 @@ export default function DevotionPageClient({ date }: DevotionPageClientProps) {
               }
               return;
             } catch (error) {
-              router.replace(`/auth/login?from=/devotion/${date}`);
+              if (!window.location.pathname.includes('/auth/login')) {
+                router.push(`/auth/login?from=/devotion/${date}`);
+              }
               return;
             }
           }
@@ -180,6 +186,12 @@ export default function DevotionPageClient({ date }: DevotionPageClientProps) {
 
         const devotionData = await response.json();
         if (!mounted) return;
+        
+        if (devotionData.notFound) {
+          // Use router.push instead of replace to prevent loops
+          router.push(`/devotion/${date}/reflection`);
+          return;
+        }
         
         setDevotion(devotionData);
 
@@ -198,7 +210,9 @@ export default function DevotionPageClient({ date }: DevotionPageClientProps) {
         const errorMessage = err.message || "Failed to load devotion";
         
         if (errorMessage.includes("Authentication failed") || errorMessage.includes("sign in")) {
-          router.replace(`/auth/login?from=/devotion/${date}`);
+          if (!window.location.pathname.includes('/auth/login')) {
+            router.push(`/auth/login?from=/devotion/${date}`);
+          }
         } else {
           setError(errorMessage);
         }
@@ -209,13 +223,16 @@ export default function DevotionPageClient({ date }: DevotionPageClientProps) {
       }
     }
 
-    loadDevotion();
+    // Only load if we haven't already loaded
+    if (!devotion && !loading) {
+      loadDevotion();
+    }
 
     return () => {
       mounted = false;
       controller.abort();
     };
-  }, [date, user, authInitialized, router]);
+  }, [date, user, authInitialized, router, devotion, loading]);
 
   if (authLoading || !authInitialized) {
     return (
