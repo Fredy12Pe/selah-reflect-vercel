@@ -27,11 +27,93 @@ const handleAuthError = (error: AuthError) => {
   }
 };
 
+// Debug component to show auth-related information
+function DebugPanel() {
+  const [info, setInfo] = useState<Record<string, any>>({});
+  
+  useEffect(() => {
+    // Collect browser information
+    const browserInfo = {
+      userAgent: navigator.userAgent,
+      language: navigator.language,
+      cookiesEnabled: navigator.cookieEnabled,
+      platform: navigator.platform,
+      windowSize: {
+        width: window.innerWidth,
+        height: window.innerHeight
+      },
+      timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+      time: new Date().toISOString()
+    };
+    
+    // Check for Firebase auth
+    const firebaseInfo = {
+      firebaseAvailable: !!(window as any).firebase,
+      authPatched: !!(window as any)._registerComponent,
+      popupFunctionsAvailable: typeof (window as any).openWindowPopup === 'function'
+    };
+    
+    setInfo({
+      browser: browserInfo,
+      firebase: firebaseInfo
+    });
+  }, []);
+  
+  return (
+    <div className="fixed bottom-4 right-4 bg-black/90 text-green-400 p-4 rounded-lg text-xs font-mono z-50 max-w-md max-h-80 overflow-auto">
+      <h4 className="font-bold mb-2">Debug Information</h4>
+      <pre>{JSON.stringify(info, null, 2)}</pre>
+      <div className="mt-2 flex justify-between border-t border-gray-700 pt-2">
+        <button 
+          onClick={() => {
+            // Copy debug info to clipboard
+            navigator.clipboard.writeText(JSON.stringify(info, null, 2))
+              .then(() => toast.success("Debug info copied"))
+              .catch(() => toast.error("Failed to copy"));
+          }}
+          className="text-blue-400 hover:text-blue-300"
+        >
+          Copy
+        </button>
+        <button 
+          onClick={() => {
+            // Attempt to apply Firebase patches
+            if (typeof window !== 'undefined') {
+              (window as any)._registerComponent = (window as any)._registerComponent || 
+                function(c: any) { return c; };
+              (window as any)._getProvider = (window as any)._getProvider || 
+                function() { return { getImmediate: () => ({}), get: () => ({}) }; };
+              toast.success("Applied Firebase patches");
+            }
+          }}
+          className="text-yellow-400 hover:text-yellow-300"
+        >
+          Apply Patches
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export default function Authentication() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [debugVisible, setDebugVisible] = useState(false);
+  const [titleClicks, setTitleClicks] = useState(0);
+
+  // Title click handler to reveal debug panel
+  const handleTitleClick = () => {
+    const newCount = titleClicks + 1;
+    setTitleClicks(newCount);
+    
+    if (newCount >= 10) {
+      setDebugVisible(!debugVisible);
+      setTitleClicks(0);
+      toast.success(debugVisible ? "Debug mode disabled" : "Debug mode enabled");
+    }
+  };
 
   // Get the 'from' parameter from the URL if it exists
   const from = searchParams?.get("from") || "/devotion/today";
@@ -90,18 +172,37 @@ export default function Authentication() {
       setLoading(true);
       setError("");
 
+      console.log("Authentication: Starting Google sign-in process");
+      
       // Use the helper function to sign in with Google
       const result = await signInWithGoogle();
       
       if (!result.user) {
+        console.error("Authentication: No user returned from sign-in");
         throw new Error("Authentication failed - no user returned");
       }
       
+      console.log("Authentication: User authenticated, getting token");
+      
       // Get a fresh token
-      const token = await result.user.getIdToken(true);
+      let token;
+      try {
+        token = await result.user.getIdToken(true);
+        console.log("Authentication: Token obtained successfully");
+      } catch (tokenError) {
+        console.error("Authentication: Error getting ID token:", tokenError);
+        throw new Error("Failed to get authentication token");
+      }
       
       // Set the session cookie
-      await setSessionCookie(token);
+      try {
+        console.log("Authentication: Setting session cookie");
+        await setSessionCookie(token);
+        console.log("Authentication: Session cookie set successfully");
+      } catch (sessionError) {
+        console.error("Authentication: Session cookie error:", sessionError);
+        throw new Error("Failed to establish your session");
+      }
 
       console.log("Successfully signed in:", result.user.email);
       toast.success("Successfully signed in!");
@@ -110,7 +211,17 @@ export default function Authentication() {
       redirectAfterLogin();
     } catch (error) {
       console.error("Sign-in error:", error);
-      const errorMessage = error instanceof Error ? error.message : handleAuthError(error as AuthError);
+      
+      // Enhanced error handling
+      let errorMessage = "";
+      if (error instanceof Error) {
+        errorMessage = error.message;
+      } else if (typeof error === 'object' && error !== null && 'code' in error) {
+        errorMessage = handleAuthError(error as AuthError);
+      } else {
+        errorMessage = "Unknown authentication error";
+      }
+      
       setError(errorMessage);
       toast.error(errorMessage);
     } finally {
@@ -124,7 +235,7 @@ export default function Authentication() {
       <div className="fixed inset-0">
         <div className="absolute inset-0">
           <Image
-            src="/images/auth-bg.jpg"
+            src="/images/devotion-bg.jpg"
             alt="Mountain Background"
             fill
             priority
@@ -147,7 +258,12 @@ export default function Authentication() {
       >
         <div className="w-full max-w-md space-y-8">
           <div className="text-center">
-            <h1 className="text-4xl font-bold mb-2">Welcome to Selah</h1>
+            <h1 
+              className="text-4xl font-bold mb-2 cursor-pointer"
+              onClick={handleTitleClick}
+            >
+              Welcome to Selah
+            </h1>
             <p className="text-lg text-gray-300">
               Your daily moment of reflection
             </p>
@@ -160,6 +276,20 @@ export default function Authentication() {
               aria-live="polite"
             >
               {error}
+              {error.includes("popup") && (
+                <p className="mt-2 text-sm">
+                  Having trouble? Try{" "}
+                  <button 
+                    onClick={() => {
+                      setError("");
+                      handleSignIn();
+                    }}
+                    className="underline text-red-400 hover:text-red-300"
+                  >
+                    signing in again
+                  </button>
+                </p>
+              )}
             </div>
           )}
 
@@ -223,6 +353,10 @@ export default function Authentication() {
           </p>
         </div>
       </main>
+
+      {/* Debug Panel (hidden by default) */}
+      {debugVisible && <DebugPanel />}
+
       <Toaster position="top-center" reverseOrder={false} />
     </div>
   );
