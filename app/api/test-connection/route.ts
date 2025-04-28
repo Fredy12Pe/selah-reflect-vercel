@@ -95,17 +95,29 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // Try to read a test document
+    // Try to read test documents from both months and hymns collections
     try {
       const db = getFirestore();
-      const testRef = db.collection('devotions').doc('monday-april-21');
-      const testDoc = await testRef.get();
+      
+      // Test reading from months collection
+      const monthRef = db.collection('months').doc('april');
+      const monthDoc = await monthRef.get();
+      
+      // Test reading from hymns collection
+      const hymnRef = db.collection('hymns').doc('hymn1');
+      const hymnDoc = await hymnRef.get();
       
       return NextResponse.json({
         status: 'success',
         message: 'Firebase connection successful',
-        exists: testDoc.exists,
-        data: testDoc.exists ? testDoc.data() : null,
+        monthData: {
+          exists: monthDoc.exists,
+          data: monthDoc.exists ? monthDoc.data() : null
+        },
+        hymnData: {
+          exists: hymnDoc.exists,
+          data: hymnDoc.exists ? hymnDoc.data() : null
+        },
         envVars: {
           projectId: !!process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
           clientEmail: !!process.env.FIREBASE_CLIENT_EMAIL,
