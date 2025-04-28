@@ -4,9 +4,10 @@
  */
 
 import { initializeApp, getApps, FirebaseApp } from 'firebase/app';
-import { getAuth, GoogleAuthProvider, Auth } from 'firebase/auth';
+import { getAuth, setPersistence, browserLocalPersistence, Auth } from 'firebase/auth';
 import { getFirestore, Firestore } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
+import type { FirebaseStorage } from 'firebase/storage';
 import { isBrowser, shouldSkipFirebaseInit } from '../utils/environment';
 
 // Define type for storage
@@ -20,7 +21,6 @@ const firebaseConfig = {
   storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
   messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
-  measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID,
 };
 
 // Debug log the configuration (but not in production)
@@ -42,62 +42,29 @@ const emptyStorage = {} as FirebaseStorage;
 const emptyApp = {} as FirebaseApp;
 
 // Initialize Firebase instances
-let app: FirebaseApp = emptyApp;
-let auth: Auth = emptyAuth;
-let firestore: Firestore = emptyFirestore;
-let storage: FirebaseStorage = emptyStorage;
-let googleProvider: GoogleAuthProvider | null = null;
+let app: FirebaseApp = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
 
-if (isBrowser() && !shouldSkipFirebaseInit) {
-  try {
-    // Check if Firebase is already initialized
-    if (!getApps().length) {
-      console.log('[Firebase] Initializing Firebase app...');
-      app = initializeApp(firebaseConfig);
-      console.log('[Firebase] App initialized successfully');
-    } else {
-      console.log('[Firebase] Using existing Firebase app');
-      app = getApps()[0];
-    }
+// Initialize Auth with persistence
+const auth: Auth = getAuth(app);
+setPersistence(auth, browserLocalPersistence)
+  .catch((error) => {
+    console.error("Error setting auth persistence:", error);
+  });
 
-    // Initialize Firebase services
-    try {
-      auth = getAuth(app);
-      console.log('[Firebase] Auth initialized');
-    } catch (error) {
-      console.error('[Firebase] Auth initialization error:', error);
-    }
+// Initialize Firestore with settings
+const db: Firestore = getFirestore(app);
+const storage = getStorage(app);
 
-    try {
-      firestore = getFirestore(app);
-      console.log('[Firebase] Firestore initialized');
-    } catch (error) {
-      console.error('[Firebase] Firestore initialization error:', error);
-    }
-
-    try {
-      storage = getStorage(app);
-      console.log('[Firebase] Storage initialized');
-    } catch (error) {
-      console.error('[Firebase] Storage initialization error:', error);
-    }
-
-    try {
-      googleProvider = new GoogleAuthProvider();
-      console.log('[Firebase] Google provider initialized');
-    } catch (error) {
-      console.error('[Firebase] Google provider initialization error:', error);
-    }
-
-    // Add Firebase to window for debugging
-    if (typeof window !== 'undefined') {
-      window.firebase = { app, auth, firestore, storage };
-    }
-  } catch (error) {
-    console.error('[Firebase] Global initialization error:', error);
-  }
-} else {
-  console.log('[Firebase] Skipping Firebase initialization in server environment or due to configuration');
+// Configure Firestore
+if (typeof window !== "undefined") {
+  const settings = {
+    experimentalForceLongPolling: true,
+    useFetchStreams: false,
+    cacheSizeBytes: 50 * 1024 * 1024 // 50MB cache size
+  };
+  
+  // @ts-ignore - Type error in settings but it works
+  db.settings(settings);
 }
 
 // Safe access functions
@@ -113,7 +80,7 @@ export const getFirebaseAuth = (): Auth => {
 
 export const getFirebaseFirestore = (): Firestore => {
   if (!isBrowser()) return emptyFirestore;
-  return firestore || emptyFirestore;
+  return db || emptyFirestore;
 };
 
 export const getFirebaseStorage = (): FirebaseStorage => {
@@ -121,13 +88,8 @@ export const getFirebaseStorage = (): FirebaseStorage => {
   return storage || emptyStorage;
 };
 
-export const getGoogleAuthProvider = (): GoogleAuthProvider => {
-  if (!isBrowser() || !googleProvider) return new GoogleAuthProvider();
-  return googleProvider;
-};
-
 // Export firebase instances
-export { app, auth, firestore, storage, googleProvider };
+export { app, auth, db, storage };
 
 // Add TypeScript declaration for debugging
 declare global {

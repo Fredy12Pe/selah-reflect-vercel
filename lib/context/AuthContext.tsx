@@ -65,14 +65,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   const setSessionCookie = async (user: User) => {
     try {
       // Get the ID token with force refresh to ensure it's up to date
-      const idToken = await user.getIdToken(true);
+      const idToken = await user.getIdToken(false);
 
       // Set the cookie with the token
       setCookie("session", idToken, {
         path: "/",
         maxAge: 60 * 60 * 24 * 7, // 7 days
-        sameSite: "strict",
+        sameSite: "lax",
         secure: process.env.NODE_ENV === "production",
+        httpOnly: true
       });
 
       console.log("Session cookie set successfully");
@@ -93,21 +94,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   useEffect(() => {
     // Only run in browser environment
     if (!isBrowser()) {
-      console.log(
-        "AuthProvider: Skip auth state listener in server environment"
-      );
+      console.log("AuthProvider: Skip auth state listener in server environment");
       setLoading(false);
       return;
     }
 
+    let authInitialized = false;
+    
     // Safety timeout to prevent infinite loading
     const safetyTimeout = setTimeout(() => {
-      console.warn(
-        "AuthProvider: Safety timeout reached, continuing without auth"
-      );
-      setLoading(false);
-      setInitAttempted(true);
-    }, 8000); // 8 second timeout
+      if (!authInitialized) {
+        console.warn("AuthProvider: Safety timeout reached, continuing without auth");
+        setLoading(false);
+        setInitAttempted(true);
+      }
+    }, 5000); // Reduced to 5 seconds
 
     // Check if auth is available
     if (!firebaseAuth) {
@@ -127,6 +128,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         firebaseAuth,
         async (authUser) => {
           setLoading(true);
+          authInitialized = true;
 
           try {
             if (authUser) {
@@ -134,7 +136,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
               setUser(authUser);
 
               // Set the session cookie whenever the user is authenticated
-              await setSessionCookie(authUser);
+              // But don't wait for it to complete
+              setSessionCookie(authUser).catch(console.error);
 
               // If on login page and authenticated, redirect to home
               if (pathname === "/auth/login") {
@@ -146,34 +149,30 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
               clearSessionCookie();
 
               // Only redirect to login if on protected route and not already on login page
-              if (
-                pathname &&
-                !pathname.startsWith("/auth/login") &&
-                !pathname.includes("_next") &&
-                !pathname.includes("firebase-fix.js") &&
-                !pathname.includes("firebase-patch.js") &&
-                !pathname.includes("favicon.ico") &&
-                !pathname.includes("manifest.json") &&
-                !pathname.includes("debug.js")
-              ) {
+              const isPublicPath = pathname?.startsWith("/auth/") || 
+                                 pathname?.includes("_next") ||
+                                 pathname?.includes("api/") ||
+                                 pathname === "/";
+              
+              if (pathname && !isPublicPath) {
                 console.log("Redirecting to login from:", pathname);
                 router.push("/auth/login");
               }
             }
           } catch (err) {
             console.error("Error processing auth state:", err);
+            // Don't set error state here to avoid UI disruption
           } finally {
-            clearTimeout(safetyTimeout);
             setLoading(false);
             setInitAttempted(true);
           }
         },
         (error) => {
           console.error("Auth state change error:", error);
-          setError(error.message);
+          // Don't set error state to avoid blocking the UI
           setLoading(false);
-          clearTimeout(safetyTimeout);
           setInitAttempted(true);
+          authInitialized = true;
         }
       );
 
@@ -186,7 +185,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     } catch (err) {
       console.error("Error setting up auth listener:", err);
       setLoading(false);
-      clearTimeout(safetyTimeout);
       setInitAttempted(true);
       return () => {};
     }
