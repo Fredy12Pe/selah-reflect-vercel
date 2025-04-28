@@ -62,14 +62,6 @@ export default function DevotionPage({ params }: { params: { date: string } }) {
       return;
     }
 
-    // For the main devotion page, always show today's devotion
-    // This ensures the main page always shows current content
-    // but allows the reflection page to navigate to other dates
-    if (params.date !== todayDate) {
-      router.replace(`/devotion/${todayDate}`);
-      return;
-    }
-
     if (!loading && !user) {
       const currentPath = window.location.pathname;
       router.push(`/auth/login?from=${encodeURIComponent(currentPath)}`);

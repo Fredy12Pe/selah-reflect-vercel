@@ -247,6 +247,16 @@ export default function ReflectionPage({
       try {
         setIsLoading(true);
         
+        // Validate the date is in correct format
+        const dateObj = parseISO(params.date);
+        if (isNaN(dateObj.getTime())) {
+          const today = new Date();
+          const formattedToday = format(today, 'yyyy-MM-dd');
+          console.log('Invalid date format, redirecting to:', formattedToday);
+          router.replace(`/devotion/${formattedToday}/reflection`);
+          return;
+        }
+
         // Fetch hymn data
         const monthStr = format(currentDate, 'MMMM').toLowerCase();
         const db = getFirebaseDb();
@@ -272,7 +282,7 @@ export default function ReflectionPage({
     if (user) {
       fetchData();
     }
-  }, [params.date, user, currentDate]);
+  }, [params.date, user, currentDate, router]);
 
   // Load background images for modals from Unsplash
   useEffect(() => {
@@ -338,7 +348,7 @@ export default function ReflectionPage({
     loadImages();
   }, [params.date]);
 
-  // Function to handle navigation
+  // Update handleDateChange to allow future dates
   const handleDateChange = async (newDate: Date) => {
     // Don't do anything if we're already loading
     if (isLoading) {

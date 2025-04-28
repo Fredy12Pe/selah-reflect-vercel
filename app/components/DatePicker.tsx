@@ -143,26 +143,22 @@ export default function DatePicker({
               const isSelected = isSameDay(day, selectedDate);
               const isTodayDate = isToday(day);
               const hasDevotional = isDateAvailable(day);
-              const cannotSelect = isFuture(day);
 
               return (
                 <button
                   key={day.toString()}
                   onClick={() => handleDateClick(day)}
-                  disabled={cannotSelect}
                   className={`
                     h-8 w-8 text-sm rounded-full flex items-center justify-center
                     ${!isCurrentMonth ? "text-gray-400 dark:text-gray-600" : ""}
                     ${
                       isSelected
                         ? "bg-primary text-white"
-                        : cannotSelect
-                        ? "cursor-not-allowed opacity-50"
                         : "hover:bg-gray-100 dark:hover:bg-gray-700"
                     }
                     ${isTodayDate && !isSelected ? "border border-primary" : ""}
                     ${
-                      hasDevotional && !isSelected && !cannotSelect
+                      hasDevotional && !isSelected
                         ? "border-2 border-green-500 text-green-500 dark:border-green-400 dark:text-green-400"
                         : ""
                     }
