@@ -60,16 +60,24 @@ export default function DevotionPageClient({ date }: DevotionPageClientProps) {
   const [bibleVerse, setBibleVerse] = useState<BibleVerse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [authInitialized, setAuthInitialized] = useState(false);
+
+  // Handle auth initialization
+  useEffect(() => {
+    if (!authLoading) {
+      setAuthInitialized(true);
+      if (!user) {
+        router.replace(`/auth/login?from=/devotion/${date}`);
+      }
+    }
+  }, [authLoading, user, router, date]);
 
   useEffect(() => {
-    // Don't do anything while auth is loading
-    if (authLoading) return;
+    // Don't do anything until auth is initialized
+    if (!authInitialized) return;
 
-    // If no user and auth is done loading, redirect to login
-    if (!user) {
-      router.replace("/auth/login");
-      return;
-    }
+    // If no user after auth is initialized, we'll handle it in the auth effect
+    if (!user) return;
 
     let mounted = true;
     let controller = new AbortController();
@@ -163,7 +171,7 @@ export default function DevotionPageClient({ date }: DevotionPageClientProps) {
               }
               return;
             } catch (error) {
-              router.replace("/auth/login");
+              router.replace(`/auth/login?from=/devotion/${date}`);
               return;
             }
           }
@@ -190,7 +198,7 @@ export default function DevotionPageClient({ date }: DevotionPageClientProps) {
         const errorMessage = err.message || "Failed to load devotion";
         
         if (errorMessage.includes("Authentication failed") || errorMessage.includes("sign in")) {
-          router.replace("/auth/login");
+          router.replace(`/auth/login?from=/devotion/${date}`);
         } else {
           setError(errorMessage);
         }
@@ -201,17 +209,15 @@ export default function DevotionPageClient({ date }: DevotionPageClientProps) {
       }
     }
 
-    if (user) {
-      loadDevotion();
-    }
+    loadDevotion();
 
     return () => {
       mounted = false;
       controller.abort();
     };
-  }, [date, user, authLoading, router]);
+  }, [date, user, authInitialized, router]);
 
-  if (authLoading || loading) {
+  if (authLoading || !authInitialized) {
     return (
       <div
         className="min-h-screen bg-cover bg-center relative"
