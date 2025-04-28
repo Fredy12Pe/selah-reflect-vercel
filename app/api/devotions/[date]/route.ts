@@ -10,6 +10,7 @@ import { isFuture, parseISO, format, subDays } from 'date-fns';
 // Configure this route for static builds
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
+export const revalidate = 3600; // Cache for 1 hour
 
 // Add generateStaticParams to make it compatible with static exports
 export function generateStaticParams() {
@@ -81,20 +82,7 @@ export async function GET(
     let db;
     
     try {
-      // Try both initialization methods to be resilient
-      try {
-        initAdmin();
-        console.log('Admin initialized with initAdmin function');
-      } catch (error) {
-        if (error instanceof Error) {
-          console.log('initAdmin failed:', error.message);
-        } else {
-          console.log('initAdmin failed with unknown error');
-        }
-        console.log('Falling back to direct initialization');
-        initializeFirebaseAdmin();
-      }
-
+      initAdmin();
       db = getFirestore();
       if (!db) {
         throw new Error('Failed to get Firestore instance');
@@ -102,17 +90,11 @@ export async function GET(
     } catch (error) {
       console.error('Devotions API: Failed to initialize Firebase Admin:', error);
       return NextResponse.json(
-        { error: 'Server configuration error', details: error.message },
+        { error: 'Server configuration error' },
         { status: 500 }
       );
     }
     
-    // TEMPORARY: Skip session cookie check for testing
-    // Remove this and uncomment the original code after debugging
-    const isDev = true; // Force skip auth for testing
-    let userId = 'anonymous';
-    
-    /* Original authentication code - temporarily disabled
     const isDev = process.env.NODE_ENV === 'development';
     let userId = 'anonymous';
     
@@ -120,11 +102,6 @@ export async function GET(
       // Get the session cookie
       const cookieStore = cookies();
       const sessionCookie = cookieStore.get('session');
-      console.log('Devotions API: Session cookie details:', {
-        present: !!sessionCookie,
-        name: sessionCookie?.name,
-        value: sessionCookie?.value ? '[REDACTED]' : undefined,
-      });
 
       if (!sessionCookie?.value) {
         console.log('Devotions API: No session cookie found');
@@ -136,11 +113,9 @@ export async function GET(
 
       // Verify the session cookie
       try {
-        console.log('Devotions API: Verifying session cookie...');
         const auth = getAuth();
         const decodedClaims = await auth.verifySessionCookie(sessionCookie.value, true);
         userId = decodedClaims.uid;
-        console.log('Devotions API: Session verified for user:', userId);
       } catch (error) {
         console.error('Devotions API: Session verification failed:', error);
         return NextResponse.json(
@@ -149,16 +124,11 @@ export async function GET(
         );
       }
     }
-    */
 
     // Get the devotion using Admin SDK
-    console.log('Devotions API: Getting Firestore document...');
     const devotionDoc = await db.collection('devotions').doc(params.date).get();
 
-    console.log('Devotions API: Document exists:', devotionDoc.exists);
     if (!devotionDoc.exists) {
-      console.log('Devotions API: No devotion found for date:', params.date);
-      
       return NextResponse.json(
         { error: 'Devotion not found' },
         { status: 404 }
@@ -166,13 +136,6 @@ export async function GET(
     }
 
     const data = devotionDoc.data() as Devotion;
-    console.log('Devotions API: Retrieved data:', {
-      id: devotionDoc.id,
-      date: data.date,
-      bibleText: data.bibleText,
-      hasReflectionSections: Array.isArray(data.reflectionSections),
-      sectionCount: Array.isArray(data.reflectionSections) ? data.reflectionSections.length : 0,
-    });
 
     // Format the response to match the Devotion type
     const formattedData: Devotion = {
@@ -194,7 +157,12 @@ export async function GET(
       reflectionQuestions: data.reflectionQuestions
     };
 
-    return NextResponse.json(formattedData);
+    // Return response with caching headers
+    return NextResponse.json(formattedData, {
+      headers: {
+        'Cache-Control': 'public, s-maxage=3600, stale-while-revalidate=86400',
+      },
+    });
 
   } catch (error: any) {
     console.error('Devotions API: Error processing request:', error);

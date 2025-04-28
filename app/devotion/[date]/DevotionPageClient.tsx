@@ -58,7 +58,7 @@ export default function DevotionPageClient({ date }: DevotionPageClientProps) {
   const { user, loading: authLoading } = useAuth();
   const [devotion, setDevotion] = useState<Devotion | null>(null);
   const [bibleVerse, setBibleVerse] = useState<BibleVerse | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -72,15 +72,14 @@ export default function DevotionPageClient({ date }: DevotionPageClientProps) {
     }
 
     let mounted = true;
+    let controller = new AbortController();
 
     async function fetchBibleVerse(reference: string) {
       if (!mounted) return null;
       try {
-        console.log("Client: Fetching Bible verse for reference:", reference);
         const response = await fetch(
-          `https://bible-api.com/${encodeURIComponent(
-            reference
-          )}?verse_numbers=true`
+          `https://bible-api.com/${encodeURIComponent(reference)}?verse_numbers=true`,
+          { signal: controller.signal }
         );
 
         if (!response.ok) {
@@ -89,10 +88,8 @@ export default function DevotionPageClient({ date }: DevotionPageClientProps) {
 
         const data = await response.json();
         if (!mounted) return null;
-        console.log("Client: Bible API response:", data);
 
         if (!data.verses || data.verses.length === 0) {
-          console.error("No verses found for reference:", reference);
           return null;
         }
 
@@ -104,7 +101,8 @@ export default function DevotionPageClient({ date }: DevotionPageClientProps) {
             text: v.text.trim(),
           })),
         };
-      } catch (error) {
+      } catch (error: any) {
+        if (error.name === 'AbortError') return null;
         console.error("Error fetching Bible verse:", error);
         return null;
       }
@@ -115,29 +113,45 @@ export default function DevotionPageClient({ date }: DevotionPageClientProps) {
       try {
         setLoading(true);
         setError(null);
-        console.log("Loading devotion for date:", date);
-        const devotionData = await getDevotionByDate(date);
-        if (!mounted) return;
-        console.log("Devotion data:", devotionData);
         
-        if (!devotionData) {
-          router.replace(`/devotion/${date}/reflection`);
-          return;
+        const response = await fetch(`/api/devotions/${date}`, {
+          credentials: 'include',
+          signal: controller.signal,
+          headers: {
+            'Cache-Control': 'no-cache'
+          }
+        });
+
+        if (!mounted) return;
+
+        if (!response.ok) {
+          if (response.status === 404) {
+            router.replace(`/devotion/${date}/reflection`);
+            return;
+          }
+          if (response.status === 401) {
+            router.push("/auth/login");
+            return;
+          }
+          throw new Error(`Failed to fetch devotion: ${response.statusText}`);
         }
+
+        const devotionData = await response.json();
+        if (!mounted) return;
         
         setDevotion(devotionData);
 
         const reference = getBibleReference(devotionData);
         if (reference) {
-          console.log("Using reference for Bible API:", reference);
           const verse = await fetchBibleVerse(reference);
           if (mounted && verse) {
-            console.log("Successfully fetched Bible verses:", verse);
             setBibleVerse(verse);
           }
         }
       } catch (err: any) {
         if (!mounted) return;
+        if (err.name === 'AbortError') return;
+        
         console.error("Error loading devotion:", err);
         const errorMessage = err.message || "Failed to load devotion";
         
@@ -157,6 +171,7 @@ export default function DevotionPageClient({ date }: DevotionPageClientProps) {
 
     return () => {
       mounted = false;
+      controller.abort();
     };
   }, [date, user, authLoading, router]);
 
