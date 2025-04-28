@@ -1,10 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/lib/context/AuthContext";
-import { getDevotionByDate } from "@/lib/services/devotionService";
 import { Devotion } from "@/lib/types/devotion";
 import { ArrowRightIcon } from "@heroicons/react/24/outline";
 
@@ -26,30 +25,24 @@ interface BibleVerse {
  * Helper functions to handle both old and new data formats
  */
 const getBibleReference = (devotion: any): string => {
-  // Try new format first, then fall back to old format
   return devotion.bibleText || devotion.scriptureReference || "";
 };
 
 const getReflectionQuestions = (devotion: any): string[] => {
-  // Try new format first
   if (devotion.reflectionSections && devotion.reflectionSections.length > 0) {
-    // Flatten all questions from all sections
     return devotion.reflectionSections.reduce((acc: string[], section: any) => {
       return acc.concat(section.questions || []);
     }, []);
   }
-  // Fall back to old format
   return devotion.reflectionQuestions || [];
 };
 
 const hasReflectionContent = (devotion: any): boolean => {
-  // Check new format
   if (devotion.reflectionSections) {
     return devotion.reflectionSections.some(
       (section: any) => section.questions && section.questions.length > 0
     );
   }
-  // Check old format
   return Array.isArray(devotion.reflectionQuestions) && devotion.reflectionQuestions.length > 0;
 };
 
@@ -58,255 +51,183 @@ export default function DevotionPageClient({ date }: DevotionPageClientProps) {
   const { user, loading: authLoading } = useAuth();
   const [devotion, setDevotion] = useState<Devotion | null>(null);
   const [bibleVerse, setBibleVerse] = useState<BibleVerse | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [authInitialized, setAuthInitialized] = useState(false);
+  const [hasAttemptedLoad, setHasAttemptedLoad] = useState(false);
 
-  // Handle auth initialization
+  const fetchBibleVerse = useCallback(async (reference: string, signal?: AbortSignal) => {
+    try {
+      const response = await fetch(
+        `https://bible-api.com/${encodeURIComponent(reference)}?verse_numbers=true`,
+        { signal }
+      );
+
+      if (!response.ok) {
+        throw new Error(`Bible API error: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      if (!data.verses || data.verses.length === 0) {
+        return null;
+      }
+
+      return {
+        text: data.text,
+        reference: data.reference,
+        verses: data.verses.map((v: any) => ({
+          verse: v.verse,
+          text: v.text.trim(),
+        })),
+      };
+    } catch (error: any) {
+      if (error.name === 'AbortError') return null;
+      console.error("Error fetching Bible verse:", error);
+      return null;
+    }
+  }, []);
+
+  const loadDevotion = useCallback(async (signal?: AbortSignal) => {
+    if (!user) return;
+    
+    try {
+      setLoading(true);
+      setError(null);
+      
+      const token = await user.getIdToken(true);
+      const response = await fetch(`/api/devotions/${date}`, {
+        credentials: 'include',
+        signal,
+        headers: {
+          'Cache-Control': 'no-cache',
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (!response.ok) {
+        if (response.status === 401) {
+          const newToken = await user.getIdToken(true);
+          const retryResponse = await fetch(`/api/devotions/${date}`, {
+            credentials: 'include',
+            signal,
+            headers: {
+              'Cache-Control': 'no-cache',
+              'Authorization': `Bearer ${newToken}`
+            }
+          });
+          
+          if (!retryResponse.ok) {
+            throw new Error('Authentication failed');
+          }
+          
+          const data = await retryResponse.json();
+          if (data.notFound) {
+            router.push(`/devotion/${date}/reflection`);
+            return;
+          }
+          
+          setDevotion(data);
+          const reference = getBibleReference(data);
+          if (reference) {
+            const verse = await fetchBibleVerse(reference, signal);
+            if (verse) setBibleVerse(verse);
+          }
+          return;
+        }
+        throw new Error(`Failed to fetch devotion: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      if (data.notFound) {
+        router.push(`/devotion/${date}/reflection`);
+        return;
+      }
+      
+      setDevotion(data);
+      const reference = getBibleReference(data);
+      if (reference) {
+        const verse = await fetchBibleVerse(reference, signal);
+        if (verse) setBibleVerse(verse);
+      }
+    } catch (err: any) {
+      if (err.name === 'AbortError') return;
+      
+      console.error("Error loading devotion:", err);
+      const errorMessage = err.message || "Failed to load devotion";
+      
+      if (errorMessage.includes("Authentication failed") || errorMessage.includes("sign in")) {
+        if (!window.location.pathname.includes('/auth/login')) {
+          router.push(`/auth/login?from=/devotion/${date}`);
+        }
+      } else {
+        setError(errorMessage);
+      }
+    } finally {
+      setLoading(false);
+      setHasAttemptedLoad(true);
+    }
+  }, [user, date, router, fetchBibleVerse]);
+
+  // Handle auth initialization and loading
   useEffect(() => {
     if (!authLoading) {
-      setAuthInitialized(true);
-      if (!user) {
-        // Only redirect if we're not already on the login page
-        const currentPath = window.location.pathname;
-        if (!currentPath.includes('/auth/login')) {
-          router.replace(`/auth/login?from=/devotion/${date}`);
-        }
+      if (!user && !window.location.pathname.includes('/auth/login')) {
+        router.push(`/auth/login?from=/devotion/${date}`);
       }
     }
   }, [authLoading, user, router, date]);
 
+  // Handle data loading
   useEffect(() => {
-    // Don't do anything until auth is initialized
-    if (!authInitialized || !user) return;
+    if (authLoading || !user || hasAttemptedLoad) return;
 
-    let mounted = true;
     const controller = new AbortController();
-
-    async function fetchBibleVerse(reference: string) {
-      if (!mounted) return null;
-      try {
-        const response = await fetch(
-          `https://bible-api.com/${encodeURIComponent(reference)}?verse_numbers=true`,
-          { signal: controller.signal }
-        );
-
-        if (!response.ok) {
-          throw new Error(`Bible API error: ${response.statusText}`);
-        }
-
-        const data = await response.json();
-        if (!mounted) return null;
-
-        if (!data.verses || data.verses.length === 0) {
-          return null;
-        }
-
-        return {
-          text: data.text,
-          reference: data.reference,
-          verses: data.verses.map((v: any) => ({
-            verse: v.verse,
-            text: v.text.trim(),
-          })),
-        };
-      } catch (error: any) {
-        if (error.name === 'AbortError') return null;
-        console.error("Error fetching Bible verse:", error);
-        return null;
-      }
-    }
-
-    async function loadDevotion() {
-      if (!mounted || !user) return;
-      try {
-        setLoading(true);
-        setError(null);
-        
-        // Get a fresh token
-        const token = await user.getIdToken(true);
-        
-        const response = await fetch(`/api/devotions/${date}`, {
-          credentials: 'include',
-          signal: controller.signal,
-          headers: {
-            'Cache-Control': 'no-cache',
-            'Authorization': `Bearer ${token}`
-          }
-        });
-
-        if (!mounted || !user) return;
-
-        if (!response.ok) {
-          if (response.status === 401) {
-            // Try to refresh the token and retry once
-            try {
-              const newToken = await user.getIdToken(true);
-              const retryResponse = await fetch(`/api/devotions/${date}`, {
-                credentials: 'include',
-                signal: controller.signal,
-                headers: {
-                  'Cache-Control': 'no-cache',
-                  'Authorization': `Bearer ${newToken}`
-                }
-              });
-              
-              if (!retryResponse.ok) {
-                throw new Error('Authentication failed');
-              }
-              
-              const devotionData = await retryResponse.json();
-              if (!mounted) return;
-              
-              if (devotionData.notFound) {
-                // Use router.push instead of replace to prevent loops
-                router.push(`/devotion/${date}/reflection`);
-                return;
-              }
-              
-              setDevotion(devotionData);
-              
-              const reference = getBibleReference(devotionData);
-              if (reference) {
-                const verse = await fetchBibleVerse(reference);
-                if (mounted && verse) {
-                  setBibleVerse(verse);
-                }
-              }
-              return;
-            } catch (error) {
-              if (!window.location.pathname.includes('/auth/login')) {
-                router.push(`/auth/login?from=/devotion/${date}`);
-              }
-              return;
-            }
-          }
-          throw new Error(`Failed to fetch devotion: ${response.statusText}`);
-        }
-
-        const devotionData = await response.json();
-        if (!mounted) return;
-        
-        if (devotionData.notFound) {
-          // Use router.push instead of replace to prevent loops
-          router.push(`/devotion/${date}/reflection`);
-          return;
-        }
-        
-        setDevotion(devotionData);
-
-        const reference = getBibleReference(devotionData);
-        if (reference) {
-          const verse = await fetchBibleVerse(reference);
-          if (mounted && verse) {
-            setBibleVerse(verse);
-          }
-        }
-      } catch (err: any) {
-        if (!mounted) return;
-        if (err.name === 'AbortError') return;
-        
-        console.error("Error loading devotion:", err);
-        const errorMessage = err.message || "Failed to load devotion";
-        
-        if (errorMessage.includes("Authentication failed") || errorMessage.includes("sign in")) {
-          if (!window.location.pathname.includes('/auth/login')) {
-            router.push(`/auth/login?from=/devotion/${date}`);
-          }
-        } else {
-          setError(errorMessage);
-        }
-      } finally {
-        if (mounted) {
-          setLoading(false);
-        }
-      }
-    }
-
-    // Only load if we haven't already loaded
-    if (!devotion && !loading) {
-      loadDevotion();
-    }
+    loadDevotion(controller.signal);
 
     return () => {
-      mounted = false;
       controller.abort();
     };
-  }, [date, user, authInitialized, router, devotion, loading]);
+  }, [authLoading, user, loadDevotion, hasAttemptedLoad]);
 
-  if (authLoading || !authInitialized) {
+  if (authLoading || (loading && !hasAttemptedLoad)) {
     return (
-      <div
-        className="min-h-screen bg-cover bg-center relative"
-        style={{ backgroundImage: "url(/images/background.jpg)" }}
-      >
-        <div className="absolute inset-0 bg-gradient-to-b from-black/60 to-black/40" />
-        <div className="relative z-10 flex items-center justify-center min-h-screen">
-          <div className="w-8 h-8 border-4 border-white border-t-transparent rounded-full animate-spin" />
-        </div>
+      <div className="min-h-screen bg-black/90 flex items-center justify-center">
+        <div className="w-8 h-8 border-4 border-white border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
 
   if (error) {
     return (
-      <div
-        className="min-h-screen bg-cover bg-center relative"
-        style={{ backgroundImage: "url(/images/background.jpg)" }}
-      >
-        <div className="absolute inset-0 bg-gradient-to-b from-black/60 to-black/40" />
-        <div className="relative z-10 flex flex-col items-center justify-center min-h-screen text-white">
-          <p className="text-xl mb-4">{error}</p>
-          {error.includes("sign in") ? (
-            <button
-              onClick={() => router.push("/auth/login")}
-              className="px-4 py-2 bg-white/20 rounded-lg hover:bg-white/30 transition-colors"
-            >
-              Sign In
-            </button>
-          ) : (
-            <button
-              onClick={() => window.location.reload()}
-              className="px-4 py-2 bg-white/20 rounded-lg hover:bg-white/30 transition-colors"
-            >
-              Try Again
-            </button>
-          )}
-        </div>
+      <div className="min-h-screen bg-black/90 flex flex-col items-center justify-center text-white p-4">
+        <p className="text-xl mb-4">{error}</p>
+        <button
+          onClick={() => {
+            setHasAttemptedLoad(false);
+            loadDevotion();
+          }}
+          className="px-4 py-2 bg-white/20 rounded-lg hover:bg-white/30 transition-colors"
+        >
+          Try Again
+        </button>
       </div>
     );
   }
 
   if (!devotion) {
     return (
-      <div
-        className="min-h-screen bg-cover bg-center relative"
-        style={{ backgroundImage: "url(/images/background.jpg)" }}
-      >
-        <div className="absolute inset-0 bg-gradient-to-b from-black/60 to-black/40" />
-        <div className="relative z-10 flex flex-col items-center justify-center min-h-screen text-white">
-          <p className="text-xl">No devotion found for this date</p>
-        </div>
+      <div className="min-h-screen bg-black/90 flex items-center justify-center text-white">
+        <p className="text-xl">No devotion found for this date</p>
       </div>
     );
   }
 
-  // Get Bible reference for display - handle both data formats
   const displayReference = getBibleReference(devotion);
-
-  // Handle reflection questions from both formats
   const hasReflectionQuestions = hasReflectionContent(devotion);
-
-  // Get reflection questions - handle both data formats
   const reflectionQuestions = getReflectionQuestions(devotion);
 
   return (
-    <div
-      className="min-h-screen bg-cover bg-center relative"
-      style={{ backgroundImage: "url(/images/background.jpg)" }}
-    >
-      <div className="absolute inset-0 bg-gradient-to-b from-black/60 to-black/40" />
-      <div className="relative z-10 container mx-auto px-4 py-12 text-white">
+    <div className="min-h-screen bg-black/90">
+      <div className="container mx-auto px-4 py-12 text-white">
         <div className="max-w-3xl mx-auto space-y-12">
           {/* Scripture Section */}
           <div className="bg-black/30 backdrop-blur-sm rounded-xl p-6 space-y-4">
@@ -328,9 +249,7 @@ export default function DevotionPageClient({ date }: DevotionPageClientProps) {
                 ))
               ) : (
                 <p className="text-lg leading-relaxed text-white/90">
-                  {(devotion as any).scriptureText
-                    ? (devotion as any).scriptureText
-                    : "Loading scripture text..."}
+                  {(devotion as any).scriptureText || "Loading scripture text..."}
                 </p>
               )}
             </div>
