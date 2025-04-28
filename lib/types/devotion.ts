@@ -11,6 +11,7 @@ export interface Devotion {
   month?: string;
   updatedAt?: string;
   updatedBy?: string;
+  notFound?: boolean;
   // Legacy fields for backward compatibility
   scriptureReference?: string;
   scriptureText?: string;

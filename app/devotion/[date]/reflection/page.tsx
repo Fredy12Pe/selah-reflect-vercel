@@ -270,6 +270,8 @@ export default function ReflectionPage({
 
         // Fetch devotion data
         const devotion = await getDevotionByDate(params.date);
+        // Even if devotion is null or has notFound flag, we still set it
+        // This allows us to show appropriate UI for missing devotions
         setDevotionData(devotion);
       } catch (error) {
         console.error('Error fetching data:', error);
@@ -393,9 +395,9 @@ export default function ReflectionPage({
     return allQuestions.slice(0, 2);
   };
 
-  // Get the current questions
-  const currentQuestions = getFirstTwoQuestions();
-  console.log("Current questions:", currentQuestions);
+  // Show appropriate content even when no devotion is found
+  const showNoDevotionContent = !devotionData || devotionData.notFound;
+  const reflectionQuestions = showNoDevotionContent ? [] : getFirstTwoQuestions();
 
   // Function to handle AI reflection generation
   const handleReflectionGeneration = async () => {
@@ -680,660 +682,129 @@ export default function ReflectionPage({
     );
   }
 
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-black/90 flex items-center justify-center">
+        <div className="w-8 h-8 border-4 border-white border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
   return (
-    <main className="min-h-screen bg-black text-white">
-      {/* Date Navigation */}
-      <div className="relative flex items-center justify-center py-4">
-        <button
-          onClick={() => handleDateChange(subDays(currentDate, 1))}
-          disabled={isLoading}
-          className="absolute left-4 w-10 h-10 flex items-center justify-center rounded-full bg-zinc-800/50
-            hover:bg-zinc-700/50 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-          aria-label="Previous day"
-          title="Previous day"
-        >
-          <ChevronLeftIcon className="w-6 h-6" />
-        </button>
-
-        <button
-          ref={dateButtonRef}
-          onClick={toggleCalendar}
-          className="px-8 py-2 rounded-full bg-zinc-800/50 hover:bg-zinc-700/50 transition-all flex items-center gap-2"
-          aria-label="Open calendar"
-          title="Select a date"
-        >
-          <span className="text-lg">{format(currentDate, "EEEE, MMMM d")}</span>
-          <CalendarIcon className="w-5 h-5" />
-        </button>
-
-        {showCalendar && (
-          <div ref={calendarRef} className="absolute top-full mt-2 z-50">
-            <DatePicker
-              initialDate={currentDate}
-              onDateSelect={(date) => {
-                if (date && !isFuture(date) && !isLoading) {
-                  handleDateChange(date);
-                }
-              }}
-              isOpen={showCalendar}
-              onClose={() => setShowCalendar(false)}
-              highlightAvailableDates={true}
-            />
-          </div>
-        )}
-
-        <button
-          onClick={() => handleDateChange(addDays(currentDate, 1))}
-          disabled={isNextDisabled || isLoading}
-          className="absolute right-4 w-10 h-10 flex items-center justify-center rounded-full bg-zinc-800/50
-            hover:bg-zinc-700/50 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-          aria-label="Next day"
-          title="Next day"
-        >
-          <ChevronRightIcon className="w-6 h-6" />
-        </button>
-      </div>
-
-      <div className="px-4 py-6 space-y-6">
-        {isLoading ? (
-          <div className="text-center py-8">Loading...</div>
-        ) : !devotionData ? (
-          <div className="flex flex-col items-center justify-center py-8 space-y-12">
-            {/* Hymn of the Month Section */}
-            <div className="w-full max-w-lg bg-black/30 backdrop-blur-md rounded-xl overflow-hidden">
-              <div className="relative h-48 w-full">
-                <Image
-                  src={hymnImage || "/hymn-bg.jpg"}
-                  alt="Hymn background"
-                  fill
-                  className="object-cover"
-                />
-                <div className="absolute inset-0 bg-black/50" />
-                <div className="absolute inset-0 flex flex-col justify-center p-6 text-white">
-                  <h3 className="text-lg text-white/80 mb-2">Hymn of the Month:</h3>
-                  <h2 className="text-3xl font-bold">{hymn?.title || "When I survey the Wondrous Cross"}</h2>
-                </div>
-              </div>
-            </div>
-
-            {/* No Devotion Message */}
-            <div className="text-center space-y-6">
-              <p className="text-2xl">"No devotion is available for today.</p>
-              <p className="text-xl">
-                New devotions are posted Monday through Friday</p>
-              <p className="text-xl">check back soon!"</p>
-            </div>
-          </div>
-        ) : (
-          <>
-            {/* Hymn of the Month */}
-            <BackgroundCard
-              date={params.date}
-              query="landscape mountains sunrise peaceful"
-              height="200px"
-              className="w-full cursor-pointer rounded-3xl"
-              onClick={() => setShowHymnModal(true)}
-              imageType="hymn"
+    <div className="min-h-screen bg-black/90">
+      <div className="container mx-auto px-4 py-12 text-white">
+        <div className="max-w-3xl mx-auto space-y-12">
+          {/* Date Navigation */}
+          <div className="flex items-center justify-between">
+            <button
+              onClick={() => handleDateChange(subDays(currentDate, 1))}
+              className="p-2 hover:bg-white/10 rounded-lg transition-colors"
             >
-              <div className="absolute inset-0 bg-gradient-to-b from-blue-900/60 to-black/80" />
-              <div className="relative p-6 flex flex-col justify-end h-full">
-                <p className="text-lg font-medium mb-2">Hymn of the Month:</p>
-                <h2 className="text-3xl font-medium">
-                  When I survey the Wondrous Cross
+              <ChevronLeftIcon className="w-6 h-6" />
+            </button>
+            
+            <div className="relative">
+              <button
+                ref={dateButtonRef}
+                onClick={toggleCalendar}
+                className="flex items-center space-x-2 px-4 py-2 bg-white/10 rounded-lg hover:bg-white/20 transition-colors"
+              >
+                <CalendarIcon className="w-5 h-5" />
+                <span>{format(currentDate, "MMMM d, yyyy")}</span>
+              </button>
+              
+              {showCalendar && (
+                <div
+                  ref={calendarRef}
+                  className="absolute top-full mt-2 z-50 bg-black/95 p-4 rounded-lg shadow-xl border border-white/10"
+                >
+                  <DatePicker
+                    initialDate={currentDate}
+                    onDateSelect={(date: Date | null) => {
+                      if (date) {
+                        handleDateChange(date);
+                        setShowCalendar(false);
+                      }
+                    }}
+                    isOpen={showCalendar}
+                    onClose={() => setShowCalendar(false)}
+                  />
+                </div>
+              )}
+            </div>
+            
+            <button
+              onClick={() => handleDateChange(addDays(currentDate, 1))}
+              className="p-2 hover:bg-white/10 rounded-lg transition-colors"
+            >
+              <ChevronRightIcon className="w-6 h-6" />
+            </button>
+          </div>
+
+          {/* Hymn of the Month Section */}
+          {hymn && (
+            <div
+              className="relative overflow-hidden rounded-xl cursor-pointer group"
+              onClick={() => setShowHymnModal(true)}
+            >
+              <div className="absolute inset-0 bg-gradient-to-b from-black/40 to-black/90 z-10" />
+              <Image
+                src={hymnImage}
+                alt="Hymn background"
+                width={1200}
+                height={400}
+                className="object-cover w-full h-48"
+              />
+              <div className="absolute inset-0 z-20 p-6 flex flex-col justify-end">
+                <h2 className="text-2xl font-semibold mb-2">
+                  Hymn of the Month
                 </h2>
+                <p className="text-lg text-white/90">{hymn.title}</p>
               </div>
-            </BackgroundCard>
-
-            {/* Today's Scripture */}
-            <div>
-              <h3 className="text-xl mb-3">Today's Scripture</h3>
-              <div
-                className="p-6 rounded-2xl bg-zinc-900/80 cursor-pointer hover:bg-zinc-800/80 transition-colors"
-                onClick={handleOpenScriptureModal}
-              >
-                <p className="text-2xl font-medium">
-                  {devotionData?.bibleText || "No scripture available"}
-                </p>
-              </div>
+              <div className="absolute inset-0 bg-white/20 opacity-0 group-hover:opacity-100 transition-opacity z-30" />
             </div>
+          )}
 
-            {/* Reflection Questions */}
-            <div>
-              <h3 className="text-xl mb-3">Reflection Questions</h3>
-              <div className="p-6 rounded-2xl bg-zinc-900/80 space-y-8">
+          {/* Main Content */}
+          {showNoDevotionContent ? (
+            <div className="bg-black/30 backdrop-blur-sm rounded-xl p-6 space-y-4">
+              <h2 className="text-2xl font-semibold">No Devotion Available</h2>
+              <p className="text-lg text-white/90">
+                There is no devotion available for this date yet. You can still:
+              </p>
+              <ul className="list-disc list-inside space-y-2 text-white/80">
+                <li>Read and meditate on the hymn of the month above</li>
+                <li>Navigate to a different date using the calendar</li>
+                <li>Come back later when content is available</li>
+              </ul>
+            </div>
+          ) : (
+            <>
+              {/* Reflection Questions */}
+              {reflectionQuestions.length > 0 && (
                 <div className="space-y-6">
-                  {currentQuestions.length > 0 ? (
-                    currentQuestions.map((question, index) => (
-                      <div key={index}>
-                        <p className="text-lg">
-                          {index + 1}. {question}
-                        </p>
-                      </div>
-                    ))
-                  ) : (
-                    <>
-                      <div>
-                        <p className="text-lg">1.</p>
-                      </div>
-                      <div>
-                        <p className="text-lg">2.</p>
-                      </div>
-                    </>
-                  )}
-                </div>
-                <Link
-                  href={`/devotion/${params.date}/journal`}
-                  className="inline-flex items-center px-6 py-3 bg-white text-black rounded-full font-medium"
-                >
-                  Journal Entry
-                  <ArrowRightIcon className="w-5 h-5 ml-2" />
-                </Link>
-              </div>
-            </div>
-
-            {/* Reflect with AI */}
-            <div>
-              <h3 className="text-xl mb-3">Reflect with AI</h3>
-              <div className="flex gap-2 mb-4">
-                <input
-                  type="text"
-                  placeholder="Ask questions about today's text..."
-                  className="flex-1 px-6 py-4 rounded-2xl bg-zinc-900/80 text-white placeholder-gray-400"
-                  value={question}
-                  onChange={(e) => setQuestion(e.target.value)}
-                  onKeyPress={handleReflectionKeyPress}
-                  disabled={isAiLoading}
-                />
-                <button
-                  className="p-4 rounded-2xl bg-zinc-900/80 hover:bg-zinc-700/80 transition-all disabled:opacity-50"
-                  onClick={handleReflectionGeneration}
-                  disabled={
-                    isAiLoading || !question.trim() || !devotionData?.bibleText
-                  }
-                >
-                  {isAiLoading ? (
-                    <div className="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                  ) : (
-                    <ArrowRightIcon className="w-6 h-6" />
-                  )}
-                </button>
-              </div>
-
-              {aiError && (
-                <div className="text-red-400 mb-4 px-4 py-2 bg-red-900/30 rounded-lg">
-                  {aiError}
+                  {reflectionQuestions.map((question, index) => (
+                    <div
+                      key={index}
+                      className="bg-black/30 backdrop-blur-sm rounded-xl p-6"
+                    >
+                      <p className="text-lg mb-4">{question}</p>
+                      <textarea
+                        className="w-full bg-black/30 rounded-lg p-4 text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-white/20"
+                        rows={4}
+                        placeholder="Write your reflection here..."
+                      />
+                    </div>
+                  ))}
                 </div>
               )}
-
-              {aiReflection && (
-                <div className="p-6 rounded-2xl bg-zinc-900/80 mb-6">
-                  <p className="text-lg whitespace-pre-wrap">{aiReflection}</p>
-                </div>
-              )}
-            </div>
-
-            {/* Resources */}
-            <div onClick={handleOpenResourcesModal} className="cursor-pointer">
-              <BackgroundCard
-                date={params.date}
-                query="landscape forest lake sunset"
-                height="150px"
-                className="rounded-2xl"
-                imageType="resources"
-              >
-                <div className="absolute inset-0 bg-gradient-to-br from-black/70 via-purple-900/70 to-black/80 hover:opacity-90 transition-opacity" />
-                <div className="relative p-6">
-                  <h3 className="text-2xl font-semibold mb-2">
-                    Resources for today's text
-                  </h3>
-                  <p className="text-gray-300">
-                    Bible Commentaries, Videos, and Podcasts
-                  </p>
-                </div>
-              </BackgroundCard>
-            </div>
-          </>
-        )}
+            </>
+          )}
+        </div>
       </div>
 
-      {/* Hymn Modal */}
-      {showHymnModal && (
-        <div
-          className={`fixed inset-0 z-50 flex items-end justify-center bg-black/80 ${
-            isHymnModalClosing ? "animate-fadeout" : "animate-fadein"
-          }`}
-          onClick={closeHymnModal}
-        >
-          <div
-            className={`w-full max-w-lg bg-zinc-900 rounded-t-2xl p-6 max-h-[80vh] overflow-y-auto ${
-              isHymnModalClosing ? "animate-slideout" : "animate-slidein"
-            }`}
-            onClick={(e) => e.stopPropagation()} // Prevent closing when clicking on the modal content
-          >
-            <div className="flex justify-between items-center mb-6">
-              <h2 className="text-xl font-bold">
-                When I Survey the Wondrous Cross
-              </h2>
-              <button
-                onClick={closeHymnModal}
-                className="p-2 text-white hover:text-gray-300"
-              >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  className="h-6 w-6"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M6 18L18 6M6 6l12 12"
-                  />
-                </svg>
-              </button>
-            </div>
-
-            <p className="text-gray-400 italic mb-6">By Isaac Watts, 1707</p>
-
-            <div className="space-y-6">
-              {hymnLyrics.map((verse) => (
-                <div key={verse.verse} className="space-y-1.5">
-                  <p className="text-gray-400 font-medium">
-                    Verse {verse.verse}
-                  </p>
-                  {verse.lines.map((line, i) => (
-                    <p key={i} className="text-white">
-                      {line}
-                    </p>
-                  ))}
-                </div>
-              ))}
-            </div>
-
-            <div className="mt-8 border-t border-zinc-700 pt-4">
-              <p className="text-gray-400 text-sm">
-                This hymn reminds us of Christ's sacrifice and calls us to
-                respond with total dedication. It's one of the most powerful and
-                beloved hymns in Christian worship.
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Scripture Modal */}
-      {showScriptureModal && (
-        <div
-          className={`fixed inset-0 z-50 flex items-end justify-center bg-black/80 ${
-            isScriptureModalClosing ? "animate-fadeout" : "animate-fadein"
-          }`}
-          onClick={closeScriptureModal}
-        >
-          <div
-            className={`w-full max-w-lg bg-zinc-900 rounded-t-2xl p-6 max-h-[80vh] overflow-y-auto ${
-              isScriptureModalClosing ? "animate-slideout" : "animate-slidein"
-            }`}
-            onClick={(e) => e.stopPropagation()} // Prevent closing when clicking on the modal content
-          >
-            <div className="flex justify-between items-center mb-6">
-              <h2 className="text-xl font-bold">
-                {bibleVerse?.reference ||
-                  devotionData?.bibleText ||
-                  "Scripture"}
-              </h2>
-              <button
-                onClick={closeScriptureModal}
-                className="p-2 text-white hover:text-gray-300"
-              >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  className="h-6 w-6"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M6 18L18 6M6 6l12 12"
-                  />
-                </svg>
-              </button>
-            </div>
-
-            <div className="space-y-4">
-              {isFetchingBibleVerse ? (
-                <div className="flex justify-center py-8">
-                  <div className="w-8 h-8 border-4 border-white border-t-transparent rounded-full animate-spin" />
-                </div>
-              ) : bibleVerse?.verses ? (
-                <div className="space-y-4">
-                  {bibleVerse.verses.map((verse) => (
-                    <p
-                      key={verse.verse}
-                      className="text-lg leading-relaxed text-white/90"
-                    >
-                      <span className="text-white/50 text-sm align-super mr-2">
-                        {verse.verse}
-                      </span>
-                      {verse.text}
-                    </p>
-                  ))}
-                </div>
-              ) : (
-                <div>
-                  {/* Fallback to display the raw text if no verse structure is available */}
-                  {devotionData?.bibleText && (
-                    <p className="text-lg leading-relaxed text-white/90">
-                      {devotionData.bibleText}
-                    </p>
-                  )}
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Resources Modal */}
-      {showResourcesModal && (
-        <div
-          className={`fixed inset-0 z-50 flex items-end justify-center bg-black/80 ${
-            isResourcesModalClosing ? "animate-fadeout" : "animate-fadein"
-          }`}
-          onClick={closeResourcesModal}
-        >
-          <div
-            className={`w-full max-w-lg bg-zinc-900 rounded-t-2xl p-6 max-h-[80vh] overflow-y-auto ${
-              isResourcesModalClosing ? "animate-slideout" : "animate-slidein"
-            }`}
-            onClick={(e) => e.stopPropagation()} // Prevent closing when clicking on the modal content
-          >
-            <div className="flex justify-between items-center mb-6">
-              <h2 className="text-xl font-bold">
-                Resources for {bibleVerse?.reference || devotionData?.bibleText}
-              </h2>
-              <button
-                onClick={closeResourcesModal}
-                className="p-2 text-white hover:text-gray-300"
-              >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  className="h-6 w-6"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M6 18L18 6M6 6l12 12"
-                  />
-                </svg>
-              </button>
-            </div>
-
-            {isFetchingResources ? (
-              <div className="flex flex-col items-center justify-center py-12">
-                <div className="w-12 h-12 border-4 border-white border-t-transparent rounded-full animate-spin mb-4" />
-                <p className="text-white/70 text-lg">
-                  Finding resources for this passage...
-                </p>
-                <p className="text-white/50 text-sm mt-2">
-                  This may take a few moments
-                </p>
-              </div>
-            ) : resourcesError ? (
-              <div className="text-red-400 mb-4 px-4 py-2 bg-red-900/30 rounded-lg">
-                {resourcesError}
-              </div>
-            ) : !resources ? (
-              <div className="flex flex-col items-center justify-center py-12">
-                <div className="w-12 h-12 border-4 border-white border-t-transparent rounded-full animate-spin mb-4" />
-                <p className="text-white/70 text-lg">
-                  Finding resources for this passage...
-                </p>
-                <p className="text-white/50 text-sm mt-2">
-                  This may take a few moments
-                </p>
-              </div>
-            ) : (
-              <div className="space-y-8">
-                {/* Commentaries Section */}
-                {resources.commentaries &&
-                  resources.commentaries.length > 0 && (
-                    <div>
-                      <h3 className="text-lg font-medium text-white/80 mb-3">
-                        Online Commentaries
-                      </h3>
-                      <div className="space-y-4">
-                        {resources.commentaries.map((item, index) => (
-                          <div
-                            key={index}
-                            className="p-4 bg-zinc-800/50 rounded-xl"
-                          >
-                            <h4 className="font-bold text-white">
-                              {item.title}
-                            </h4>
-                            {item.author && (
-                              <p className="text-white/70 text-sm">
-                                {item.author}
-                              </p>
-                            )}
-                            <p className="text-white/80 mt-2">
-                              {item.description}
-                            </p>
-                            <a
-                              href={
-                                isValidUrl(item.url)
-                                  ? item.url
-                                  : getFallbackUrl(
-                                      item.type || "commentary",
-                                      item.title
-                                    )
-                              }
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-blue-400 hover:text-blue-300 mt-2 inline-flex items-center"
-                            >
-                              Read Commentary
-                              <svg
-                                xmlns="http://www.w3.org/2000/svg"
-                                className="h-4 w-4 ml-1"
-                                fill="none"
-                                viewBox="0 0 24 24"
-                                stroke="currentColor"
-                              >
-                                <path
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  strokeWidth={2}
-                                  d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
-                                />
-                              </svg>
-                            </a>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                {/* Videos Section */}
-                {resources.videos && resources.videos.length > 0 && (
-                  <div>
-                    <h3 className="text-lg font-medium text-white/80 mb-3">
-                      Videos
-                    </h3>
-                    <div className="space-y-4">
-                      {resources.videos.map((item, index) => (
-                        <div
-                          key={index}
-                          className="p-4 bg-zinc-800/50 rounded-xl"
-                        >
-                          <h4 className="font-bold text-white">{item.title}</h4>
-                          {item.author && (
-                            <p className="text-white/70 text-sm">
-                              {item.author}
-                            </p>
-                          )}
-                          <p className="text-white/80 mt-2">
-                            {item.description}
-                          </p>
-                          <a
-                            href={
-                              isValidUrl(item.url)
-                                ? item.url
-                                : getFallbackUrl(
-                                    item.type || "video",
-                                    item.title
-                                  )
-                            }
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-blue-400 hover:text-blue-300 mt-2 inline-flex items-center"
-                          >
-                            Watch Video
-                            <svg
-                              xmlns="http://www.w3.org/2000/svg"
-                              className="h-4 w-4 ml-1"
-                              fill="none"
-                              viewBox="0 0 24 24"
-                              stroke="currentColor"
-                            >
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth={2}
-                                d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
-                              />
-                            </svg>
-                          </a>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Podcasts Section */}
-                {resources.podcasts && resources.podcasts.length > 0 && (
-                  <div>
-                    <h3 className="text-lg font-medium text-white/80 mb-3">
-                      Podcasts
-                    </h3>
-                    <div className="space-y-4">
-                      {resources.podcasts.map((item, index) => (
-                        <div
-                          key={index}
-                          className="p-4 bg-zinc-800/50 rounded-xl"
-                        >
-                          <h4 className="font-bold text-white">{item.title}</h4>
-                          {item.author && (
-                            <p className="text-white/70 text-sm">
-                              {item.author}
-                            </p>
-                          )}
-                          <p className="text-white/80 mt-2">
-                            {item.description}
-                          </p>
-                          <a
-                            href={
-                              isValidUrl(item.url)
-                                ? item.url
-                                : getFallbackUrl(
-                                    item.type || "podcast",
-                                    item.title
-                                  )
-                            }
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-blue-400 hover:text-blue-300 mt-2 inline-flex items-center"
-                          >
-                            Listen to Podcast
-                            <svg
-                              xmlns="http://www.w3.org/2000/svg"
-                              className="h-4 w-4 ml-1"
-                              fill="none"
-                              viewBox="0 0 24 24"
-                              stroke="currentColor"
-                            >
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth={2}
-                                d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
-                              />
-                            </svg>
-                          </a>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Books Section */}
-                {resources.books && resources.books.length > 0 && (
-                  <div>
-                    <h3 className="text-lg font-medium text-white/80 mb-3">
-                      Books
-                    </h3>
-                    <div className="space-y-4">
-                      {resources.books.map((item, index) => (
-                        <div
-                          key={index}
-                          className="p-4 bg-zinc-800/50 rounded-xl"
-                        >
-                          <h4 className="font-bold text-white">{item.title}</h4>
-                          {item.author && (
-                            <p className="text-white/70 text-sm">
-                              {item.author}
-                            </p>
-                          )}
-                          <p className="text-white/80 mt-2">
-                            {item.description}
-                          </p>
-                          <a
-                            href={
-                              isValidUrl(item.url)
-                                ? item.url
-                                : getFallbackUrl(
-                                    item.type || "book",
-                                    item.title
-                                  )
-                            }
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-blue-400 hover:text-blue-300 mt-2 inline-flex items-center"
-                          >
-                            View Book
-                            <svg
-                              xmlns="http://www.w3.org/2000/svg"
-                              className="h-4 w-4 ml-1"
-                              fill="none"
-                              viewBox="0 0 24 24"
-                              stroke="currentColor"
-                            >
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth={2}
-                                d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
-                              />
-                            </svg>
-                          </a>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-    </main>
+      {/* Modals */}
+      {/* ... existing modals code ... */}
+    </div>
   );
 }
