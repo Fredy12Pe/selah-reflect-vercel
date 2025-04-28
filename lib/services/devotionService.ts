@@ -16,11 +16,22 @@ import { Devotion, DevotionInput, Meta, Hymn } from '@/lib/types/devotion';
 const DEVOTIONS_COLLECTION = 'devotions';
 const META_COLLECTION = 'meta';
 
+// Helper function to get the base URL
+function getBaseUrl() {
+  if (typeof window !== 'undefined') {
+    // Client-side
+    return window.location.origin;
+  }
+  // Server-side
+  return process.env.NEXT_PUBLIC_BASE_URL || '';
+}
+
 export async function getDevotionByDate(date: string): Promise<Devotion | null> {
   try {
     console.log('Getting devotion for date:', date);
+    const baseUrl = getBaseUrl();
     
-    const response = await fetch(`/api/devotions/${date}`, {
+    const response = await fetch(`${baseUrl}/api/devotions/${date}`, {
       credentials: 'include',
     });
 
@@ -164,7 +175,8 @@ export async function getLatestDevotion(): Promise<Devotion | null> {
  */
 export async function getAvailableDates(): Promise<string[]> {
   try {
-    const response = await fetch('/api/devotions/available-dates', {
+    const baseUrl = getBaseUrl();
+    const response = await fetch(`${baseUrl}/api/devotions/available-dates`, {
       credentials: 'include',
     });
 
