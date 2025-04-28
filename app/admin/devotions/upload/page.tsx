@@ -65,14 +65,20 @@ export default function BulkUploadDevotions() {
       reader.onload = (event) => {
         try {
           const data = event.target?.result as string;
-          // Validate JSON format and structure
+          // Parse and validate JSON format
           const parsedData = JSON.parse(data);
-          if (!Array.isArray(parsedData)) {
-            toast.error("Invalid JSON format: Expected an array of months");
-            return;
+          
+          // Convert object format to array format if needed
+          let monthsArray: MonthData[];
+          if (Array.isArray(parsedData)) {
+            monthsArray = parsedData;
+          } else {
+            // Convert object format to array
+            monthsArray = Object.values(parsedData);
           }
+
           // Validate each month's structure
-          const isValid = parsedData.every((month: MonthData) => {
+          const isValid = monthsArray.every((month: MonthData) => {
             return (
               month.month &&
               month.hymn &&
@@ -81,11 +87,14 @@ export default function BulkUploadDevotions() {
               Array.isArray(month.devotions)
             );
           });
+
           if (!isValid) {
             toast.error("Invalid data structure in JSON");
             return;
           }
-          setJsonData(data);
+
+          // Store as stringified array
+          setJsonData(JSON.stringify(monthsArray));
           toast.success("JSON file validated successfully");
         } catch (error) {
           console.error("Error parsing JSON:", error);
