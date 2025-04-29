@@ -49,6 +49,7 @@ interface MonthData {
     date: string;
     bibleText: string;
     reflectionSections: Array<{
+      passage?: string;
       questions: string[];
     }>;
   }>;
@@ -175,6 +176,7 @@ export async function POST(request: NextRequest) {
                 date: dateKey,
                 bibleText: devotion.bibleText,
                 reflectionSections: devotion.reflectionSections.map(section => ({
+                  passage: section.passage || devotion.bibleText,
                   questions: section.questions || []
                 })),
                 monthId: normalizedMonthKey,

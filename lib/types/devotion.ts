@@ -45,6 +45,7 @@ export interface MonthData {
     date: string;
     bibleText: string;
     reflectionSections: Array<{
+      passage?: string;
       questions: string[];
     }>;
   }>;
