@@ -37,3 +37,7 @@ next-env.d.ts
 **/*.bak
 **/*.backup
 **/*.back
+
+# Firebase service account credentials
+selah-reflect-app-firebase-adminsdk-fbsvc-a53e8f2908.json
+*-firebase-adminsdk-*.json
