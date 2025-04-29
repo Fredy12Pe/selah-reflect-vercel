@@ -41,45 +41,67 @@
     try {
       // Wait for Firebase to be initialized
       const checkFirebase = setInterval(() => {
-        if (window.firebase && window.firebase.auth) {
+        if (window.firebase) {
           clearInterval(checkFirebase);
           
-          // Get the Auth prototype
-          const AuthPrototype = Object.getPrototypeOf(window.firebase.auth());
+          let authInstance = null;
           
-          // Check if signInWithPopup is missing
-          if (!AuthPrototype.signInWithPopup) {
-            console.log("[Firebase Patch] Adding missing signInWithPopup method");
+          // Check if auth is a function or already initialized instance
+          if (typeof window.firebase.auth === 'function') {
+            console.log("[Firebase Patch] Auth is a function, getting instance");
+            try {
+              authInstance = window.firebase.auth();
+            } catch (error) {
+              console.warn("[Firebase Patch] Error calling auth():", error);
+            }
+          } else if (window.firebase.auth && typeof window.firebase.auth === 'object') {
+            console.log("[Firebase Patch] Auth is already an object instance");
+            authInstance = window.firebase.auth;
+          } else {
+            console.warn("[Firebase Patch] Firebase auth not available in expected format");
+            return;
+          }
+          
+          // Add the method to Firebase auth if missing
+          if (authInstance) {
+            const AuthPrototype = Object.getPrototypeOf(authInstance);
             
-            // Add the missing method
-            AuthPrototype.signInWithPopup = function(provider) {
-              console.log("[Firebase Patch] Using patched signInWithPopup method");
+            // Check if signInWithPopup is missing
+            if (!AuthPrototype.signInWithPopup) {
+              console.log("[Firebase Patch] Adding missing signInWithPopup method");
               
-              // Try to open a popup window
-              try {
-                const popupWindow = window.open('about:blank', '_blank', 'width=600,height=600');
-                if (popupWindow) {
-                  popupWindow.document.write('<html><head><title>Authentication</title></head><body style="font-family: Arial, sans-serif; padding: 20px; text-align: center;"><h2>Mock Authentication</h2><p>This is a mock authentication window.</p><p>You would normally authenticate with Google here.</p><button id="completeAuth" style="padding: 10px 15px; background: #4285F4; color: white; border: none; border-radius: 4px; cursor: pointer;">Complete Authentication</button><script>document.getElementById("completeAuth").addEventListener("click", function() { window.close(); });</script></body></html>');
-                  
-                  // Return a mock credential after a short delay
-                  return new Promise((resolve) => {
-                    setTimeout(() => {
-                      if (!popupWindow.closed) {
-                        popupWindow.close();
-                      }
-                      resolve(createMockUserCredential());
-                    }, 2000);
-                  });
+              // Add the missing method
+              AuthPrototype.signInWithPopup = function(provider) {
+                console.log("[Firebase Patch] Using patched signInWithPopup method");
+                
+                // Try to open a popup window
+                try {
+                  const popupWindow = window.open('about:blank', '_blank', 'width=600,height=600');
+                  if (popupWindow) {
+                    popupWindow.document.write('<html><head><title>Authentication</title></head><body style="font-family: Arial, sans-serif; padding: 20px; text-align: center;"><h2>Mock Authentication</h2><p>This is a mock authentication window.</p><p>You would normally authenticate with Google here.</p><button id="completeAuth" style="padding: 10px 15px; background: #4285F4; color: white; border: none; border-radius: 4px; cursor: pointer;">Complete Authentication</button><script>document.getElementById("completeAuth").addEventListener("click", function() { window.close(); });</script></body></html>');
+                    
+                    // Return a mock credential after a short delay
+                    return new Promise((resolve) => {
+                      setTimeout(() => {
+                        if (!popupWindow.closed) {
+                          popupWindow.close();
+                        }
+                        resolve(createMockUserCredential());
+                      }, 2000);
+                    });
+                  }
+                } catch (e) {
+                  console.warn("[Firebase Patch] Could not open popup:", e);
                 }
-              } catch (e) {
-                console.warn("[Firebase Patch] Could not open popup:", e);
-              }
+                
+                // Fallback: just return a mock credential
+                return Promise.resolve(createMockUserCredential());
+              };
               
-              // Fallback: just return a mock credential
-              return Promise.resolve(createMockUserCredential());
-            };
-            
-            console.log("[Firebase Patch] Popup authentication patched successfully");
+              console.log("[Firebase Patch] Popup authentication patched successfully");
+            } else {
+              console.log("[Firebase Patch] signInWithPopup method already exists");
+            }
           }
         }
       }, 100);

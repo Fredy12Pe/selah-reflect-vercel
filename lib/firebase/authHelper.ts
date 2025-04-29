@@ -72,12 +72,41 @@ export function getAuthInstance(): Auth {
     const app = getApps().length > 0 
       ? getApps()[0] 
       : initializeApp(firebaseConfig);
-      
-    // Get and return the auth instance
-    const auth = firebaseGetAuth(app);
     
+    // Try to get auth from Firebase app
+    let auth;
+    try {
+      auth = firebaseGetAuth(app);
+      console.log('AuthHelper: Got auth instance from Firebase');
+    } catch (authError) {
+      console.error('AuthHelper: Error getting auth from Firebase app:', authError);
+      
+      // Try alternate method with global firebase object if available
+      if (typeof window !== 'undefined' && (window as any).firebase) {
+        console.log('AuthHelper: Trying to get auth from window.firebase');
+        
+        if (typeof (window as any).firebase.auth === 'function') {
+          try {
+            auth = (window as any).firebase.auth();
+            console.log('AuthHelper: Got auth from window.firebase.auth()');
+          } catch (windowAuthError) {
+            console.error('AuthHelper: Error calling window.firebase.auth():', windowAuthError);
+          }
+        } else if ((window as any).firebase.auth && typeof (window as any).firebase.auth === 'object') {
+          auth = (window as any).firebase.auth;
+          console.log('AuthHelper: Got auth from window.firebase.auth object');
+        }
+      }
+      
+      // If still no auth, create an empty object
+      if (!auth) {
+        auth = {} as Auth;
+        console.warn('AuthHelper: Using empty auth object as fallback');
+      }
+    }
+      
     // Add signInWithPopup if it doesn't exist
-    if (!auth.signInWithPopup) {
+    if (!(auth as any).signInWithPopup) {
       console.log('Adding signInWithPopup method to auth instance');
       // @ts-ignore
       auth.signInWithPopup = async (provider) => {
