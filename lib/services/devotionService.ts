@@ -16,6 +16,12 @@ import { Devotion, DevotionInput, Meta, Hymn } from '@/lib/types/devotion';
 const DEVOTIONS_COLLECTION = 'devotions';
 const META_COLLECTION = 'meta';
 
+// Near the top of the file, add a partial devotion type for error handling
+interface PartialDevotion extends Partial<Devotion> {
+  notFound?: boolean;
+  error?: string;
+}
+
 // Helper function to get the base URL
 function getBaseUrl() {
   if (typeof window !== 'undefined') {
@@ -26,40 +32,83 @@ function getBaseUrl() {
   return process.env.NEXT_PUBLIC_BASE_URL || '';
 }
 
-export async function getDevotionByDate(date: string): Promise<Devotion | null> {
+export async function getDevotionByDate(date: string): Promise<Devotion | PartialDevotion | null> {
   try {
-    console.log('Getting devotion for date:', date);
+    console.log('DevotionService: Getting devotion for date:', date);
     const baseUrl = getBaseUrl();
+    console.log('DevotionService: Using base URL:', baseUrl);
     
-    const response = await fetch(`${baseUrl}/api/devotions/${date}`, {
-      credentials: 'include',
-      headers: {
-        'Cache-Control': 'no-cache',
-      },
-    });
+    try {
+      const response = await fetch(`${baseUrl}/api/devotions/${date}`, {
+        credentials: 'include',
+        headers: {
+          'Cache-Control': 'no-cache',
+        },
+      });
 
-    if (!response.ok) {
-      if (response.status === 401) {
-        throw new Error('You must be signed in to access devotions');
+      console.log('DevotionService: Fetch response status:', response.status);
+
+      if (!response.ok) {
+        if (response.status === 401) {
+          console.error('DevotionService: Authentication error (401)');
+          throw new Error('You must be signed in to access devotions');
+        }
+        if (response.status === 404) {
+          console.log(`DevotionService: No devotion found for date: ${date}`);
+          // Return an object with notFound flag
+          return { notFound: true, date } as PartialDevotion;
+        }
+        
+        // Try to get error details from response
+        let errorMessage = `Failed to fetch devotion: ${response.statusText}`;
+        try {
+          const data = await response.json();
+          if (data && data.error) {
+            errorMessage = data.error;
+          }
+        } catch (parseError) {
+          console.error('DevotionService: Error parsing error response:', parseError);
+        }
+        
+        console.error('DevotionService: API error:', errorMessage);
+        throw new Error(errorMessage);
       }
-      if (response.status === 404) {
-        console.log(`No devotion found for date: ${date}`);
-        return null;
+
+      const devotionData = await response.json();
+      console.log('DevotionService: Successfully fetched devotion data');
+      return devotionData as Devotion;
+    } catch (fetchError) {
+      // Handle network or fetch-specific errors
+      console.error('DevotionService: Fetch error:', fetchError);
+      
+      if (fetchError instanceof Error) {
+        // Only rethrow authentication and permission errors
+        if (fetchError.message.includes('sign in') || fetchError.message.includes('permission')) {
+          throw fetchError;
+        }
       }
-      const data = await response.json().catch(() => ({ error: 'Failed to fetch devotion' }));
-      throw new Error(data.error || `Failed to fetch devotion: ${response.statusText}`);
+      
+      // Return with notFound flag
+      return { 
+        notFound: true, 
+        date,
+        error: fetchError instanceof Error ? fetchError.message : 'Network error'
+      } as PartialDevotion;
     }
-
-    const devotionData = await response.json();
-    return devotionData as Devotion;
   } catch (error: any) {
-    console.error('Error fetching devotion:', error);
+    console.error('DevotionService: Error in getDevotionByDate:', error);
+    
     // Only rethrow authentication and permission errors
     if (error.message.includes('sign in') || error.message.includes('permission')) {
       throw error;
     }
-    // For other errors, return null to prevent infinite retries
-    return null;
+    
+    // For other errors, return an object with notFound flag
+    return { 
+      notFound: true, 
+      date,
+      error: error.message 
+    } as PartialDevotion;
   }
 }
 

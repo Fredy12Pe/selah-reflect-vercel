@@ -147,19 +147,43 @@ interface Hymn {
   author?: string;
 }
 
+// Add a partial devotion type to match the service
+interface PartialDevotion extends Partial<Devotion> {
+  notFound?: boolean;
+  error?: string;
+}
+
 export default function ReflectionPage({
   params,
 }: {
   params: { date: string };
 }) {
+  console.log('ReflectionPage: Component starting render for date:', params.date);
+  
   const router = useRouter();
   const { user, loading } = useAuth();
-  const [devotionData, setDevotionData] = useState<Devotion | null>(null);
+  console.log('ReflectionPage: Auth state:', { userExists: !!user, loading });
+  
+  // Update the type to include PartialDevotion
+  const [devotionData, setDevotionData] = useState<Devotion | PartialDevotion | null>(null);
   const [hymn, setHymn] = useState<Hymn | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [hymnImage, setHymnImage] = useState<string>("/hymn-bg.jpg");
   const [showCalendar, setShowCalendar] = useState(false);
-  const currentDate = parseISO(params.date);
+  
+  // Parse date once and handle errors
+  let currentDate: Date;
+  try {
+    currentDate = parseISO(params.date);
+    if (isNaN(currentDate.getTime())) {
+      console.error('ReflectionPage: Invalid date in URL, using today instead');
+      currentDate = new Date();
+    }
+  } catch (error) {
+    console.error('ReflectionPage: Error parsing date from URL, using today instead:', error);
+    currentDate = new Date();
+  }
+  
   const today = new Date();
   const calendarRef = useRef<HTMLDivElement>(null);
   const dateButtonRef = useRef<HTMLButtonElement>(null);
@@ -243,22 +267,52 @@ export default function ReflectionPage({
   ];
 
   useEffect(() => {
+    console.log('ReflectionPage: Data fetch effect running, user:', !!user, 'loading:', loading, 'isLoading:', isLoading);
+    
     const fetchData = async () => {
       try {
         setIsLoading(true);
         
+        // More detailed logging for debugging
+        console.log('Reflection page: Starting fetch for date:', params.date);
+        
         // Validate the date is in correct format
-        const dateObj = parseISO(params.date);
+        let dateObj;
+        try {
+          dateObj = parseISO(params.date);
+          console.log('Reflection page: Parsed date:', dateObj.toISOString());
+        } catch (error) {
+          console.error('Reflection page: Error parsing date:', error);
+          dateObj = new Date(); // Fallback to today
+        }
+        
         if (isNaN(dateObj.getTime())) {
+          console.error('Reflection page: Invalid date format:', params.date);
           const today = new Date();
           const formattedToday = format(today, 'yyyy-MM-dd');
-          console.log('Invalid date format, redirecting to:', formattedToday);
+          console.log('Reflection page: Redirecting to valid date:', formattedToday);
+          router.replace(`/devotion/${formattedToday}/reflection`);
+          return;
+        }
+        
+        // Handle future dates - allow view but show appropriate message
+        console.log('Reflection page: Date is future date?', isFuture(dateObj));
+        
+        // For dates that are too far in the future (more than 3 months), redirect to today
+        const threeMonthsLater = addDays(new Date(), 90);
+        if (dateObj > threeMonthsLater) {
+          console.log('Reflection page: Date is too far in the future, beyond:', threeMonthsLater.toISOString());
+          const today = new Date();
+          const formattedToday = format(today, 'yyyy-MM-dd');
+          console.log('Reflection page: Redirecting to today:', formattedToday);
           router.replace(`/devotion/${formattedToday}/reflection`);
           return;
         }
 
         // Fetch hymn data
         const monthStr = format(currentDate, 'MMMM').toLowerCase();
+        console.log('Reflection page: Getting hymn for month:', monthStr);
+        
         const db = getFirebaseDb();
         console.log('Reflection page: Got Firestore instance:', !!db);
         
@@ -325,11 +379,15 @@ export default function ReflectionPage({
         try {
           console.log('Reflection page: Fetching devotion for date:', params.date);
           const devotion = await getDevotionByDate(params.date);
-          console.log('Reflection page: Devotion fetch result:', !!devotion);
+          console.log('Reflection page: Devotion fetch result:', devotion);
           
-          // Even if devotion is null or has notFound flag, we still set it
-          // This allows us to show appropriate UI for missing devotions
+          // Set the devotion data
           setDevotionData(devotion);
+          
+          // If there's an error message in the devotion, show it
+          if (devotion && 'error' in devotion && devotion.error) {
+            toast.error(devotion.error);
+          }
         } catch (error) {
           console.error('Error fetching devotion:', error);
           if (error instanceof Error && error.message.includes('sign in')) {
@@ -340,21 +398,28 @@ export default function ReflectionPage({
             toast.error('Failed to load devotion');
           }
         }
-      } catch (error) {
+    } catch (error) {
         console.error('Error in fetchData:', error);
+        // Ensure devotionData is set even on error to prevent infinite loading
+        if (!devotionData) {
+          setDevotionData({ notFound: true } as Devotion);
+        }
         toast.error('Failed to load data');
       } finally {
+        console.log('ReflectionPage: Setting isLoading to false');
         setIsLoading(false);
-      }
-    };
+    }
+  };
 
     // Only fetch if we have a user and we're not already loading
     if (user && !isLoading) {
+      console.log('ReflectionPage: Calling fetchData()');
       fetchData();
     } else if (!loading && !user) {
-      // If auth is done loading and we don't have a user, redirect to login
-      console.log('Reflection page: No user, redirecting to login');
+      console.log('ReflectionPage: No user and not loading, redirecting to login');
       router.push('/auth/login?from=' + encodeURIComponent(`/devotion/${params.date}/reflection`));
+    } else {
+      console.log('ReflectionPage: Skipping fetchData call:', { userExists: !!user, authLoading: loading, pageLoading: isLoading });
     }
   }, [params.date, user, currentDate, router, loading, hymnLyrics, isLoading]);
 
@@ -382,17 +447,17 @@ export default function ReflectionPage({
           setHymnImage(cachedHymnImage);
         } else {
           try {
-            const hymn = await getDailyDevotionImage(
-              params.date,
-              "landscape,mountains,sunrise,peaceful"
-            );
-            if (hymn) {
+          const hymn = await getDailyDevotionImage(
+            params.date,
+            "landscape,mountains,sunrise,peaceful"
+          );
+          if (hymn) {
               setHymnImage(hymn);
-              try {
-                sessionStorage.setItem(hymnCacheKey, hymn);
-              } catch (error) {
+            try {
+              sessionStorage.setItem(hymnCacheKey, hymn);
+            } catch (error) {
                 console.warn("Unable to store hymn image in sessionStorage", error);
-              }
+            }
             }
           } catch (error) {
             console.error("Error loading hymn image:", error);
@@ -405,17 +470,17 @@ export default function ReflectionPage({
           setResourcesImage(cachedResourcesImage);
         } else {
           try {
-            const resources = await getDailyDevotionImage(
-              params.date,
-              "landscape,forest,lake,sunset"
-            );
-            if (resources) {
+          const resources = await getDailyDevotionImage(
+            params.date,
+            "landscape,forest,lake,sunset"
+          );
+          if (resources) {
               setResourcesImage(resources);
-              try {
-                sessionStorage.setItem(resourcesCacheKey, resources);
-              } catch (error) {
+            try {
+              sessionStorage.setItem(resourcesCacheKey, resources);
+            } catch (error) {
                 console.warn("Unable to store resources image in sessionStorage", error);
-              }
+            }
             }
           } catch (error) {
             console.error("Error loading resources image:", error);
@@ -476,8 +541,9 @@ export default function ReflectionPage({
     return allQuestions.slice(0, 2);
   };
 
-  // Show appropriate content even when no devotion is found
-  const showNoDevotionContent = !devotionData || devotionData.notFound;
+  // Adapt the showNoDevotionContent to handle PartialDevotion
+  const showNoDevotionContent = !devotionData || 
+    (devotionData && 'notFound' in devotionData && devotionData.notFound);
   const reflectionQuestions = showNoDevotionContent ? [] : getFirstTwoQuestions();
 
   // Function to handle AI reflection generation
@@ -567,7 +633,7 @@ export default function ReflectionPage({
         console.log("[DEBUG] Storing to localStorage:", jsonToStore);
         
         try {
-          localStorage.setItem(storageKey, jsonToStore);
+        localStorage.setItem(storageKey, jsonToStore);
           console.log("[DEBUG] Successfully saved to localStorage");
         } catch (error) {
           console.error("[DEBUG] Error saving to localStorage:", error);
@@ -772,8 +838,13 @@ export default function ReflectionPage({
 
   if (!user) {
     return (
-      <div className="min-h-screen bg-black text-white flex items-center justify-center">
-        <p>Please sign in to view devotions</p>
+      <div className="min-h-screen bg-black text-white flex items-center justify-center p-4">
+        <div className="max-w-md text-center">
+          <p className="text-xl mb-4">Please sign in to view devotions</p>
+          <Link href={`/auth/login?from=${encodeURIComponent(`/devotion/${params.date}/reflection`)}`} className="px-4 py-2 bg-zinc-800 rounded-lg hover:bg-zinc-700">
+            Sign In
+          </Link>
+        </div>
       </div>
     );
   }
@@ -781,10 +852,16 @@ export default function ReflectionPage({
   if (isLoading) {
     return (
       <div className="min-h-screen bg-black/90 flex items-center justify-center">
-        <div className="w-8 h-8 border-4 border-white border-t-transparent rounded-full animate-spin" />
+        <div className="text-center">
+          <div className="w-8 h-8 border-4 border-white border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-white/80">Loading devotion...</p>
+        </div>
       </div>
     );
   }
+
+  // Check if we're viewing a future date - add a special message
+  const isFutureDate = isFuture(currentDate);
 
   return (
     <div className="min-h-screen bg-black">
@@ -797,7 +874,7 @@ export default function ReflectionPage({
           >
             <ChevronLeftIcon className="w-6 h-6" />
           </button>
-          
+
           <button
             ref={dateButtonRef}
             onClick={toggleCalendar}
@@ -814,6 +891,16 @@ export default function ReflectionPage({
             <ChevronRightIcon className="w-6 h-6" />
           </button>
         </div>
+
+        {/* Future Date Notice */}
+        {isFutureDate && (
+          <div className="bg-yellow-900/30 border border-yellow-800 rounded-2xl p-4 mb-8">
+            <h2 className="text-lg font-semibold text-yellow-400 mb-2">Future Date</h2>
+            <p className="text-white/80">
+              You're viewing a future date. Devotion content may not be available yet.
+            </p>
+          </div>
+        )}
 
         {showCalendar && (
           <div
@@ -837,9 +924,9 @@ export default function ReflectionPage({
         {/* Hymn Section - Updated to match mockup */}
         {hymn && (
           <div
-            onClick={() => setShowHymnModal(true)}
+              onClick={() => setShowHymnModal(true)}
             className="relative overflow-hidden rounded-2xl mb-8 cursor-pointer"
-          >
+            >
             <div className="absolute inset-0 bg-gradient-to-b from-black/40 to-black/90 z-10" />
             <Image
               src={hymnImage}
@@ -851,22 +938,22 @@ export default function ReflectionPage({
             <div className="absolute inset-0 z-20 p-4">
               <p className="text-sm font-medium text-white/80 mb-1">Hymn of the Month:</p>
               <h2 className="text-xl font-semibold">{hymn.title}</h2>
-            </div>
+              </div>
           </div>
         )}
 
         {/* Scripture Section */}
         {devotionData?.bibleText && (
-          <div 
-            onClick={handleOpenScriptureModal}
+              <div
+                onClick={handleOpenScriptureModal}
             className="bg-zinc-900 rounded-2xl p-4 mb-8 cursor-pointer"
-          >
+              >
             <h2 className="text-sm font-medium text-white/80 mb-1">Today's Scripture</h2>
             <p className="text-xl font-semibold">{devotionData.bibleText}</p>
-          </div>
+              </div>
         )}
 
-        {/* Reflection Questions */}
+            {/* Reflection Questions */}
         {!showNoDevotionContent && reflectionQuestions.length > 0 && (
           <div className="mb-8">
             <h2 className="text-lg font-semibold mb-4">Reflection Questions</h2>
@@ -882,10 +969,10 @@ export default function ReflectionPage({
                     rows={3}
                     placeholder="Write your reflection here..."
                   />
-                </div>
+                      </div>
               ))}
-            </div>
-          </div>
+                      </div>
+                      </div>
         )}
 
         {/* AI Reflection Section */}
@@ -932,7 +1019,7 @@ export default function ReflectionPage({
           <div
             onClick={handleOpenResourcesModal}
             className="relative overflow-hidden rounded-2xl cursor-pointer"
-          >
+              >
             <div className="absolute inset-0 bg-gradient-to-b from-black/40 to-black/90 z-10" />
             <Image
               src={resourcesImage}
@@ -944,8 +1031,8 @@ export default function ReflectionPage({
             <div className="absolute inset-0 z-20 p-4">
               <h2 className="text-xl font-semibold mb-1">Resources for today's text</h2>
               <p className="text-sm text-white/80">Bible Commentaries, Videos, and Podcasts</p>
+                </div>
             </div>
-          </div>
         )}
 
         {/* No Devotion Content */}
@@ -968,9 +1055,9 @@ export default function ReflectionPage({
       {/* Hymn Modal */}
       {showHymnModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
-          <div 
+        <div
             className={`fixed inset-0 bg-black/50 ${isHymnModalClosing ? 'animate-fade-out' : 'animate-fade-in'}`}
-            onClick={closeHymnModal}
+          onClick={closeHymnModal}
           />
           <div className={`relative w-full max-w-lg mx-4 bg-white rounded-lg shadow-xl ${isHymnModalClosing ? 'animate-slide-down' : 'animate-slide-up'}`}>
             <div className="relative h-48">
@@ -984,7 +1071,7 @@ export default function ReflectionPage({
               <div className="absolute inset-0 p-6 flex flex-col justify-end">
                 <p className="text-sm font-medium text-white/80 mb-1">Hymn of the Month</p>
                 <h2 className="text-2xl font-semibold">{hymn?.title}</h2>
-              </div>
+            </div>
             </div>
             <div className="p-6 space-y-6">
               {hymnLyrics.map((verse, index) => (
@@ -1003,9 +1090,9 @@ export default function ReflectionPage({
       {/* Scripture Modal */}
       {showScriptureModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
-          <div 
+        <div
             className={`fixed inset-0 bg-black/50 ${isScriptureModalClosing ? 'animate-fade-out' : 'animate-fade-in'}`}
-            onClick={closeScriptureModal}
+          onClick={closeScriptureModal}
           />
           <div className={`relative w-full max-w-lg mx-4 bg-white rounded-lg shadow-xl ${isScriptureModalClosing ? 'animate-slide-down' : 'animate-slide-up'}`}>
             <div className="p-6">
@@ -1036,9 +1123,9 @@ export default function ReflectionPage({
       {/* Resources Modal */}
       {showResourcesModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
-          <div 
+        <div
             className={`fixed inset-0 bg-black/50 ${isResourcesModalClosing ? 'animate-fade-out' : 'animate-fade-in'}`}
-            onClick={closeResourcesModal}
+          onClick={closeResourcesModal}
           />
           <div className={`relative w-full max-w-lg mx-4 bg-white rounded-lg shadow-xl ${isResourcesModalClosing ? 'animate-slide-down' : 'animate-slide-up'}`}>
             <div className="relative h-48">
@@ -1054,16 +1141,16 @@ export default function ReflectionPage({
                 <p className="text-white/80">For {devotionData?.bibleText}</p>
               </div>
             </div>
-            
+
             <div className="p-6">
-              {isFetchingResources ? (
+            {isFetchingResources ? (
                 <div className="flex justify-center py-8">
                   <div className="w-8 h-8 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                </div>
-              ) : resourcesError ? (
+              </div>
+            ) : resourcesError ? (
                 <p className="text-red-400">{resourcesError}</p>
               ) : resources ? (
-                <div className="space-y-8">
+              <div className="space-y-8">
                   {/* Commentaries */}
                   {resources.commentaries && resources.commentaries.length > 0 && (
                     <div>
@@ -1073,8 +1160,8 @@ export default function ReflectionPage({
                           <a
                             key={index}
                             href={isValidUrl(item.url) ? item.url : getFallbackUrl(item.type, item.title)}
-                            target="_blank"
-                            rel="noopener noreferrer"
+                              target="_blank"
+                              rel="noopener noreferrer"
                             className="block bg-black/30 rounded-xl p-4 hover:bg-black/50 transition-colors"
                           >
                             <h4 className="font-medium mb-1">{item.title}</h4>
@@ -1082,20 +1169,20 @@ export default function ReflectionPage({
                               <p className="text-sm text-white/60 mb-2">by {item.author}</p>
                             )}
                             <p className="text-sm text-white/80">{item.description}</p>
-                          </a>
+                            </a>
                         ))}
                       </div>
                     </div>
                   )}
 
                   {/* Videos */}
-                  {resources.videos && resources.videos.length > 0 && (
-                    <div>
+                {resources.videos && resources.videos.length > 0 && (
+                  <div>
                       <h3 className="text-lg font-semibold mb-4">Videos</h3>
-                      <div className="space-y-4">
-                        {resources.videos.map((item, index) => (
+                    <div className="space-y-4">
+                      {resources.videos.map((item, index) => (
                           <a
-                            key={index}
+                          key={index}
                             href={isValidUrl(item.url) ? item.url : getFallbackUrl(item.type, item.title)}
                             target="_blank"
                             rel="noopener noreferrer"
@@ -1104,19 +1191,19 @@ export default function ReflectionPage({
                             <h4 className="font-medium mb-2">{item.title}</h4>
                             <p className="text-sm text-white/80">{item.description}</p>
                           </a>
-                        ))}
-                      </div>
+                      ))}
                     </div>
-                  )}
+                  </div>
+                )}
 
                   {/* Podcasts */}
-                  {resources.podcasts && resources.podcasts.length > 0 && (
-                    <div>
+                {resources.podcasts && resources.podcasts.length > 0 && (
+                  <div>
                       <h3 className="text-lg font-semibold mb-4">Podcasts</h3>
-                      <div className="space-y-4">
-                        {resources.podcasts.map((item, index) => (
+                    <div className="space-y-4">
+                      {resources.podcasts.map((item, index) => (
                           <a
-                            key={index}
+                          key={index}
                             href={isValidUrl(item.url) ? item.url : getFallbackUrl(item.type, item.title)}
                             target="_blank"
                             rel="noopener noreferrer"
@@ -1125,14 +1212,14 @@ export default function ReflectionPage({
                             <h4 className="font-medium mb-2">{item.title}</h4>
                             <p className="text-sm text-white/80">{item.description}</p>
                           </a>
-                        ))}
-                      </div>
+                      ))}
                     </div>
-                  )}
-                </div>
+                  </div>
+                )}
+              </div>
               ) : (
                 <p className="text-white/60">No resources available</p>
-              )}
+            )}
             </div>
           </div>
         </div>
