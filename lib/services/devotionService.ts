@@ -213,13 +213,14 @@ export async function getHymnByMonth(month: string): Promise<Hymn | null> {
     
     const metaRef = doc(db, META_COLLECTION, 'hymns');
     const metaSnap = await getDoc(metaRef);
+    const metaData = metaSnap.data();
 
-    if (!metaSnap.exists()) {
+    if (!metaData) {
       console.log('No hymns data found');
       return null;
     }
 
-    const hymns = metaSnap.data() as { [month: string]: Hymn };
+    const hymns = metaData as { [month: string]: Hymn };
     return hymns[month] || null;
   } catch (error) {
     console.error('Error fetching hymn:', error);

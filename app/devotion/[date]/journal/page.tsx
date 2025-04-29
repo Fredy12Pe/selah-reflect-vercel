@@ -94,31 +94,35 @@ export default function JournalPage({ params }: { params: { date: string } }) {
           router.push(`/devotion/${params.date}/reflection`);
           return;
         }
-        setDevotion(devotionData);
+        
+        // TypeScript cast to handle the complex Devotion type
+        setDevotion(devotionData as any);
 
         // Load existing journal entries
         const journalRef = safeDoc(user.uid, "journalEntries", params.date);
         const journalSnap = await safeGetDoc(journalRef);
+        const journalData = journalSnap.data();
 
-        if (journalSnap.exists()) {
-          const data = journalSnap.data();
-          setEntries(data.entries || {});
+        if (journalData) {
+          setEntries(journalData.entries || {});
 
           // Load AI reflections if they exist
-          if (data.aiReflections) {
-            setAiReflections(data.aiReflections);
+          if (journalData.aiReflections) {
+            setAiReflections(journalData.aiReflections);
           }
         } else {
           // Initialize empty entries for all questions
           const initialEntries: JournalEntry = {};
-          devotionData.reflectionSections.forEach((section, sectionIndex) => {
-            initialEntries[sectionIndex.toString()] = {};
-            section.questions.forEach((_, questionIndex) => {
-              initialEntries[sectionIndex.toString()][
-                questionIndex.toString()
-              ] = "";
+          if (devotionData.reflectionSections) {
+            devotionData.reflectionSections.forEach((section, sectionIndex) => {
+              initialEntries[sectionIndex.toString()] = {};
+              section.questions.forEach((_, questionIndex) => {
+                initialEntries[sectionIndex.toString()][
+                  questionIndex.toString()
+                ] = "";
+              });
             });
-          });
+          }
           setEntries(initialEntries);
         }
 
@@ -168,12 +172,10 @@ export default function JournalPage({ params }: { params: { date: string } }) {
                   // Check if we already have this reflection
                   const alreadyExists =
                     newReflections.some((r) => r.question === data.question) ||
-                    (journalSnap.exists() &&
-                      journalSnap
-                        .data()
-                        .aiReflections?.some(
-                          (r: AIReflection) => r.question === data.question
-                        ));
+                    (journalData && 
+                      journalData.aiReflections?.some(
+                        (r: AIReflection) => r.question === data.question
+                      ));
 
                   console.log(
                     "[DEBUG-JOURNAL] Already exists check:",

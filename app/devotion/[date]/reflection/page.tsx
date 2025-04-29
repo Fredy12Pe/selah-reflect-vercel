@@ -455,19 +455,11 @@ export default function ReflectionPage({
               const hymnRef = doc(db, 'hymns', monthStr);
               const hymnSnap = await getDoc(hymnRef);
               
-              // Safely check if document exists - handles both SDK implementations
-              const docExists = hymnSnap && (
-                // Check if it's a function (client SDK)
-                (typeof hymnSnap.exists === 'function' && hymnSnap.exists()) ||
-                // Check if it's a property (admin SDK) 
-                (typeof hymnSnap.exists === 'boolean' && hymnSnap.exists) ||
-                // Fallback - check if data() returns something
-                (hymnSnap.data && hymnSnap.data() !== null && Object.keys(hymnSnap.data() || {}).length > 0)
-              );
-              
-              if (docExists) {
+              // Check if document exists by directly checking data
+              const data = hymnSnap.data();
+              if (data) {
                 console.log('Reflection page: Found hymn data for month:', monthStr);
-                setHymn(hymnSnap.data() as Hymn);
+                setHymn(data as Hymn);
               } else {
                 console.log('Reflection page: No hymn found for month:', monthStr);
                 // We've already set the default hymn above

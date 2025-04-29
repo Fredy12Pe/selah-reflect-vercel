@@ -130,35 +130,29 @@ export default function DevotionPage({ params }: { params: { date: string } }) {
           return;
         }
 
-        if (devotionSnap.exists()) {
-          const devotionData = devotionSnap.data() as DevotionData;
-          console.log("Devotion data from Firestore:", devotionData);
-          setDevotion(devotionData);
+        // We have data
+        const devotionData = devotionSnap as DevotionData;
+        console.log("Devotion data from Firestore:", devotionData);
+        setDevotion(devotionData);
 
-          // Try fetching Bible verse using bibleText field first (new format)
-          // Fall back to scriptureReference for backward compatibility
-          const reference =
-            devotionData.bibleText || devotionData.scriptureReference;
-          if (reference) {
-            console.log("Using reference for Bible API:", reference);
-            const verse = await fetchBibleVerse(reference);
-            if (verse) {
-              setBibleVerse(verse);
-              console.log("Successfully loaded Bible verse:", verse.reference);
-            } else {
-              console.error(
-                "Failed to fetch Bible verse for reference:",
-                reference
-              );
-            }
+        // Try fetching Bible verse using bibleText field first (new format)
+        // Fall back to scriptureReference for backward compatibility
+        const reference =
+          devotionData.bibleText || devotionData.scriptureReference;
+        if (reference) {
+          console.log("Using reference for Bible API:", reference);
+          const verse = await fetchBibleVerse(reference);
+          if (verse) {
+            setBibleVerse(verse);
+            console.log("Successfully loaded Bible verse:", verse.reference);
           } else {
-            console.warn("No Bible reference found in devotion data");
+            console.error(
+              "Failed to fetch Bible verse for reference:",
+              reference
+            );
           }
         } else {
-          console.log("No devotion found for date:", params.date);
-          // Redirect to reflection page when no devotion is found
-          router.replace(`/devotion/${params.date}/reflection`);
-          return;
+          console.warn("No Bible reference found in devotion data");
         }
       } catch (error) {
         console.error("Error fetching data:", error);
