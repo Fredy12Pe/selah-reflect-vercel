@@ -1113,6 +1113,12 @@ export default function ReflectionPage({
     setShowCalendar(!showCalendar);
   };
 
+  // Add a function to check if user is admin
+  const isAdmin = () => {
+    return user?.email?.endsWith('@selahreflect.com') || 
+           user?.email === 'fredy12pe@gmail.com';
+  };
+
   if (!user) {
     return (
       <div className="min-h-screen bg-black text-white flex items-center justify-center p-4">
@@ -1152,6 +1158,18 @@ export default function ReflectionPage({
           </div>
         ) : (
           <>
+            {/* Admin Tools Link */}
+            {isAdmin() && (
+              <div className="absolute top-2 right-4 z-50">
+                <Link 
+                  href="/debug/cache-tools" 
+                  className="text-xs text-white/30 hover:text-white/80"
+                >
+                  Cache Tools
+                </Link>
+              </div>
+            )}
+            
             {/* Date Navigation */}
             <div className="pt-6 pb-4 px-6 flex items-center justify-center">
               <div className="relative w-full max-w-xs">
