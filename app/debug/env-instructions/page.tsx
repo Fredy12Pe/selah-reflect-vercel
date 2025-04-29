@@ -85,7 +85,7 @@ export default function EnvInstructionsPage() {
               <li>Clicking the gear icon (⚙️) next to "Project Overview"</li>
               <li>Selecting "Project settings"</li>
               <li>Scrolling down to "Your apps" section</li>
-              <li>Find the web app and click the config button (</>) to view the configuration</li>
+              <li>Find the web app and click the config button (&lt;/&gt;) to view the configuration</li>
             </ol>
           </div>
         </div>
