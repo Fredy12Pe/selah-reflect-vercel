@@ -3,7 +3,6 @@ import "./_firebase";
 import "./globals.css";
 // Remove next/font imports
 import { AuthProvider } from "@/lib/context/AuthContext";
-import FirebasePatch from "./_document";
 import type { Metadata } from "next";
 import { Providers } from "./providers";
 import { Toaster } from "react-hot-toast";
@@ -38,16 +37,9 @@ export default function RootLayout({
   return (
     <html lang="en">
       <head>
-        {/* Pre-initialize Firebase global variables */}
-        <script src="/firebase-setup.js" />
-
-        {/* Critical Firebase patches applied before any React code runs */}
-        <script src="/c-auth-fix.js" />
-        <script src="/firebase-init-fix.js" />
-        <script src="/firebase-auth-fix.js" />
+        {/* Single Firebase patch to fix initialization issues */}
         <script src="/firebase-fix.js" />
-        <FirebasePatch />
-        <script src="/firebase-patch.js" async />
+
         <meta name="application-name" content="Selah" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta

@@ -73,7 +73,7 @@ export async function GET(request: NextRequest) {
   try {
     // Initialize Firebase Admin
     try {
-      initializeFirebaseAdmin();
+        initializeFirebaseAdmin();
     } catch (error) {
       console.error('Firebase Admin initialization error:', error);
       return NextResponse.json({
@@ -130,7 +130,7 @@ export async function GET(request: NextRequest) {
         status: 'error',
         message: 'Failed to read from Firestore',
         error: error instanceof Error ? error.message : 'Unknown error'
-      });
+    });
     }
   } catch (error) {
     console.error('Unexpected error:', error);

@@ -14,7 +14,17 @@ export async function GET(request: NextRequest) {
     const db = getFirestore();
     const devotionDoc = await db.collection('devotions').doc(date).get();
 
-    if (!devotionDoc.exists) {
+    // Safely check if document exists - Admin SDK may implement exists differently
+    const docExists = devotionDoc && (
+      // As a property
+      (typeof devotionDoc.exists === 'boolean' && devotionDoc.exists) ||
+      // As a function - cast the function to avoid TypeScript complaints
+      (typeof devotionDoc.exists === 'function' && (devotionDoc.exists as () => boolean)()) ||
+      // Fallback - check if data() returns something
+      (devotionDoc.data && typeof devotionDoc.data === 'function' && devotionDoc.data() !== null && Object.keys(devotionDoc.data() || {}).length > 0)
+    );
+
+    if (!docExists) {
       return NextResponse.json(
         { error: 'Devotion not found' },
         { status: 404 }

@@ -64,36 +64,52 @@ export async function GET(
   { params }: { params: { date: string } }
 ) {
   try {
-    // Check if date is valid
+  // Check if date is valid
     let dateObj;
-    try {
+  try {
       dateObj = parseISO(params.date);
       if (isNaN(dateObj.getTime())) {
         throw new Error('Invalid date');
       }
     } catch (error: any) {
-      return NextResponse.json(
-        { error: 'Invalid date format' },
-        { status: 400 }
-      );
-    }
-
+    return NextResponse.json(
+      { error: 'Invalid date format' },
+      { status: 400 }
+    );
+  }
+  
     // Initialize Firebase Admin
     let db;
-    try {
-      initAdmin();
+      try {
+        initAdmin();
       db = getFirestore();
       if (!db) {
+        console.error('Failed to get Firestore instance after initialization');
         throw new Error('Failed to get Firestore instance');
       }
     } catch (error) {
       console.error('Failed to initialize Firebase Admin:', error);
+      
+      // More specific error messages
+      let errorMessage = 'Server configuration error';
+      if (error instanceof Error) {
+        if (error.message.includes('Missing required environment variables')) {
+          errorMessage = 'Firebase Admin configuration missing: ' + error.message;
+        } else if (error.message.includes('initialization skipped during build')) {
+          errorMessage = 'API not available during build';
+        }
+      }
+      
       return NextResponse.json(
-        { error: 'Server configuration error' },
+        { 
+          error: errorMessage,
+          date: params.date,
+          notFound: true 
+        },
         { status: 500 }
       );
     }
-
+    
     // Check authentication
     let isAuthenticated = false;
     const auth = getAuth();
@@ -130,16 +146,26 @@ export async function GET(
     }
 
     if (!isAuthenticated) {
-      return NextResponse.json(
+        return NextResponse.json(
         { error: 'You must be signed in to access devotions' },
-        { status: 401 }
-      );
-    }
+          { status: 401 }
+        );
+      }
 
     // Get the devotion using Admin SDK
     const devotionDoc = await db.collection('devotions').doc(params.date).get();
 
-    if (!devotionDoc.exists) {
+    // Safely check if document exists - Admin SDK may implement exists differently
+    const docExists = devotionDoc && (
+      // As a property
+      (typeof devotionDoc.exists === 'boolean' && devotionDoc.exists) ||
+      // As a function - cast the function to avoid TypeScript complaints
+      (typeof devotionDoc.exists === 'function' && (devotionDoc.exists as () => boolean)()) ||
+      // Fallback - check if data() returns something
+      (devotionDoc.data && typeof devotionDoc.data === 'function' && devotionDoc.data() !== null && Object.keys(devotionDoc.data() || {}).length > 0)
+    );
+
+    if (!docExists) {
       // Return a structured response for missing devotions
       return NextResponse.json({
         id: params.date,
@@ -161,8 +187,46 @@ export async function GET(
       id: devotionDoc.id,
       date: data.date || devotionDoc.id,
       bibleText: data.bibleText || data.scriptureReference || '',
-      reflectionSections: data.reflectionSections || 
-        (data.reflectionQuestions ? [{ questions: data.reflectionQuestions }] : []),
+      
+      // Enhanced handling for reflectionSections with better structure conversion
+      reflectionSections: (() => {
+        // If reflectionSections already exists with proper structure, use it
+        if (data.reflectionSections && Array.isArray(data.reflectionSections)) {
+          // Ensure each section has required fields
+          return data.reflectionSections.map((section, index) => {
+            // If it already has passage and questions
+            if (section.passage && section.questions) {
+              return section;
+            }
+            
+            // If it has questions but no passage
+            if (section.questions && !section.passage) {
+              return {
+                ...section,
+                passage: `${data.bibleText || data.scriptureReference || ''} (Part ${index + 1})` 
+              };
+            }
+            
+            // Default case
+            return {
+              passage: `${data.bibleText || data.scriptureReference || ''} (Part ${index + 1})`,
+              questions: Array.isArray(section.questions) ? section.questions : []
+            };
+          });
+        }
+        
+        // If we have reflectionQuestions but no reflectionSections
+        else if (data.reflectionQuestions && Array.isArray(data.reflectionQuestions)) {
+          return [{
+            passage: data.bibleText || data.scriptureReference || '',
+            questions: data.reflectionQuestions
+          }];
+        }
+        
+        // Fallback to empty array
+        return [];
+      })(),
+      
       monthId: data.monthId || format(dateObj, 'MMMM').toLowerCase(),
       month: data.month || format(dateObj, 'MMMM'),
       updatedAt: data.updatedAt,

@@ -13,7 +13,7 @@
  * Example: /devotion/2024-03-19/reflection
  */
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, createRef } from "react";
 import { useRouter } from "next/navigation";
 import {
   format,
@@ -28,12 +28,12 @@ import {
 import Link from "next/link";
 import Image from "next/image";
 import { useAuth } from "@/lib/context/AuthContext";
-import DatePicker from "@/app/components/DatePicker";
 import {
   ChevronLeftIcon,
   ChevronRightIcon,
   ArrowRightIcon,
   CalendarIcon,
+  XMarkIcon,
 } from "@heroicons/react/24/outline";
 import { getDevotionByDate } from "@/lib/services/devotionService";
 import { Devotion } from "@/lib/types/devotion";
@@ -43,6 +43,8 @@ import DynamicBackground from "@/app/components/DynamicBackground";
 import BackgroundCard from "@/app/components/BackgroundCard";
 import { doc, getDoc } from "firebase/firestore";
 import { getFirebaseDb } from "@/lib/firebase/firebase";
+import dynamic from 'next/dynamic';
+import { safeDoc, safeGetDocWithFallback } from "@/lib/utils/firebase-helpers";
 
 // Bible verse interface
 interface BibleVerse {
@@ -141,17 +143,82 @@ const getReflectionStorageKey = (dateString: string) => {
   return `aiReflection_${dateString}`;
 };
 
+// Hymn interface
 interface Hymn {
   title: string;
   lyrics: Array<{ lineNumber: number; text: string }>;
   author?: string;
 }
 
-// Add a partial devotion type to match the service
-interface PartialDevotion extends Partial<Devotion> {
+// Define ReflectionSection interface to match the expected structure
+interface ReflectionSection {
+  questions: string[];
+  title?: string;
+  content?: string;
+  passage?: string;
+}
+
+// Instead of extending Devotion, let's define our own interface
+interface PartialDevotion {
+  id?: string;
+  date?: string;
+  bibleText?: string;
+  reflectionSections?: ReflectionSection[];
+  title?: string;
   notFound?: boolean;
   error?: string;
 }
+
+// Add this ClientOnly component after your imports
+const ClientOnly = ({ children }: { children: React.ReactNode }) => {
+  const [mounted, setMounted] = useState(false);
+  const [mountError, setMountError] = useState<Error | null>(null);
+  
+  useEffect(() => {
+    try {
+      setMounted(true);
+    } catch (error) {
+      console.error("Error mounting ClientOnly component:", error);
+      setMountError(error instanceof Error ? error : new Error("Unknown error"));
+    }
+  }, []);
+  
+  if (mountError) {
+    return (
+      <div className="min-h-screen bg-black/90 flex items-center justify-center">
+        <div className="bg-red-900/30 p-4 rounded-lg max-w-md text-center">
+          <p className="text-red-400 mb-2">Error loading application:</p>
+          <p className="text-white/80">{mountError.message}</p>
+          <button 
+            onClick={() => window.location.reload()}
+            className="mt-4 px-4 py-2 bg-white/20 rounded-lg hover:bg-white/30"
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
+  
+  if (!mounted) {
+    return (
+      <div className="min-h-screen bg-black/90 flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-10 h-10 border-4 border-white border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-white/80">Loading Devotion...</p>
+        </div>
+      </div>
+    );
+  }
+  
+  return <>{children}</>;
+};
+
+// Add dynamic import for DatePicker
+const DatePicker = dynamic(() => import("@/app/components/DatePicker"), {
+  ssr: false,
+  loading: () => <div className="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin" />
+});
 
 export default function ReflectionPage({
   params,
@@ -164,36 +231,67 @@ export default function ReflectionPage({
   const { user, loading } = useAuth();
   console.log('ReflectionPage: Auth state:', { userExists: !!user, loading });
   
-  // Update the type to include PartialDevotion
   const [devotionData, setDevotionData] = useState<Devotion | PartialDevotion | null>(null);
   const [hymn, setHymn] = useState<Hymn | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [hymnImage, setHymnImage] = useState<string>("/hymn-bg.jpg");
   const [showCalendar, setShowCalendar] = useState(false);
   
+  // Add a key based on the date to force re-mount on date change
+  const componentKey = params.date;
+  
+  // Create calendar ref INSIDE the component
+  const calendarRef = useRef<HTMLDivElement>(null);
+  
+  // Add reload protection
+  const fetchAttemptCountRef = useRef(0);
+  
+  // Define CalendarWrapper inside the component
+  const CalendarWrapper = ({ children }: { children: React.ReactNode }) => (
+    <div
+      ref={calendarRef}
+      className="absolute top-20 left-1/2 -translate-x-1/2 z-50 bg-zinc-900 p-4 rounded-2xl shadow-xl border border-zinc-800"
+    >
+      {children}
+    </div>
+  );
+  
   // Parse date once and handle errors
-  let currentDate: Date;
-  try {
-    currentDate = parseISO(params.date);
-    if (isNaN(currentDate.getTime())) {
-      console.error('ReflectionPage: Invalid date in URL, using today instead');
-      currentDate = new Date();
+  const [currentDate, setCurrentDate] = useState<Date>(() => {
+    try {
+      const parsed = parseISO(params.date);
+      if (isNaN(parsed.getTime())) {
+        console.error('ReflectionPage: Invalid date in URL, using today instead');
+        return new Date();
+      }
+      return parsed;
+    } catch (error) {
+      console.error('ReflectionPage: Error parsing date from URL, using today instead:', error);
+      return new Date();
     }
-  } catch (error) {
-    console.error('ReflectionPage: Error parsing date from URL, using today instead:', error);
-    currentDate = new Date();
-  }
+  });
+  
+  // Important: Update the currentDate when params.date changes
+  useEffect(() => {
+    try {
+      const parsed = parseISO(params.date);
+      if (!isNaN(parsed.getTime())) {
+        setCurrentDate(parsed);
+      }
+    } catch (error) {
+      console.error('Error updating currentDate from params:', error);
+    }
+  }, [params.date]);
   
   const today = new Date();
-  const calendarRef = useRef<HTMLDivElement>(null);
   const dateButtonRef = useRef<HTMLButtonElement>(null);
 
   // Image states
   const [resourcesImage, setResourcesImage] = useState("/resources-bg.jpg");
 
   // AI reflection states
-  const [question, setQuestion] = useState("");
-  const [aiReflection, setAiReflection] = useState("");
+  const [aiQuestion, setAiQuestion] = useState("");
+  const [aiResponse, setAiResponse] = useState("");
   const [isAiLoading, setIsAiLoading] = useState(false);
   const [aiError, setAiError] = useState("");
 
@@ -266,16 +364,35 @@ export default function ReflectionPage({
     },
   ];
 
+  // Update useEffect to better handle errors
   useEffect(() => {
     console.log('ReflectionPage: Data fetch effect running, user:', !!user, 'loading:', loading, 'isLoading:', isLoading);
     
+    // Reset state when date changes
+    setDevotionData(null);
+    setBibleVerse(null);
+    setResources(null);
+    setIsLoading(true);
+    fetchAttemptCountRef.current = 0;
+    
+    // Safety check to prevent infinite fetching
+    fetchAttemptCountRef.current += 1;
+    if (fetchAttemptCountRef.current > 3) {
+      console.warn('ReflectionPage: Too many fetch attempts, forcing stop');
+      setIsLoading(false);
+      if (!devotionData) {
+        setDevotionData({ notFound: true, error: "Too many fetch attempts" } as PartialDevotion);
+      }
+      return;
+    }
+    
     const fetchData = async () => {
-      try {
-        setIsLoading(true);
+    try {
+      setIsLoading(true);
         
         // More detailed logging for debugging
         console.log('Reflection page: Starting fetch for date:', params.date);
-        
+
         // Validate the date is in correct format
         let dateObj;
         try {
@@ -296,7 +413,8 @@ export default function ReflectionPage({
         }
         
         // Handle future dates - allow view but show appropriate message
-        console.log('Reflection page: Date is future date?', isFuture(dateObj));
+        const isFutureDate = isFuture(dateObj);
+        console.log('Reflection page: Date is future date?', isFutureDate);
         
         // For dates that are too far in the future (more than 3 months), redirect to today
         const threeMonthsLater = addDays(new Date(), 90);
@@ -309,70 +427,61 @@ export default function ReflectionPage({
           return;
         }
 
-        // Fetch hymn data
+        // Fetch hymn data - Use default hymn if there are issues
         const monthStr = format(currentDate, 'MMMM').toLowerCase();
         console.log('Reflection page: Getting hymn for month:', monthStr);
         
-        const db = getFirebaseDb();
-        console.log('Reflection page: Got Firestore instance:', !!db);
+        // Set default hymn first as a fallback
+        setHymn({
+          title: "When I Survey the Wondrous Cross",
+          author: "Isaac Watts",
+          lyrics: hymnLyrics.flatMap((verse, verseIndex) => 
+            verse.lines.map((line, lineIndex) => ({
+              lineNumber: verseIndex * verse.lines.length + lineIndex + 1,
+              text: line
+            }))
+          )
+        });
         
-        if (db) {
-          try {
-            // Check if we can access Firestore methods
-            if (typeof (db as any).collection !== 'function' || 
-                typeof (db as any).doc !== 'function') {
-              console.error('Firestore methods not available');
-              throw new Error('Firestore not properly initialized');
-            }
+        // Try to fetch hymn from Firestore
+        try {
+          const db = getFirebaseDb();
+          
+          if (db) {
+            console.log('Reflection page: Got Firestore instance, fetching hymn');
             
-            console.log('Reflection page: Fetching hymn for month:', monthStr);
-            const hymnRef = doc(db, 'hymns', monthStr);
-            const hymnSnap = await getDoc(hymnRef);
-            
-            if (hymnSnap.exists()) {
-              console.log('Reflection page: Found hymn data for month:', monthStr);
-              setHymn(hymnSnap.data() as Hymn);
-            } else {
-              console.log('Reflection page: No hymn found for month:', monthStr);
-              // Set default hymn data
-              setHymn({
-                title: "When I Survey the Wondrous Cross",
-                author: "Isaac Watts",
-                lyrics: hymnLyrics.flatMap((verse, verseIndex) => 
-                  verse.lines.map((line, lineIndex) => ({
-                    lineNumber: verseIndex * verse.lines.length + lineIndex + 1,
-                    text: line
-                  }))
-                )
-              });
+            // Use a more resilient approach for getting document
+            try {
+              const hymnRef = doc(db, 'hymns', monthStr);
+              const hymnSnap = await getDoc(hymnRef);
+              
+              // Safely check if document exists - handles both SDK implementations
+              const docExists = hymnSnap && (
+                // Check if it's a function (client SDK)
+                (typeof hymnSnap.exists === 'function' && hymnSnap.exists()) ||
+                // Check if it's a property (admin SDK) 
+                (typeof hymnSnap.exists === 'boolean' && hymnSnap.exists) ||
+                // Fallback - check if data() returns something
+                (hymnSnap.data && hymnSnap.data() !== null && Object.keys(hymnSnap.data() || {}).length > 0)
+              );
+              
+              if (docExists) {
+                console.log('Reflection page: Found hymn data for month:', monthStr);
+                setHymn(hymnSnap.data() as Hymn);
+              } else {
+                console.log('Reflection page: No hymn found for month:', monthStr);
+                // We've already set the default hymn above
+              }
+            } catch (docError) {
+              console.error('Error fetching hymn doc:', docError);
+              // We'll keep the default hymn set above
             }
-          } catch (error) {
-            console.error('Error fetching hymn from Firestore:', error);
-            // Set default hymn data on error
-            setHymn({
-              title: "When I Survey the Wondrous Cross",
-              author: "Isaac Watts",
-              lyrics: hymnLyrics.flatMap((verse, verseIndex) => 
-                verse.lines.map((line, lineIndex) => ({
-                  lineNumber: verseIndex * verse.lines.length + lineIndex + 1,
-                  text: line
-                }))
-              )
-            });
+          } else {
+            console.warn('Reflection page: No Firestore instance available, using default hymn');
           }
-        } else {
-          console.log('Reflection page: No Firestore instance available, using default hymn');
-          // No Firestore instance, set default hymn
-          setHymn({
-            title: "When I Survey the Wondrous Cross",
-            author: "Isaac Watts",
-            lyrics: hymnLyrics.flatMap((verse, verseIndex) => 
-              verse.lines.map((line, lineIndex) => ({
-                lineNumber: verseIndex * verse.lines.length + lineIndex + 1,
-                text: line
-              }))
-            )
-          });
+        } catch (firestoreError) {
+          console.error('Reflection page: Firestore error fetching hymn:', firestoreError);
+          // Keep using the default hymn set above
         }
 
         // Fetch devotion data
@@ -388,7 +497,7 @@ export default function ReflectionPage({
           if (devotion && 'error' in devotion && devotion.error) {
             toast.error(devotion.error);
           }
-        } catch (error) {
+    } catch (error) {
           console.error('Error fetching devotion:', error);
           if (error instanceof Error && error.message.includes('sign in')) {
             // Authentication error
@@ -402,7 +511,7 @@ export default function ReflectionPage({
         console.error('Error in fetchData:', error);
         // Ensure devotionData is set even on error to prevent infinite loading
         if (!devotionData) {
-          setDevotionData({ notFound: true } as Devotion);
+          setDevotionData({ notFound: true } as PartialDevotion);
         }
         toast.error('Failed to load data');
       } finally {
@@ -411,17 +520,16 @@ export default function ReflectionPage({
     }
   };
 
-    // Only fetch if we have a user and we're not already loading
-    if (user && !isLoading) {
+    // Only fetch if we have a user or we're in a public path
+    if (user !== null && !loading) {
       console.log('ReflectionPage: Calling fetchData()');
       fetchData();
-    } else if (!loading && !user) {
+    } else if (!loading && user === null) {
       console.log('ReflectionPage: No user and not loading, redirecting to login');
+      setIsLoading(false); // Make sure to set loading to false
       router.push('/auth/login?from=' + encodeURIComponent(`/devotion/${params.date}/reflection`));
-    } else {
-      console.log('ReflectionPage: Skipping fetchData call:', { userExists: !!user, authLoading: loading, pageLoading: isLoading });
     }
-  }, [params.date, user, currentDate, router, loading, hymnLyrics, isLoading]);
+  }, [params.date, user, router, loading]);
 
   // Load background images for modals from Unsplash with error handling
   useEffect(() => {
@@ -512,12 +620,69 @@ export default function ReflectionPage({
 
     try {
       console.log(`Navigating to date: ${formattedDate}`);
-      router.push(`/devotion/${formattedDate}/reflection`);
+      // Update local state immediately for smoother UI
+      setCurrentDate(newDate);
+      setIsLoading(true); // Set loading immediately to prevent multiple clicks
+      
+      // Reset states for the new date to avoid showing stale data
+      setDevotionData(null);
+      setBibleVerse(null);
+      setResources(null);
+      setAiResponse("");
+      
+      // Clear error states
+      setAiError("");
+      setResourcesError("");
+      
+      // Close any open modals
+      if (showHymnModal) closeHymnModal();
+      if (showScriptureModal) closeScriptureModal();
+      if (showResourcesModal) closeResourcesModal();
+      if (showCalendar) setShowCalendar(false);
+      
+      // Use a hard navigation instead of client-side to ensure a full remount
+      window.location.href = `/devotion/${formattedDate}/reflection`;
     } catch (error) {
       console.error("Error changing date:", error);
       toast.error("An unexpected error occurred. Please try again.");
+      setIsLoading(false); // Ensure loading state is reset on error
     }
   };
+
+  // Add new effect to reset Firestore if connection errors are detected
+  useEffect(() => {
+    // Check console errors for Firestore connection issues
+    const originalConsoleError = console.error;
+    
+    console.error = function(...args) {
+      // Call the original console.error first
+      originalConsoleError.apply(console, args);
+      
+      // Check if the error is related to Firestore connection
+      const errorMessage = args.join(' ');
+      if (
+        (typeof errorMessage === 'string' && 
+        (errorMessage.includes('Firestore') || 
+         errorMessage.includes('firebase') || 
+         errorMessage.includes('SERVER_ERROR')))
+      ) {
+        console.log('Detected Firestore error, refreshing connection');
+        // Attempt to refresh the page after a brief delay if still on the page
+        if (document && window) {
+          setTimeout(() => {
+            if (document.visibilityState === 'visible') {
+              window.location.reload();
+            }
+          }, 2000);
+        }
+      }
+    };
+    
+    // Restore original console.error on cleanup
+    return () => {
+      console.error = originalConsoleError;
+    };
+  }, []);
 
   // Disable next button if current date is today
   const isNextDisabled = isToday(currentDate) || isFuture(currentDate);
@@ -548,7 +713,7 @@ export default function ReflectionPage({
 
   // Function to handle AI reflection generation
   const handleReflectionGeneration = async () => {
-    if (!question.trim() || !devotionData?.bibleText) return;
+    if (!aiQuestion.trim() || !devotionData?.bibleText) return;
 
     setIsAiLoading(true);
     setAiError("");
@@ -556,7 +721,7 @@ export default function ReflectionPage({
     try {
       console.log(
         "[DEBUG] Generating reflection for question:",
-        question.trim(),
+        aiQuestion.trim(),
         "and verse:",
         devotionData.bibleText
       );
@@ -568,7 +733,7 @@ export default function ReflectionPage({
         },
         body: JSON.stringify({
           verse: devotionData.bibleText,
-          question: question.trim(),
+          question: aiQuestion.trim(),
         }),
       });
 
@@ -584,7 +749,7 @@ export default function ReflectionPage({
         throw new Error("Received empty reflection from API");
       }
       
-      setAiReflection(data.reflection);
+      setAiResponse(data.reflection);
 
       // Get existing reflections from localStorage
       const storageKey = getReflectionStorageKey(params.date);
@@ -610,7 +775,7 @@ export default function ReflectionPage({
 
       // Create the new reflection
       const newReflection = {
-        question: question.trim(),
+        question: aiQuestion.trim(),
         reflection: data.reflection,
         timestamp: new Date().toISOString(),
       };
@@ -687,29 +852,53 @@ export default function ReflectionPage({
 
     setIsFetchingBibleVerse(true);
     try {
-      // Clean and normalize the reference
-      let cleanReference = reference.trim()
-        // Remove any non-alphanumeric characters except spaces, colons, and hyphens
-        .replace(/[^\w\s:-]/g, '')
-        // Ensure proper spacing around colons
-        .replace(/(\d):(\d)/g, '$1 : $2')
-        // Normalize spaces
-        .replace(/\s+/g, ' ');
-        
-      // Special case handling for common formats
-      const match = cleanReference.match(/^(\w+)\s+(\d+)\s*:\s*(\d+)(?:\s*-\s*(\d+))?/);
-      if (match) {
-        const [_, book, chapter, startVerse, endVerse] = match;
-        cleanReference = endVerse 
-          ? `${book} ${chapter}:${startVerse}-${endVerse}`
-          : `${book} ${chapter}:${startVerse}`;
+      // Try ESV API first
+      const esvApiKey = process.env.NEXT_PUBLIC_ESV_BIBLE_API_KEY;
+      
+      if (esvApiKey) {
+        try {
+          const esvResponse = await fetch(
+            `https://api.esv.org/v3/passage/text/?q=${encodeURIComponent(reference)}&include-passage-references=true&include-verse-numbers=true&include-footnotes=false`,
+            {
+              headers: {
+                'Authorization': `Token ${esvApiKey}`
+              }
+            }
+          );
+          
+          if (esvResponse.ok) {
+            const esvData = await esvResponse.json();
+            
+            if (esvData.passages && esvData.passages.length > 0) {
+              // Process ESV data into our standard format
+              const text = esvData.passages[0];
+              const verseRegex = /\[(\d+)\](.*?)(?=\[\d+\]|$)/g;
+              const verses = [];
+              let match;
+              
+              while ((match = verseRegex.exec(text)) !== null) {
+                verses.push({
+                  verse: parseInt(match[1]),
+                  text: match[2].trim(),
+                });
+              }
+              
+              return {
+                text: text,
+                reference: esvData.passage_meta[0]?.canonical || reference,
+                verses: verses.length > 0 ? verses : [{verse: 1, text}],
+              };
+            }
+          }
+        } catch (esvError) {
+          console.error("Error with ESV API:", esvError);
+          // Fall back to Bible API
+        }
       }
       
-      console.log("Fetching Bible verse for reference:", cleanReference);
+      // Fallback to Bible API
       const response = await fetch(
-        `https://bible-api.com/${encodeURIComponent(
-          cleanReference
-        )}?verse_numbers=true`
+        `https://bible-api.com/${encodeURIComponent(reference)}?verse_numbers=true`
       );
 
       if (!response.ok) {
@@ -717,10 +906,9 @@ export default function ReflectionPage({
       }
 
       const data = await response.json();
-      console.log("Bible API response:", data);
 
       if (!data.verses || data.verses.length === 0) {
-        console.error("No verses found for reference:", cleanReference);
+        console.error("No verses found for reference:", reference);
         return null;
       }
 
@@ -812,6 +1000,11 @@ export default function ReflectionPage({
     }
   };
 
+  // Handle opening the hymn modal
+  const handleOpenHymnModal = () => {
+    setShowHymnModal(true);
+  };
+
   // Handle clicks outside the calendar to close it
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -864,366 +1057,414 @@ export default function ReflectionPage({
   const isFutureDate = isFuture(currentDate);
 
   return (
-    <div className="min-h-screen bg-black">
-      <div className="max-w-md mx-auto px-4 py-6">
-        {/* Date Navigation - Updated to match mockup */}
-        <div className="flex items-center justify-between bg-zinc-900 rounded-full px-4 py-2 mb-8">
-          <button
-            onClick={() => handleDateChange(subDays(currentDate, 1))}
-            className="p-2"
-          >
-            <ChevronLeftIcon className="w-6 h-6" />
-          </button>
-
-          <button
-            ref={dateButtonRef}
-            onClick={toggleCalendar}
-            className="text-lg font-medium"
-          >
-            {format(currentDate, "EEEE, MMMM d")}
-          </button>
-          
-          <button
-            onClick={() => handleDateChange(addDays(currentDate, 1))}
-            disabled={isNextDisabled}
-            className={`p-2 ${isNextDisabled ? 'opacity-50' : ''}`}
-          >
-            <ChevronRightIcon className="w-6 h-6" />
-          </button>
-        </div>
-
-        {/* Future Date Notice */}
-        {isFutureDate && (
-          <div className="bg-yellow-900/30 border border-yellow-800 rounded-2xl p-4 mb-8">
-            <h2 className="text-lg font-semibold text-yellow-400 mb-2">Future Date</h2>
-            <p className="text-white/80">
-              You're viewing a future date. Devotion content may not be available yet.
-            </p>
+    <ClientOnly>
+      <div key={`reflection-${params.date}`} className="min-h-screen bg-black text-white relative pb-20 font-outfit">
+        {isLoading ? (
+          <div className="min-h-screen flex items-center justify-center">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-white mx-auto"></div>
+              <p className="mt-4">Loading devotion...</p>
+            </div>
           </div>
-        )}
-
-        {showCalendar && (
-          <div
-            ref={calendarRef}
-            className="absolute top-20 left-1/2 -translate-x-1/2 z-50 bg-zinc-900 p-4 rounded-2xl shadow-xl border border-zinc-800"
-          >
-            <DatePicker
-              initialDate={currentDate}
-              onDateSelect={(date: Date | null) => {
-                if (date) {
-                  handleDateChange(date);
-                  setShowCalendar(false);
-                }
-              }}
-              isOpen={showCalendar}
-              onClose={() => setShowCalendar(false)}
-            />
-          </div>
-        )}
-
-        {/* Hymn Section - Updated to match mockup */}
-        {hymn && (
-          <div
-              onClick={() => setShowHymnModal(true)}
-            className="relative overflow-hidden rounded-2xl mb-8 cursor-pointer"
-            >
-            <div className="absolute inset-0 bg-gradient-to-b from-black/40 to-black/90 z-10" />
-            <Image
-              src={hymnImage}
-              alt="Hymn background"
-              width={800}
-              height={300}
-              className="object-cover w-full h-32"
-            />
-            <div className="absolute inset-0 z-20 p-4">
-              <p className="text-sm font-medium text-white/80 mb-1">Hymn of the Month:</p>
-              <h2 className="text-xl font-semibold">{hymn.title}</h2>
-              </div>
-          </div>
-        )}
-
-        {/* Scripture Section */}
-        {devotionData?.bibleText && (
-              <div
-                onClick={handleOpenScriptureModal}
-            className="bg-zinc-900 rounded-2xl p-4 mb-8 cursor-pointer"
-              >
-            <h2 className="text-sm font-medium text-white/80 mb-1">Today's Scripture</h2>
-            <p className="text-xl font-semibold">{devotionData.bibleText}</p>
-              </div>
-        )}
-
-            {/* Reflection Questions */}
-        {!showNoDevotionContent && reflectionQuestions.length > 0 && (
-          <div className="mb-8">
-            <h2 className="text-lg font-semibold mb-4">Reflection Questions</h2>
-            <div className="space-y-4">
-              {reflectionQuestions.map((question, index) => (
-                <div
-                  key={index}
-                  className="bg-zinc-900 rounded-2xl p-4"
-                >
-                  <p className="text-base mb-3">{question}</p>
-                  <textarea
-                    className="w-full bg-black rounded-xl p-3 text-white placeholder-white/50 focus:outline-none focus:ring-1 focus:ring-white/20"
-                    rows={3}
-                    placeholder="Write your reflection here..."
-                  />
-                      </div>
-              ))}
-                      </div>
-                      </div>
-        )}
-
-        {/* AI Reflection Section */}
-        {!showNoDevotionContent && (
-          <div className="mb-8">
-            <h2 className="text-lg font-semibold mb-4">Reflect with AI</h2>
-            <div className="bg-zinc-900 rounded-2xl p-4">
-              <div className="flex items-center space-x-2 mb-4">
-                <input
-                  type="text"
-                  value={question}
-                  onChange={(e) => setQuestion(e.target.value)}
-                  onKeyPress={handleReflectionKeyPress}
-                  placeholder="Ask questions about today's text..."
-                  className="flex-1 bg-black rounded-full px-4 py-2 text-white placeholder-white/50 focus:outline-none focus:ring-1 focus:ring-white/20"
-                />
+        ) : (
+          <>
+            {/* Date Navigation */}
+            <div className="pt-6 pb-4 px-6 flex items-center justify-center">
+              <div className="relative w-full max-w-xs">
                 <button
-                  onClick={handleReflectionGeneration}
-                  disabled={isAiLoading || !question.trim()}
-                  className="p-2 rounded-full bg-white/10 hover:bg-white/20 disabled:opacity-50 disabled:hover:bg-white/10"
+                  onClick={() => handleDateChange(subDays(currentDate, 1))}
+                  className="p-3 rounded-full hover:bg-zinc-800 absolute left-0 top-1/2 -translate-y-1/2"
+                  aria-label="Previous day"
                 >
-                  <ArrowRightIcon className="w-5 h-5" />
+                  <ChevronLeftIcon className="w-6 h-6" />
+                </button>
+
+                <button
+                  ref={dateButtonRef}
+                  onClick={toggleCalendar}
+                  className="w-full text-center py-3 px-4 bg-zinc-800 rounded-full text-lg font-medium"
+                >
+                  {format(currentDate, "EEEE, MMMM d")}
+                </button>
+
+                <button
+                  onClick={() => handleDateChange(addDays(currentDate, 1))}
+                  disabled={isNextDisabled}
+                  className={`p-3 rounded-full absolute right-0 top-1/2 -translate-y-1/2 ${
+                    isNextDisabled
+                      ? "text-white/30 cursor-not-allowed"
+                      : "hover:bg-zinc-800"
+                  }`}
+                  aria-label="Next day"
+                >
+                  <ChevronRightIcon className="w-6 h-6" />
                 </button>
               </div>
-              {isAiLoading && (
-                <div className="flex justify-center py-4">
-                  <div className="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                </div>
+            </div>
+
+            {/* Main Content */}
+            <div className="px-6 pb-16 space-y-6">
+              {showCalendar && (
+                <CalendarWrapper>
+                  <DatePicker 
+                    initialDate={currentDate} 
+                    onDateSelect={handleDateChange} 
+                  />
+                </CalendarWrapper>
               )}
-              {aiError && (
-                <p className="text-red-400 text-sm mb-4">{aiError}</p>
-              )}
-              {aiReflection && (
-                <div className="bg-black/50 rounded-xl p-4">
-                  <p className="text-white/90">{aiReflection}</p>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* Resources Section */}
-        {!showNoDevotionContent && devotionData?.bibleText && (
-          <div
-            onClick={handleOpenResourcesModal}
-            className="relative overflow-hidden rounded-2xl cursor-pointer"
-              >
-            <div className="absolute inset-0 bg-gradient-to-b from-black/40 to-black/90 z-10" />
-            <Image
-              src={resourcesImage}
-              alt="Resources background"
-              width={800}
-              height={300}
-              className="object-cover w-full h-32"
-            />
-            <div className="absolute inset-0 z-20 p-4">
-              <h2 className="text-xl font-semibold mb-1">Resources for today's text</h2>
-              <p className="text-sm text-white/80">Bible Commentaries, Videos, and Podcasts</p>
-                </div>
-            </div>
-        )}
-
-        {/* No Devotion Content */}
-        {showNoDevotionContent && (
-          <div className="bg-zinc-900 rounded-2xl p-6 space-y-4">
-            <h2 className="text-xl font-semibold">No Devotion Available</h2>
-            <p className="text-white/80">
-              There is no devotion available for this date yet. You can:
-            </p>
-            <ul className="list-disc list-inside space-y-2 text-white/70 ml-4">
-              <li>Read and meditate on the hymn of the month above</li>
-              <li>Navigate to a different date using the calendar</li>
-              <li>Come back later when content is available</li>
-            </ul>
-          </div>
-        )}
-      </div>
-
-      {/* Modals */}
-      {/* Hymn Modal */}
-      {showHymnModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
-        <div
-            className={`fixed inset-0 bg-black/50 ${isHymnModalClosing ? 'animate-fade-out' : 'animate-fade-in'}`}
-          onClick={closeHymnModal}
-          />
-          <div className={`relative w-full max-w-lg mx-4 bg-white rounded-lg shadow-xl ${isHymnModalClosing ? 'animate-slide-down' : 'animate-slide-up'}`}>
-            <div className="relative h-48">
-              <Image
-                src={hymnImage}
-                alt="Hymn background"
-                fill
-                className="object-cover"
-              />
-              <div className="absolute inset-0 bg-gradient-to-b from-black/40 to-black/90" />
-              <div className="absolute inset-0 p-6 flex flex-col justify-end">
-                <p className="text-sm font-medium text-white/80 mb-1">Hymn of the Month</p>
-                <h2 className="text-2xl font-semibold">{hymn?.title}</h2>
-            </div>
-            </div>
-            <div className="p-6 space-y-6">
-              {hymnLyrics.map((verse, index) => (
-                <div key={index} className="space-y-2">
-                  <p className="text-sm font-medium text-white/60">Verse {verse.verse}</p>
-                  {verse.lines.map((line, lineIndex) => (
-                    <p key={lineIndex} className="text-lg">{line}</p>
-                  ))}
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Scripture Modal */}
-      {showScriptureModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
-        <div
-            className={`fixed inset-0 bg-black/50 ${isScriptureModalClosing ? 'animate-fade-out' : 'animate-fade-in'}`}
-          onClick={closeScriptureModal}
-          />
-          <div className={`relative w-full max-w-lg mx-4 bg-white rounded-lg shadow-xl ${isScriptureModalClosing ? 'animate-slide-down' : 'animate-slide-up'}`}>
-            <div className="p-6">
-              <h2 className="text-sm font-medium text-white/80 mb-1">Today's Scripture</h2>
-              <p className="text-xl font-semibold mb-6">{devotionData?.bibleText}</p>
               
-              {isFetchingBibleVerse ? (
-                <div className="flex justify-center py-8">
-                  <div className="w-8 h-8 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              {/* Hymn of the Month */}
+              <div 
+                className="rounded-xl overflow-hidden relative cursor-pointer"
+                onClick={handleOpenHymnModal}
+              >
+                <div className="relative h-48">
+                  <Image
+                    src={hymnImage}
+                    alt="Hymn background"
+                    fill
+                    className="object-cover"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-b from-black/30 to-black/70" />
+                  <div className="absolute inset-0 p-6 flex flex-col justify-end">
+                    <p className="text-lg font-medium text-white/80 mb-1">Hymn of the Month:</p>
+                    <h2 className="text-4xl font-bold">{hymn?.title}</h2>
+                  </div>
                 </div>
-              ) : bibleVerse ? (
-                <div className="space-y-4">
-                  {bibleVerse.verses.map((verse) => (
-                    <div key={verse.verse} className="flex">
-                      <span className="text-white/40 mr-4">{verse.verse}</span>
-                      <p>{verse.text}</p>
+              </div>
+
+              {/* If we have future date, show it clearly */}
+              {isFuture(currentDate) && (
+                <div className="bg-zinc-900 rounded-xl p-6 mt-4 text-center">
+                  <h2 className="text-xl font-semibold mb-2">Future Date</h2>
+                  <p className="text-white/80">
+                    This devotion is not yet available. Content will be released on {format(currentDate, "MMMM d, yyyy")}.
+                  </p>
+                </div>
+              )}
+              
+              {/* Display devotion content if we have it */}
+              {!isFuture(currentDate) && devotionData && !('notFound' in devotionData) ? (
+                <>
+                  {/* Scripture Reference */}
+                  <div>
+                    <p className="text-white/70 text-lg mb-2">Today's Scripture</p>
+                    <div className="bg-zinc-900 p-6 rounded-xl">
+                      <h2 className="text-3xl font-semibold text-center">{devotionData.bibleText}</h2>
+                      <div className="flex justify-center mt-3">
+                        <button
+                          onClick={handleOpenScriptureModal}
+                          className="text-blue-400 hover:text-blue-300 font-medium"
+                        >
+                          Read
+                        </button>
+                      </div>
                     </div>
-                  ))}
-                </div>
+                  </div>
+                  
+                  {/* Reflection Questions */}
+                  <div>
+                    <p className="text-white/70 text-lg mb-2">Reflection Questions</p>
+                    <div className="bg-zinc-900 p-6 rounded-xl">
+                      {devotionData?.reflectionSections && devotionData.reflectionSections.length > 0 && devotionData.reflectionSections.map((section, sectionIndex) => (
+                        <div key={sectionIndex} className="mb-6">
+                          {section.passage && (
+                            <h3 className="text-lg font-medium text-white/90 mb-3">
+                              {section.passage}
+                            </h3>
+                          )}
+                          
+                          <ol className="list-decimal ml-5 space-y-4">
+                            {section.questions?.map((q: string, idx: number) => (
+                              <li key={idx} className="text-xl pl-2">
+                                {q}
+                              </li>
+                            ))}
+                          </ol>
+                        </div>
+                      ))}
+                      
+                      {/* Fallback for no sections or simple question list */}
+                      {(!devotionData?.reflectionSections || devotionData.reflectionSections.length === 0) && reflectionQuestions.length > 0 && (
+                        <ol className="list-decimal ml-5 space-y-6">
+                          {reflectionQuestions.slice(0, 2).map((q: string, idx: number) => (
+                            <li key={idx} className="text-xl pl-2">
+                              {q}
+                            </li>
+                          ))}
+                        </ol>
+                      )}
+                      
+                      <div className="mt-8 flex justify-start">
+                        <button
+                          className="px-6 py-3 bg-white/10 rounded-full hover:bg-white/20 flex items-center space-x-2"
+                        >
+                          <span className="font-medium">Journal Entry</span>
+                          <ChevronRightIcon className="w-5 h-5" />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {/* AI Reflection */}
+                  <div>
+                    <p className="text-white/70 text-lg mb-2">Reflect with AI</p>
+                    <div className="bg-zinc-900 rounded-xl p-4">
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="text"
+                          value={aiQuestion}
+                          onChange={(e) => setAiQuestion(e.target.value)}
+                          onKeyPress={handleReflectionKeyPress}
+                          placeholder="Ask questions about today's text..."
+                          className="flex-1 bg-black/30 border-none outline-none rounded-full px-4 py-3 text-white placeholder-white/50"
+                        />
+                        <button
+                          onClick={handleReflectionGeneration}
+                          disabled={isAiLoading || !aiQuestion.trim()}
+                          className={`p-3 rounded-full ${
+                            isAiLoading || !aiQuestion.trim()
+                              ? "bg-white/10 cursor-not-allowed"
+                              : "bg-white/20 hover:bg-white/30"
+                          }`}
+                        >
+                          <ArrowRightIcon className="w-5 h-5" />
+                        </button>
+                      </div>
+                      
+                      {aiResponse && (
+                        <div className="mt-4 p-4 bg-white/5 rounded-xl">
+                          <p className="text-white/90 whitespace-pre-line">{aiResponse}</p>
+                        </div>
+                      )}
+                      
+                      {aiError && (
+                        <div className="mt-4 p-4 bg-red-900/20 rounded-xl">
+                          <p className="text-red-400">{aiError}</p>
+                        </div>
+                      )}
+                      
+                      {isAiLoading && (
+                        <div className="mt-4 flex justify-center">
+                          <div className="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  
+                  {/* Resources */}
+                  <div 
+                    className="rounded-xl overflow-hidden relative cursor-pointer"
+                    onClick={handleOpenResourcesModal}
+                  >
+                    <div className="relative h-48">
+                      <Image
+                        src={resourcesImage}
+                        alt="Resources background"
+                        fill
+                        className="object-cover"
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-b from-black/30 to-black/70" />
+                      <div className="absolute inset-0 p-6 flex flex-col justify-end">
+                        <h2 className="text-2xl font-bold mb-1">Resources for today's text</h2>
+                        <p className="text-white/80">Bible Commentaries, Videos, and Podcasts</p>
+                      </div>
+                    </div>
+                  </div>
+                </>
               ) : (
-                <p className="text-white/60">Failed to load Bible verses</p>
+                !isFuture(currentDate) && showNoDevotionContent && (
+                  <div className="text-center pt-10">
+                    <h2 className="text-2xl font-medium mb-8">"No devotion is available for today.</h2>
+                    
+                    <p className="text-xl text-white/80 mb-6">
+                      New devotions are posted Monday through Friday
+                    </p>
+                    
+                    <p className="text-xl text-white/80 mb-6">
+                      check back soon!"
+                    </p>
+                  </div>
+                )
               )}
             </div>
-          </div>
-        </div>
-      )}
-
-      {/* Resources Modal */}
-      {showResourcesModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
-        <div
-            className={`fixed inset-0 bg-black/50 ${isResourcesModalClosing ? 'animate-fade-out' : 'animate-fade-in'}`}
-          onClick={closeResourcesModal}
-          />
-          <div className={`relative w-full max-w-lg mx-4 bg-white rounded-lg shadow-xl ${isResourcesModalClosing ? 'animate-slide-down' : 'animate-slide-up'}`}>
-            <div className="relative h-48">
-              <Image
-                src={resourcesImage}
-                alt="Resources background"
-                fill
-                className="object-cover"
-              />
-              <div className="absolute inset-0 bg-gradient-to-b from-black/40 to-black/90" />
-              <div className="absolute inset-0 p-6 flex flex-col justify-end">
-                <h2 className="text-2xl font-semibold mb-1">Resources</h2>
-                <p className="text-white/80">For {devotionData?.bibleText}</p>
+          </>
+        )}
+        
+        {/* Modals (outside of loading check) */}
+        {/* Hymn Modal */}
+        {showHymnModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div
+              className={`fixed inset-0 bg-black/50 ${isHymnModalClosing ? 'animate-fade-out' : 'animate-fade-in'}`}
+            onClick={closeHymnModal}
+            />
+            <div className={`relative w-full max-w-lg mx-4 bg-white rounded-lg shadow-xl ${isHymnModalClosing ? 'animate-slide-down' : 'animate-slide-up'}`}>
+              <div className="relative h-48">
+                <Image
+                  src={hymnImage}
+                  alt="Hymn background"
+                  fill
+                  className="object-cover"
+                />
+                <div className="absolute inset-0 bg-gradient-to-b from-black/40 to-black/90" />
+                <div className="absolute inset-0 p-6 flex flex-col justify-end">
+                  <p className="text-sm font-medium text-white/80 mb-1">Hymn of the Month</p>
+                  <h2 className="text-2xl font-semibold">{hymn?.title}</h2>
+              </div>
+              </div>
+              <div className="p-6 space-y-6">
+                {hymnLyrics.map((verse, index) => (
+                  <div key={index} className="space-y-2">
+                    <p className="text-sm font-medium text-white/60">Verse {verse.verse}</p>
+                    {verse.lines.map((line, lineIndex) => (
+                      <p key={lineIndex} className="text-lg">{line}</p>
+                    ))}
+                  </div>
+                ))}
               </div>
             </div>
+          </div>
+        )}
 
-            <div className="p-6">
-            {isFetchingResources ? (
-                <div className="flex justify-center py-8">
-                  <div className="w-8 h-8 border-2 border-white border-t-transparent rounded-full animate-spin" />
+        {/* Scripture Modal */}
+        {showScriptureModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div
+              className={`fixed inset-0 bg-black/50 ${isScriptureModalClosing ? 'animate-fade-out' : 'animate-fade-in'}`}
+            onClick={closeScriptureModal}
+            />
+            <div className={`relative w-full max-w-lg mx-4 bg-white rounded-lg shadow-xl ${isScriptureModalClosing ? 'animate-slide-down' : 'animate-slide-up'}`}>
+              <div className="p-6">
+                <h2 className="text-sm font-medium text-white/80 mb-1">Today's Scripture</h2>
+                <p className="text-xl font-semibold mb-6">{devotionData?.bibleText}</p>
+                
+                {isFetchingBibleVerse ? (
+                  <div className="flex justify-center py-8">
+                    <div className="w-8 h-8 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  </div>
+                ) : bibleVerse ? (
+                  <div className="space-y-4">
+                    {bibleVerse.verses.map((verse) => (
+                      <div key={verse.verse} className="flex">
+                        <span className="text-white/40 mr-4">{verse.verse}</span>
+                        <p>{verse.text}</p>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-white/60">Failed to load Bible verses</p>
+                )}
               </div>
-            ) : resourcesError ? (
-                <p className="text-red-400">{resourcesError}</p>
-              ) : resources ? (
-              <div className="space-y-8">
-                  {/* Commentaries */}
-                  {resources.commentaries && resources.commentaries.length > 0 && (
+            </div>
+          </div>
+        )}
+
+        {/* Resources Modal */}
+        {showResourcesModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div
+              className={`fixed inset-0 bg-black/50 ${isResourcesModalClosing ? 'animate-fade-out' : 'animate-fade-in'}`}
+            onClick={closeResourcesModal}
+            />
+            <div className={`relative w-full max-w-lg mx-4 bg-white rounded-lg shadow-xl ${isResourcesModalClosing ? 'animate-slide-down' : 'animate-slide-up'}`}>
+              <div className="relative h-48">
+                <Image
+                  src={resourcesImage}
+                  alt="Resources background"
+                  fill
+                  className="object-cover"
+                />
+                <div className="absolute inset-0 bg-gradient-to-b from-black/40 to-black/90" />
+                <div className="absolute inset-0 p-6 flex flex-col justify-end">
+                  <h2 className="text-2xl font-semibold mb-1">Resources</h2>
+                  <p className="text-white/80">For {devotionData?.bibleText}</p>
+                </div>
+              </div>
+
+              <div className="p-6">
+              {isFetchingResources ? (
+                  <div className="flex justify-center py-8">
+                    <div className="w-8 h-8 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                </div>
+              ) : resourcesError ? (
+                  <p className="text-red-400">{resourcesError}</p>
+                ) : resources ? (
+                <div className="space-y-8">
+                    {/* Commentaries */}
+                    {resources.commentaries && resources.commentaries.length > 0 && (
+                      <div>
+                        <h3 className="text-lg font-semibold mb-4">Bible Commentaries</h3>
+                        <div className="space-y-4">
+                          {resources.commentaries.map((item, index) => (
+                            <a
+                              key={index}
+                              href={isValidUrl(item.url) ? item.url : getFallbackUrl(item.type, item.title)}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                              className="block bg-black/30 rounded-xl p-4 hover:bg-black/50 transition-colors"
+                            >
+                              <h4 className="font-medium mb-1">{item.title}</h4>
+                              {item.author && (
+                                <p className="text-sm text-white/60 mb-2">by {item.author}</p>
+                              )}
+                              <p className="text-sm text-white/80">{item.description}</p>
+                              </a>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Videos */}
+                  {resources.videos && resources.videos.length > 0 && (
                     <div>
-                      <h3 className="text-lg font-semibold mb-4">Bible Commentaries</h3>
+                        <h3 className="text-lg font-semibold mb-4">Videos</h3>
                       <div className="space-y-4">
-                        {resources.commentaries.map((item, index) => (
-                          <a
+                        {resources.videos.map((item, index) => (
+                            <a
                             key={index}
-                            href={isValidUrl(item.url) ? item.url : getFallbackUrl(item.type, item.title)}
+                              href={isValidUrl(item.url) ? item.url : getFallbackUrl(item.type, item.title)}
                               target="_blank"
                               rel="noopener noreferrer"
-                            className="block bg-black/30 rounded-xl p-4 hover:bg-black/50 transition-colors"
-                          >
-                            <h4 className="font-medium mb-1">{item.title}</h4>
-                            {item.author && (
-                              <p className="text-sm text-white/60 mb-2">by {item.author}</p>
-                            )}
-                            <p className="text-sm text-white/80">{item.description}</p>
+                              className="block bg-black/30 rounded-xl p-4 hover:bg-black/50 transition-colors"
+                            >
+                              <h4 className="font-medium mb-2">{item.title}</h4>
+                              <p className="text-sm text-white/80">{item.description}</p>
                             </a>
                         ))}
                       </div>
                     </div>
                   )}
 
-                  {/* Videos */}
-                {resources.videos && resources.videos.length > 0 && (
-                  <div>
-                      <h3 className="text-lg font-semibold mb-4">Videos</h3>
-                    <div className="space-y-4">
-                      {resources.videos.map((item, index) => (
-                          <a
-                          key={index}
-                            href={isValidUrl(item.url) ? item.url : getFallbackUrl(item.type, item.title)}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="block bg-black/30 rounded-xl p-4 hover:bg-black/50 transition-colors"
-                          >
-                            <h4 className="font-medium mb-2">{item.title}</h4>
-                            <p className="text-sm text-white/80">{item.description}</p>
-                          </a>
-                      ))}
+                    {/* Podcasts */}
+                  {resources.podcasts && resources.podcasts.length > 0 && (
+                    <div>
+                        <h3 className="text-lg font-semibold mb-4">Podcasts</h3>
+                      <div className="space-y-4">
+                        {resources.podcasts.map((item, index) => (
+                            <a
+                            key={index}
+                              href={isValidUrl(item.url) ? item.url : getFallbackUrl(item.type, item.title)}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="block bg-black/30 rounded-xl p-4 hover:bg-black/50 transition-colors"
+                            >
+                              <h4 className="font-medium mb-2">{item.title}</h4>
+                              <p className="text-sm text-white/80">{item.description}</p>
+                            </a>
+                        ))}
+                      </div>
                     </div>
-                  </div>
-                )}
-
-                  {/* Podcasts */}
-                {resources.podcasts && resources.podcasts.length > 0 && (
-                  <div>
-                      <h3 className="text-lg font-semibold mb-4">Podcasts</h3>
-                    <div className="space-y-4">
-                      {resources.podcasts.map((item, index) => (
-                          <a
-                          key={index}
-                            href={isValidUrl(item.url) ? item.url : getFallbackUrl(item.type, item.title)}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="block bg-black/30 rounded-xl p-4 hover:bg-black/50 transition-colors"
-                          >
-                            <h4 className="font-medium mb-2">{item.title}</h4>
-                            <p className="text-sm text-white/80">{item.description}</p>
-                          </a>
-                      ))}
-                    </div>
-                  </div>
-                )}
+                  )}
+                </div>
+                ) : (
+                  <p className="text-white/60">No resources available</p>
+              )}
               </div>
-              ) : (
-                <p className="text-white/60">No resources available</p>
-            )}
             </div>
           </div>
-        </div>
-      )}
-    </div>
+        )}
+      </div>
+    </ClientOnly>
   );
 }

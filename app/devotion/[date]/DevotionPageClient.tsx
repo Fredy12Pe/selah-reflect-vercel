@@ -56,20 +56,20 @@ export default function DevotionPageClient({ date }: DevotionPageClientProps) {
   const [hasAttemptedLoad, setHasAttemptedLoad] = useState(false);
 
   const fetchBibleVerse = useCallback(async (reference: string, signal?: AbortSignal) => {
-    try {
-      const response = await fetch(
+      try {
+        const response = await fetch(
         `https://bible-api.com/${encodeURIComponent(reference)}?verse_numbers=true`,
         { signal }
-      );
+        );
 
-      if (!response.ok) {
-        throw new Error(`Bible API error: ${response.statusText}`);
-      }
+        if (!response.ok) {
+          throw new Error(`Bible API error: ${response.statusText}`);
+        }
 
-      const data = await response.json();
-      if (!data.verses || data.verses.length === 0) {
-        return null;
-      }
+        const data = await response.json();
+        if (!data.verses || data.verses.length === 0) {
+          return null;
+        }
 
       return {
         text: data.text,
@@ -78,20 +78,20 @@ export default function DevotionPageClient({ date }: DevotionPageClientProps) {
           verse: v.verse,
           text: v.text.trim(),
         })),
-      };
+        };
     } catch (error: any) {
       if (error.name === 'AbortError') return null;
-      console.error("Error fetching Bible verse:", error);
-      return null;
-    }
+        console.error("Error fetching Bible verse:", error);
+        return null;
+      }
   }, []);
 
   const loadDevotion = useCallback(async (signal?: AbortSignal) => {
     if (!user) return;
-    
-    try {
-      setLoading(true);
-      setError(null);
+
+      try {
+        setLoading(true);
+        setError(null);
       
       const token = await user.getIdToken(true);
       const response = await fetch(`/api/devotions/${date}`, {
@@ -127,14 +127,14 @@ export default function DevotionPageClient({ date }: DevotionPageClientProps) {
           
           setDevotion(data);
           const reference = getBibleReference(data);
-          if (reference) {
+        if (reference) {
             const verse = await fetchBibleVerse(reference, signal);
             if (verse) setBibleVerse(verse);
           }
           return;
         }
         throw new Error(`Failed to fetch devotion: ${response.statusText}`);
-      }
+          }
 
       const data = await response.json();
       if (data.notFound) {
@@ -147,24 +147,24 @@ export default function DevotionPageClient({ date }: DevotionPageClientProps) {
       if (reference) {
         const verse = await fetchBibleVerse(reference, signal);
         if (verse) setBibleVerse(verse);
-      }
-    } catch (err: any) {
+        }
+      } catch (err: any) {
       if (err.name === 'AbortError') return;
       
-      console.error("Error loading devotion:", err);
+        console.error("Error loading devotion:", err);
       const errorMessage = err.message || "Failed to load devotion";
       
       if (errorMessage.includes("Authentication failed") || errorMessage.includes("sign in")) {
         if (!window.location.pathname.includes('/auth/login')) {
           router.push(`/auth/login?from=/devotion/${date}`);
         }
-      } else {
+        } else {
         setError(errorMessage);
-      }
-    } finally {
-      setLoading(false);
+        }
+      } finally {
+        setLoading(false);
       setHasAttemptedLoad(true);
-    }
+      }
   }, [user, date, router, fetchBibleVerse]);
 
   // Handle auth initialization and loading
@@ -191,7 +191,7 @@ export default function DevotionPageClient({ date }: DevotionPageClientProps) {
   if (authLoading || (loading && !hasAttemptedLoad)) {
     return (
       <div className="min-h-screen bg-black/90 flex items-center justify-center">
-        <div className="w-8 h-8 border-4 border-white border-t-transparent rounded-full animate-spin" />
+          <div className="w-8 h-8 border-4 border-white border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
@@ -199,16 +199,16 @@ export default function DevotionPageClient({ date }: DevotionPageClientProps) {
   if (error) {
     return (
       <div className="min-h-screen bg-black/90 flex flex-col items-center justify-center text-white p-4">
-        <p className="text-xl mb-4">{error}</p>
-        <button
+          <p className="text-xl mb-4">{error}</p>
+            <button
           onClick={() => {
             setHasAttemptedLoad(false);
             loadDevotion();
           }}
-          className="px-4 py-2 bg-white/20 rounded-lg hover:bg-white/30 transition-colors"
-        >
-          Try Again
-        </button>
+              className="px-4 py-2 bg-white/20 rounded-lg hover:bg-white/30 transition-colors"
+            >
+              Try Again
+            </button>
       </div>
     );
   }
@@ -216,7 +216,7 @@ export default function DevotionPageClient({ date }: DevotionPageClientProps) {
   if (!devotion) {
     return (
       <div className="min-h-screen bg-black/90 flex items-center justify-center text-white">
-        <p className="text-xl">No devotion found for this date</p>
+          <p className="text-xl">No devotion found for this date</p>
       </div>
     );
   }

@@ -185,7 +185,7 @@ export async function POST(request: NextRequest) {
 
               await devotionRef.set(devotionDoc);
               console.log(`Successfully saved devotion for ${dateKey}`);
-              successCount++;
+        successCount++;
             } catch (error) {
               console.error(`Error saving devotion for date ${devotion.date}:`, error);
               errorItems.push({
@@ -210,7 +210,7 @@ export async function POST(request: NextRequest) {
       message: `Successfully processed ${successCount} devotions with ${errorItems.length} errors`,
       errorItems: errorItems.length > 0 ? errorItems : undefined
     });
-
+    
   } catch (error) {
     console.error('Error processing upload:', error);
     return NextResponse.json(

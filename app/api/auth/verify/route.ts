@@ -10,7 +10,7 @@ export async function GET() {
     if (shouldSkipApiRoutes === true || shouldSkipFirebaseAdmin === true) {
       console.log('Verify API: Skipping verification in development');
       return NextResponse.json({ status: 'success', verified: true });
-    }
+  }
 
     // Initialize Firebase Admin
     initAdmin();
@@ -23,7 +23,7 @@ export async function GET() {
 
     // Verify the session cookie
     const decodedClaims = await auth.verifySessionCookie(sessionCookie, true);
-    
+
     return NextResponse.json({
       status: 'success',
       verified: true,

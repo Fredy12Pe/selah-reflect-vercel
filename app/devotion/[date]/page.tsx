@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { useAuth } from "@/lib/context/AuthContext";
-import { safeDoc, safeGetDoc } from "@/lib/utils/firebase-helpers";
+import { safeDoc, safeGetDoc, safeGetDocWithFallback } from "@/lib/utils/firebase-helpers";
 import { toast, Toaster } from "react-hot-toast";
 import {
   getDailyDevotionImage,
@@ -108,8 +108,27 @@ export default function DevotionPage({ params }: { params: { date: string } }) {
 
     const fetchData = async () => {
       try {
+        // Create a document reference using our safe helper
         const devotionRef = safeDoc("devotions", params.date);
-        const devotionSnap = await safeGetDoc(devotionRef);
+        
+        // If we couldn't get a document reference, show error
+        if (!devotionRef) {
+          console.error("Failed to create document reference for date:", params.date);
+          setPageLoading(false);
+          toast.error("Failed to load devotion");
+          return;
+        }
+        
+        // Use our fallback helper to avoid crashing on errors
+        const devotionSnap = await safeGetDocWithFallback(devotionRef);
+        
+        // Check if we have a valid snapshot
+        if (!devotionSnap) {
+          console.error("Failed to fetch devotion data for date:", params.date);
+          setPageLoading(false);
+          toast.error("Failed to load devotion");
+          return;
+        }
 
         if (devotionSnap.exists()) {
           const devotionData = devotionSnap.data() as DevotionData;

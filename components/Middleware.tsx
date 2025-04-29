@@ -12,8 +12,10 @@ const PUBLIC_PATHS = [
   "/favicon.ico",
   "/manifest.json",
   "/firebase-fix.js",
-  "/firebase-patch.js",
-  "/debug.js",
+  "/firebase-setup.js",
+  "/debug",
+  "/error",
+  "/"
 ];
 
 interface MiddlewareProps {
@@ -24,85 +26,65 @@ export function Middleware({ children }: MiddlewareProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const pathname = usePathname();
-
+  
   // Check if current path is public
-  const isPublicPath = PUBLIC_PATHS.some((path) => pathname?.startsWith(path));
+  const isPublicPath = PUBLIC_PATHS.some((path) => 
+    pathname?.startsWith(path) || pathname === path
+  );
 
   useEffect(() => {
-    // Only run in browser
+    // Skip authentication check during SSR
     if (!isBrowser()) {
-      console.log("[Middleware Client] Running in server context, skipping");
       setLoading(false);
       return;
     }
 
     // Skip authentication check for public paths
     if (isPublicPath) {
-      console.log(
-        "[Middleware Client] Public path detected, skipping auth check:",
-        pathname
-      );
       setLoading(false);
       return;
     }
 
     // Add a safety timeout to prevent endless loading
     const safetyTimeout = setTimeout(() => {
-      console.warn(
-        "[Middleware Client] Safety timeout reached, continuing anyway"
-      );
+      console.warn("[Middleware] Safety timeout reached, proceeding");
       setLoading(false);
-    }, 5000); // 5 second safety timeout
+    }, 3000); // 3 second safety timeout
 
-    // Initialize Firebase patch checking
-    const patchCheck = () => {
+    // Apply basic Firebase patches if needed
+    const applyPatches = () => {
+      if (typeof window === 'undefined') return;
+      
       try {
-        // Check if Firebase patches are applied
-        if (typeof window !== "undefined") {
-          const hasFbPatches =
-            typeof window._isFirebaseServerApp === "function" &&
-            typeof window._registerComponent === "function" &&
-            typeof window._getProvider === "function";
-
-          if (!hasFbPatches) {
-            console.error(
-              "[Middleware Client] Firebase patches not detected, applying now"
-            );
-
-            // Apply patches if not present
-            window._isFirebaseServerApp =
-              window._isFirebaseServerApp ||
-              function () {
-                return false;
-              };
-            window._registerComponent =
-              window._registerComponent ||
-              function (c) {
-                return c;
-              };
-            window._getProvider =
-              window._getProvider ||
-              function () {
-                return { getImmediate: () => ({}), get: () => ({}) };
-              };
-          } else {
-            console.log("[Middleware Client] Firebase patches detected");
-          }
+        // Ensure Firebase internals are available
+        window._registerComponent = window._registerComponent || 
+          function(component) { return component; };
+        
+        window._getProvider = window._getProvider || 
+          function() { return { getImmediate: () => ({}), get: () => ({}) }; };
+        
+        window._isFirebaseServerApp = window._isFirebaseServerApp || 
+          function() { return false; };
+        
+        // Expose these functions on known module paths to prevent errors
+        for (let i = 0; i < 5; i++) {
+          const modName = `__FIREBASE_APP__WEBPACK_IMPORTED_MODULE_${i}__`;
+          if (!window[modName]) window[modName] = {};
+          window[modName]._registerComponent = window._registerComponent;
+          window[modName]._getProvider = window._getProvider;
+          window[modName]._isFirebaseServerApp = window._isFirebaseServerApp;
         }
       } catch (err) {
-        console.error("[Middleware Client] Error in patch check:", err);
-        // Continue despite errors
+        console.error("[Middleware] Error applying patches:", err);
       } finally {
-        // Continue loading the app
         clearTimeout(safetyTimeout);
         setLoading(false);
       }
     };
 
-    // Allow some time for Firebase patches to be applied
-    setTimeout(patchCheck, 500);
+    // Allow a brief delay for Firebase to initialize
+    setTimeout(applyPatches, 300);
 
-    // Cleanup
     return () => {
       clearTimeout(safetyTimeout);
     };
@@ -113,8 +95,8 @@ export function Middleware({ children }: MiddlewareProps) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-black">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary mx-auto"></div>
-          <p className="mt-4 text-white">Initializing application...</p>
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-white mx-auto"></div>
+          <p className="mt-4 text-white">Loading...</p>
           {error && <p className="mt-2 text-red-500 text-sm">{error}</p>}
         </div>
       </div>

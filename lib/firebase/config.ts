@@ -4,7 +4,7 @@
  */
 
 import { initializeApp, getApps, FirebaseApp } from 'firebase/app';
-import { getAuth, setPersistence, browserLocalPersistence, Auth } from 'firebase/auth';
+import { getAuth, setPersistence, browserLocalPersistence, Auth, connectAuthEmulator } from 'firebase/auth';
 import { getFirestore, Firestore, connectFirestoreEmulator } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 
@@ -30,69 +30,102 @@ if (process.env.NODE_ENV !== 'production') {
   });
 }
 
-// Initialize Firebase
 let app: FirebaseApp;
 let auth: Auth;
 let db: Firestore;
 let storage: any;
 
-// Only initialize Firebase in the browser
+// Create empty implementations for SSR mode
+const createEmptyAuth = (): Auth => ({
+  currentUser: null,
+  onAuthStateChanged: () => () => {},
+  signInWithPopup: async () => ({ user: null, credential: null }) as any,
+  signOut: async () => {},
+} as unknown as Auth);
+
+const createEmptyFirestore = (): Firestore => ({
+  collection: () => ({}),
+  doc: () => ({}),
+} as unknown as Firestore);
+
+// Only initialize Firebase in the client
 if (typeof window !== 'undefined') {
   try {
-    // Initialize or get existing app
-    app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
+    if (!firebaseConfig.apiKey) {
+      throw new Error("Firebase configuration is missing required fields");
+    }
     
-    // Initialize Auth with persistence
-    auth = getAuth(app);
-    setPersistence(auth, browserLocalPersistence)
-      .catch((error) => {
-        console.error("Error setting auth persistence:", error);
-      });
+    // Initialize Firebase app if not already initialized
+    if (!getApps().length) {
+      app = initializeApp(firebaseConfig);
+      console.log('[Firebase] App initialized');
+    } else {
+      app = getApps()[0];
+      console.log('[Firebase] Using existing app instance');
+    }
     
-    // Initialize Firestore
-    db = getFirestore(app);
+    try {
+      // Initialize Auth with local persistence
+      auth = getAuth(app);
+      setPersistence(auth, browserLocalPersistence)
+        .then(() => console.log('[Firebase] Auth persistence set to local'))
+        .catch(error => console.error('[Firebase] Error setting auth persistence:', error));
+    } catch (authError) {
+      console.error('[Firebase] Auth initialization error:', authError);
+      auth = createEmptyAuth();
+    }
     
-    // Initialize Storage
-    storage = getStorage(app);
+    try {
+      // Initialize Firestore with settings for better offline support
+      db = getFirestore(app);
+      
+      // Apply Firestore settings
+      if (db && typeof (db as any).settings === 'function') {
+        (db as any).settings({
+          experimentalForceLongPolling: true,
+          ignoreUndefinedProperties: true,
+          cacheSizeBytes: 50 * 1024 * 1024 // 50MB cache
+        });
+      }
+    } catch (dbError) {
+      console.error('[Firebase] Firestore initialization error:', dbError);
+      db = createEmptyFirestore();
+    }
+    
+    try {
+      // Initialize Storage
+      storage = getStorage(app);
+    } catch (storageError) {
+      console.error('[Firebase] Storage initialization error:', storageError);
+      storage = {};
+    }
+    
+    // Make available globally for debugging
+    if (process.env.NODE_ENV !== 'production') {
+      window.firebase = {
+        app,
+        auth,
+        firestore: db,
+        storage
+      };
+    }
     
     console.log('[Firebase] Services initialized successfully');
   } catch (error) {
-    console.error('[Firebase] Initialization error:', error);
-    // Provide empty instances on error
+    console.error('[Firebase] Core initialization error:', error);
+    // Provide fallback implementations
     app = {} as FirebaseApp;
-    auth = {} as Auth;
-    db = {} as Firestore;
+    auth = createEmptyAuth();
+    db = createEmptyFirestore();
     storage = {};
   }
 } else {
-  // Provide empty instances for SSR
+  // Server-side rendering - use empty implementations
+  console.log('[Firebase] Using empty implementations for SSR');
   app = {} as FirebaseApp;
-  auth = {} as Auth;
-  db = {} as Firestore;
+  auth = createEmptyAuth();
+  db = createEmptyFirestore();
   storage = {};
-}
-
-// Configure Firestore
-if (typeof window !== "undefined") {
-  try {
-    // Only apply settings if db is properly initialized and has the settings method
-    if (db && typeof db.settings === 'function') {
-      const settings = {
-        experimentalForceLongPolling: true,
-        useFetchStreams: false,
-        cacheSizeBytes: 50 * 1024 * 1024 // 50MB cache size
-      };
-      
-      // @ts-ignore - Type error in settings but it works
-      db.settings(settings);
-      console.log('[Firebase] Firestore settings applied successfully');
-    } else {
-      console.warn('[Firebase] Firestore settings not applied: db.settings is not a function');
-    }
-  } catch (error) {
-    console.error('[Firebase] Error applying Firestore settings:', error);
-    // Continue without settings - app will use defaults
-  }
 }
 
 export { app, auth, db, storage };

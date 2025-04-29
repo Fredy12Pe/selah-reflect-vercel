@@ -1,5 +1,8 @@
 export interface ReflectionSection {
   questions: string[];
+  passage?: string;
+  title?: string;
+  content?: string;
 }
 
 export interface Devotion {

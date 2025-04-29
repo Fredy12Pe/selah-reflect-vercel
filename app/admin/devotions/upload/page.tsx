@@ -120,7 +120,7 @@ export default function BulkUploadDevotions() {
           'Content-Type': 'application/json',
         },
         body: jsonData,
-      });
+            });
 
       if (!response.ok) {
         const errorData = await response.json();

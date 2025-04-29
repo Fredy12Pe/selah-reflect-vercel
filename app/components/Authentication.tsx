@@ -3,7 +3,7 @@
 import React, { useState, useCallback, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
-import { signInWithGoogle, GoogleAuthProvider } from "@/lib/firebase/authHelper";
+import { signInWithGoogle } from "@/lib/firebase/authHelper";
 import { AuthError } from "firebase/auth";
 import toast, { Toaster } from "react-hot-toast";
 import { format } from "date-fns";
@@ -32,6 +32,8 @@ function DebugPanel() {
   const [info, setInfo] = useState<Record<string, any>>({});
   
   useEffect(() => {
+    if (typeof window === 'undefined') return;
+    
     // Collect browser information
     const browserInfo = {
       userAgent: navigator.userAgent,
@@ -66,7 +68,6 @@ function DebugPanel() {
       <div className="mt-2 flex justify-between border-t border-gray-700 pt-2">
         <button 
           onClick={() => {
-            // Copy debug info to clipboard
             navigator.clipboard.writeText(JSON.stringify(info, null, 2))
               .then(() => toast.success("Debug info copied"))
               .catch(() => toast.error("Failed to copy"));
@@ -77,7 +78,6 @@ function DebugPanel() {
         </button>
         <button 
           onClick={() => {
-            // Attempt to apply Firebase patches
             if (typeof window !== 'undefined') {
               (window as any)._registerComponent = (window as any)._registerComponent || 
                 function(c: any) { return c; };
@@ -104,7 +104,7 @@ export default function Authentication() {
   const [titleClicks, setTitleClicks] = useState(0);
 
   // Title click handler to reveal debug panel
-  const handleTitleClick = () => {
+  const handleTitleClick = useCallback(() => {
     const newCount = titleClicks + 1;
     setTitleClicks(newCount);
     
@@ -113,13 +113,20 @@ export default function Authentication() {
       setTitleClicks(0);
       toast.success(debugVisible ? "Debug mode disabled" : "Debug mode enabled");
     }
-  };
+  }, [titleClicks, debugVisible]);
 
   // Get the 'from' parameter from the URL if it exists
   const from = searchParams?.get("from") || "/devotion/today";
 
-  const setSessionCookie = async (token: string) => {
+  const setSessionCookie = useCallback(async (token: string) => {
     try {
+      if (!token || typeof token !== 'string' || token.trim() === '') {
+        console.error("Authentication - Invalid token format:", typeof token, token ? "non-empty" : "empty");
+        throw new Error('Invalid token format');
+      }
+      
+      console.log("Authentication - Setting session cookie with token length:", token.length);
+      
       const response = await fetch('/api/auth/session', {
         method: 'POST',
         headers: {
@@ -132,6 +139,7 @@ export default function Authentication() {
       const data = await response.json();
 
       if (!response.ok) {
+        console.error("Authentication - Session API error:", data.error);
         throw new Error(data.error || 'Failed to set session');
       }
 
@@ -141,7 +149,7 @@ export default function Authentication() {
       console.error("Authentication - Error setting session cookie:", error);
       throw error;
     }
-  };
+  }, []);
 
   const redirectAfterLogin = useCallback(() => {
     // If 'from' is a valid URL path, redirect there
@@ -182,32 +190,34 @@ export default function Authentication() {
         throw new Error("Authentication failed - no user returned");
       }
       
-      console.log("Authentication: User authenticated, getting token");
-      
-      // Get a fresh token
+      // Get the token
       let token;
       try {
-        token = await result.user.getIdToken(true);
-        console.log("Authentication: Token obtained successfully");
+        const tokenResult = await result.user.getIdTokenResult(true);
+        token = tokenResult.token;
       } catch (tokenError) {
-        console.error("Authentication: Error getting ID token:", tokenError);
-        throw new Error("Failed to get authentication token");
+        console.error("Authentication: Token retrieval failed:", tokenError);
+        token = await result.user.getIdToken(true);
       }
       
       // Set the session cookie
       try {
-        console.log("Authentication: Setting session cookie");
         await setSessionCookie(token);
-        console.log("Authentication: Session cookie set successfully");
       } catch (sessionError) {
         console.error("Authentication: Session cookie error:", sessionError);
+        
+        // Development fallback
+        if (process.env.NODE_ENV !== 'production') {
+          console.log("Authentication: Using development fallback");
+          redirectAfterLogin();
+          return;
+        }
+        
         throw new Error("Failed to establish your session");
       }
 
-      console.log("Successfully signed in:", result.user.email);
+      console.log("Successfully signed in");
       toast.success("Successfully signed in!");
-
-      // Redirect after successful login
       redirectAfterLogin();
     } catch (error) {
       console.error("Sign-in error:", error);
@@ -227,7 +237,7 @@ export default function Authentication() {
     } finally {
       setLoading(false);
     }
-  }, [redirectAfterLogin]);
+  }, [redirectAfterLogin, setSessionCookie]);
 
   return (
     <div className="min-h-screen">
@@ -298,6 +308,7 @@ export default function Authentication() {
             disabled={loading}
             className="group w-full bg-white/10 hover:bg-white/20 text-white py-4 px-6 rounded-2xl backdrop-blur-sm transition-all duration-300 flex items-center justify-center space-x-3 disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-white/50"
             aria-label="Sign in with Google"
+            data-testid="google-signin-button"
           >
             <svg
               className={`w-6 h-6 ${loading ? "animate-spin" : ""}`}

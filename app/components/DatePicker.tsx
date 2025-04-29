@@ -20,41 +20,47 @@ import { getAvailableDates } from "@/lib/services/devotionService";
 
 interface DatePickerProps {
   initialDate?: Date;
-  onDateSelect: (date: Date) => void;
-  isOpen: boolean;
-  onClose: () => void;
+  selectedDate?: Date;
+  onDateSelect?: (date: Date) => void;
+  onChange?: (date: Date) => void;
+  isOpen?: boolean;
+  onClose?: () => void;
   highlightAvailableDates?: boolean;
+  className?: string;
+  inline?: boolean;
 }
 
 export default function DatePicker({
   initialDate = new Date(),
+  selectedDate: controlledSelectedDate,
   onDateSelect,
-  isOpen,
-  onClose,
+  onChange,
+  isOpen = true,
+  onClose = () => {},
   highlightAvailableDates = true,
+  className = "",
+  inline = false,
 }: DatePickerProps) {
   const [currentMonth, setCurrentMonth] = useState(startOfMonth(initialDate));
-  const [selectedDate, setSelectedDate] = useState(initialDate);
+  const [internalSelectedDate, setInternalSelectedDate] = useState(controlledSelectedDate || initialDate);
   const [availableDates, setAvailableDates] = useState<string[]>([]);
   const [isLoadingDates, setIsLoadingDates] = useState(false);
+  
+  const selectedDate = controlledSelectedDate || internalSelectedDate;
 
-  // Get all days in the current month
   const daysInMonth = eachDayOfInterval({
     start: startOfMonth(currentMonth),
     end: endOfMonth(currentMonth),
   });
 
-  // Navigate to previous month
   const prevMonth = () => {
     setCurrentMonth(subMonths(currentMonth, 1));
   };
 
-  // Navigate to next month
   const nextMonth = () => {
     setCurrentMonth(addMonths(currentMonth, 1));
   };
 
-  // Fetch available devotion dates
   useEffect(() => {
     if (isOpen && highlightAvailableDates) {
       const fetchAvailableDates = async () => {
@@ -73,24 +79,103 @@ export default function DatePicker({
     }
   }, [isOpen, highlightAvailableDates]);
 
-  // Check if a date has an available devotion
   const isDateAvailable = (date: Date): boolean => {
     const dateString = format(date, "yyyy-MM-dd");
     return availableDates.includes(dateString);
   };
 
-  // Handle date selection
   const handleDateClick = (date: Date) => {
-    setSelectedDate(date);
-    onDateSelect(date);
-    onClose();
+    setInternalSelectedDate(date);
+    
+    if (onDateSelect) onDateSelect(date);
+    if (onChange) onChange(date);
+    
+    if (!inline && onClose) {
+      onClose();
+    }
   };
 
   if (!isOpen) return null;
 
+  if (inline) {
+    return (
+      <div className={`bg-white dark:bg-gray-800 p-4 rounded-lg shadow-lg ${className}`}>
+        <div className="flex justify-between items-center mb-4">
+          <button
+            onClick={prevMonth}
+            className="p-1 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700"
+          >
+            <ChevronLeftIcon className="w-5 h-5" />
+          </button>
+
+          <span className="font-medium">
+            {format(currentMonth, "MMMM yyyy")}
+          </span>
+
+          <button
+            onClick={nextMonth}
+            className="p-1 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700"
+          >
+            <ChevronRightIcon className="w-5 h-5" />
+          </button>
+        </div>
+
+        <div className="grid grid-cols-7 gap-1 mb-2">
+          {["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"].map((day) => (
+            <div
+              key={day}
+              className="text-center text-sm font-medium text-gray-500"
+            >
+              {day}
+            </div>
+          ))}
+        </div>
+
+        <div className="grid grid-cols-7 gap-1">
+          {isLoadingDates ? (
+            <div className="col-span-7 py-8 flex justify-center">
+              <div className="animate-spin h-5 w-5 border-2 border-primary border-t-transparent rounded-full"></div>
+            </div>
+          ) : (
+            daysInMonth.map((day) => {
+              const isCurrentMonth = isSameMonth(day, currentMonth);
+              const isSelected = isSameDay(day, selectedDate);
+              const isTodayDate = isToday(day);
+              const hasDevotional = isDateAvailable(day);
+
+              return (
+                <button
+                  key={day.toString()}
+                  onClick={() => handleDateClick(day)}
+                  className={`
+                    h-8 w-8 text-sm rounded-full flex items-center justify-center
+                    ${!isCurrentMonth ? "text-gray-400 dark:text-gray-600" : ""}
+                    ${
+                      isSelected
+                        ? "bg-primary text-white"
+                        : "hover:bg-gray-100 dark:hover:bg-gray-700"
+                    }
+                    ${isTodayDate && !isSelected ? "border border-primary" : ""}
+                    ${
+                      hasDevotional && !isSelected
+                        ? "border-2 border-green-500 text-green-500 dark:border-green-400 dark:text-green-400"
+                        : ""
+                    }
+                  `}
+                >
+                  {format(day, "d")}
+                </button>
+              );
+            })
+          )}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="fixed inset-0 flex items-center justify-center z-50 bg-black/50">
-      <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow-lg max-w-sm w-full">
+      <div className={`bg-white dark:bg-gray-800 p-4 rounded-lg shadow-lg max-w-sm w-full ${className}`}>
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-lg font-semibold">Select a Date</h2>
           <button

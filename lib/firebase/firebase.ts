@@ -2,7 +2,7 @@ import { initializeApp, getApps, FirebaseApp } from 'firebase/app';
 import { getAuth, Auth, GoogleAuthProvider } from 'firebase/auth';
 import { getFirestore, Firestore } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
-import { isBrowser, shouldSkipFirebaseInit } from '../utils/environment';
+import { isBrowser, shouldSkipFirebaseInit as shouldSkipInit } from '../utils/environment';
 
 // Import patches conditionally to avoid server-side issues
 if (isBrowser()) {
@@ -10,6 +10,9 @@ if (isBrowser()) {
   require('../firebase/patch');
   require('../firebase/patchAuth');
 }
+
+// Create a local variable for skipping initialization
+let shouldSkipFirebaseInit = shouldSkipInit;
 
 // Firebase configuration
 export const firebaseConfig = {
@@ -48,60 +51,72 @@ if (isBrowser() && !shouldSkipFirebaseInit) {
     if (getApps().length === 0) {
       console.log('[Firebase] Creating new Firebase app instance');
       
-      app = initializeApp(firebaseConfig);
-      console.log('[Firebase] Firebase app initialized');
+      // Check if Firebase config is valid
+      if (!firebaseConfig.apiKey || !firebaseConfig.authDomain || !firebaseConfig.projectId) {
+        console.error('[Firebase] Firebase configuration is incomplete:', 
+          JSON.stringify({
+            apiKey: !!firebaseConfig.apiKey,
+            authDomain: !!firebaseConfig.authDomain,
+            projectId: !!firebaseConfig.projectId,
+          }));
+        throw new Error('Firebase configuration is incomplete');
+      }
       
-      // Initialize Firestore with settings
+      // Initialize Firebase app
+      app = initializeApp(firebaseConfig);
+      console.log('[Firebase] Firebase app initialized successfully');
+
+      // Initialize Firestore synchronously
       try {
         console.log('[Firebase] Initializing Firestore');
         firestore = getFirestore(app);
+        console.log('[Firebase] Firestore initialized successfully');
         
-        // Add a delay before applying settings to ensure Firestore is ready
-        setTimeout(() => {
-          try {
-            if (firestore && typeof (firestore as any).settings === 'function') {
-              (firestore as any).settings({
-                experimentalForceLongPolling: true,
-                useFetchStreams: false,
-                cacheSizeBytes: 50 * 1024 * 1024 // 50MB cache size
-              });
-              console.log('[Firebase] Firestore settings applied successfully');
-            } else {
-              console.warn('[Firebase] Firestore settings not applied: db.settings is not a function');
-            }
-          } catch (settingsError) {
-            console.error('[Firebase] Error applying Firestore settings:', settingsError);
-          }
-        }, 500);
+        // Apply settings synchronously
+        if (typeof (firestore as any).settings === 'function') {
+          (firestore as any).settings({
+            experimentalForceLongPolling: true,
+            useFetchStreams: false,
+            cacheSizeBytes: 50 * 1024 * 1024 // 50MB cache size
+          });
+          console.log('[Firebase] Firestore settings applied successfully');
+        }
       } catch (firestoreError) {
         console.error('[Firebase] Error initializing Firestore:', firestoreError);
       }
+      
+      // Initialize Auth
+      try {
+        console.log('[Firebase] Initializing Auth');
+        auth = getAuth(app);
+        console.log('[Firebase] Auth initialized successfully');
+      } catch (authError) {
+        console.error('[Firebase] Error initializing Auth:', authError);
+      }
+      
+      // Initialize Storage
+      try {
+        console.log('[Firebase] Initializing Storage');
+        storage = getStorage(app);
+        console.log('[Firebase] Storage initialized successfully');
+      } catch (storageError) {
+        console.error('[Firebase] Error initializing Storage:', storageError);
+      }
+      
     } else {
       console.log('[Firebase] Using existing Firebase app instance');
       app = getApps()[0];
+      
+      // Initialize services from existing app
       try {
         firestore = getFirestore(app);
-      } catch (firestoreError) {
-        console.error('[Firebase] Error getting existing Firestore:', firestoreError);
+        auth = getAuth(app);
+        storage = getStorage(app);
+        console.log('[Firebase] Services initialized from existing app');
+      } catch (error) {
+        console.error('[Firebase] Error initializing services from existing app:', error);
       }
     }
-    
-    // Initialize Firebase services
-    try {
-      console.log('[Firebase] Initializing Firebase Auth');
-      auth = getAuth(app);
-    } catch (authError) {
-      console.error('[Firebase] Error initializing Auth:', authError);
-    }
-    
-    try {
-      console.log('[Firebase] Initializing Storage');
-      storage = getStorage(app);
-    } catch (storageError) {
-      console.error('[Firebase] Error initializing Storage:', storageError);
-    }
-    
-    console.log('[Firebase] All services initialized successfully');
   } catch (error) {
     console.error('[Firebase] Initialization error:', error);
     // Keep using the placeholder objects on error
@@ -166,47 +181,34 @@ export const getFirebaseDb = (): Firestore | null => {
     return null;
   }
   
+  // If firestore is already initialized and valid, return it
+  if (firestore && typeof firestore === 'object' && Object.keys(firestore).length > 0) {
+    return firestore;
+  }
+  
+  // If app is not initialized yet, return null
+  if (!app || Object.keys(app).length === 0) {
+    console.error('[Firebase] Firebase app not initialized');
+    return null;
+  }
+  
+  // Try to initialize Firestore if not already done
   try {
-    // Check if Firestore is already initialized properly
-    if (firestore && typeof (firestore as any).collection === 'function') {
-      console.log('[Firebase] Using existing Firestore instance');
-      return firestore;
+    console.log('[Firebase] Initializing Firestore on demand');
+    firestore = getFirestore(app);
+    
+    // Apply settings
+    if (firestore && typeof (firestore as any).settings === 'function') {
+      (firestore as any).settings({
+        experimentalForceLongPolling: true,
+        useFetchStreams: false,
+        cacheSizeBytes: 50 * 1024 * 1024 // 50MB cache size
+      });
     }
     
-    // Need to initialize or reinitialize Firestore
-    console.log('[Firebase] Creating new Firestore instance');
-    
-    // Check if we have a valid app
-    if (!app || Object.keys(app).length === 0) {
-      console.log('[Firebase] Initializing app for Firestore');
-      app = getApps().length > 0 ? getApps()[0] : initializeApp(firebaseConfig);
-    }
-    
-    try {
-      // Initialize Firestore with the app
-      firestore = getFirestore(app);
-      
-      // Apply settings immediately
-      try {
-        if (firestore && typeof (firestore as any).settings === 'function') {
-          (firestore as any).settings({
-            experimentalForceLongPolling: true,
-            useFetchStreams: false,
-            cacheSizeBytes: 50 * 1024 * 1024 // 50MB cache size
-          });
-          console.log('[Firebase] Applied Firestore settings on dynamic init');
-        }
-      } catch (settingsError) {
-        console.warn('[Firebase] Error applying settings on dynamic init:', settingsError);
-      }
-      
-      return firestore;
-    } catch (initError) {
-      console.error('[Firebase] Error initializing Firestore dynamically:', initError);
-      return null;
-    }
+    return firestore;
   } catch (error) {
-    console.error('[Firebase] Error getting Firestore:', error);
+    console.error('[Firebase] Error initializing Firestore on demand:', error);
     return null;
   }
 };

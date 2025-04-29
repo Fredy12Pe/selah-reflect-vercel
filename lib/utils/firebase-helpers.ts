@@ -5,20 +5,60 @@ import { doc, collection, setDoc, getDoc, getDocs, updateDoc, query, where, addD
 
 /**
  * Safely get a document reference, checking for null db
+ * @param path Collection path or first segment
+ * @param pathSegments Additional path segments (can include document ID)
  */
 export function safeDoc(path: string, ...pathSegments: string[]): DocumentReference | null {
-  const db = getFirebaseDb();
-  if (!db) return null;
-  return doc(db, path, ...pathSegments);
+  try {
+    const db = getFirebaseDb();
+    if (!db) {
+      console.error('Failed to get Firestore instance in safeDoc');
+      return null;
+    }
+    
+    // Validate the path and segments
+    if (!path || typeof path !== 'string') {
+      console.error('Invalid path provided to safeDoc:', path);
+      return null;
+    }
+    
+    // Remove any undefined or null segments
+    const validSegments = pathSegments.filter(segment => segment !== undefined && segment !== null);
+    
+    // Create the document reference
+    return doc(db, path, ...validSegments);
+  } catch (error) {
+    console.error('Error in safeDoc:', error);
+    return null;
+  }
 }
 
 /**
  * Safely get a collection reference, checking for null db
  */
 export function safeCollection(path: string, ...pathSegments: string[]): CollectionReference | null {
-  const db = getFirebaseDb();
-  if (!db) return null;
-  return collection(db, path, ...pathSegments);
+  try {
+    const db = getFirebaseDb();
+    if (!db) {
+      console.error('Failed to get Firestore instance in safeCollection');
+      return null;
+    }
+    
+    // Validate the path and segments
+    if (!path || typeof path !== 'string') {
+      console.error('Invalid path provided to safeCollection:', path);
+      return null;
+    }
+    
+    // Remove any undefined or null segments
+    const validSegments = pathSegments.filter(segment => segment !== undefined && segment !== null);
+    
+    // Create the collection reference
+    return collection(db, path, ...validSegments);
+  } catch (error) {
+    console.error('Error in safeCollection:', error);
+    return null;
+  }
 }
 
 /**
@@ -47,11 +87,66 @@ export async function safeUpdateDoc(docRef: DocumentReference | null, data: any)
  * Safely get a document, checking for null references
  */
 export async function safeGetDoc(docRef: DocumentReference | null) {
-  if (!docRef) {
-    console.error('Document reference is null');
-    throw new Error('Document reference is null');
+  try {
+    if (!docRef) {
+      console.error('Document reference is null in safeGetDoc');
+      throw new Error('Document reference is null');
+    }
+    
+    // Validate document reference has path
+    if (!docRef.path) {
+      console.error('Document reference path is invalid');
+      throw new Error('Document reference path is invalid');
+    }
+    
+    return await getDoc(docRef);
+  } catch (error) {
+    console.error('Error in safeGetDoc:', error);
+    throw error;
   }
-  return getDoc(docRef);
+}
+
+/**
+ * Safely get a document and handle errors gracefully
+ * Returns null instead of throwing errors (for UI use)
+ */
+export async function safeGetDocWithFallback<T = any>(
+  docRef: DocumentReference | null, 
+  fallback: T | null = null
+): Promise<T | null> {
+  try {
+    if (!docRef) {
+      console.error('Document reference is null in safeGetDocWithFallback');
+      return fallback;
+    }
+    
+    // Validate document reference has path
+    if (!docRef.path) {
+      console.error('Document reference path is invalid');
+      return fallback;
+    }
+    
+    const snapshot = await getDoc(docRef);
+    
+    // Safely check if document exists - handles both SDK implementations
+    const docExists = snapshot && (
+      // Check if it's a function (client SDK)
+      (typeof snapshot.exists === 'function' && snapshot.exists()) ||
+      // Check if it's a property (admin SDK) 
+      (typeof snapshot.exists === 'boolean' && snapshot.exists) ||
+      // Fallback - check if data() returns something
+      (snapshot.data && snapshot.data() !== null && Object.keys(snapshot.data() || {}).length > 0)
+    );
+    
+    if (!docExists) {
+      return fallback;
+    }
+    
+    return snapshot.data() as T;
+  } catch (error) {
+    console.error('Error in safeGetDocWithFallback:', error);
+    return fallback;
+  }
 }
 
 /**
@@ -74,4 +169,39 @@ export function getDb(): Firestore {
     throw new Error('Firestore is not available');
   }
   return db;
+}
+
+/**
+ * A utility function to check if Firestore is properly initialized
+ */
+export const isFirestoreInitialized = (): boolean => {
+  try {
+    const db = getFirebaseDb();
+    if (!db) return false;
+    
+    // Check for basic Firestore methods
+    return typeof doc === 'function' && 
+           typeof collection === 'function';
+  } catch (error) {
+    console.error('[Firebase Helper] Error checking Firestore initialization:', error);
+    return false;
+  }
+};
+
+/**
+ * A convenience wrapper for safeDoc and safeGetDocWithFallback combined
+ * Gets a document by collection and ID with fallback data
+ */
+export async function getDocumentWithFallback<T = any>(
+  collectionPath: string,
+  docId: string,
+  fallback: T | null = null
+): Promise<T | null> {
+  try {
+    const docRef = safeDoc(collectionPath, docId);
+    return await safeGetDocWithFallback<T>(docRef, fallback);
+  } catch (error) {
+    console.error(`Error getting document ${collectionPath}/${docId}:`, error);
+    return fallback;
+  }
 } 

@@ -13,10 +13,17 @@ export default function NewDevotion() {
   const [devotion, setDevotion] = useState({
     date: "",
     title: "",
-    scriptureReference: "",
+    bibleText: "",
     scriptureText: "",
     content: "",
     prayer: "",
+    reflectionSections: [
+      {
+        passage: "",
+        questions: [""]
+      }
+    ],
+    // Keep legacy field for backwards compatibility
     reflectionQuestions: [""],
   });
 
@@ -31,24 +38,68 @@ export default function NewDevotion() {
     );
   }
 
-  const handleQuestionChange = (index: number, value: string) => {
-    const newQuestions = [...devotion.reflectionQuestions];
-    newQuestions[index] = value;
-    setDevotion({ ...devotion, reflectionQuestions: newQuestions });
+  const handleSectionChange = (sectionIndex: number, field: string, value: any) => {
+    const newSections = [...devotion.reflectionSections];
+    newSections[sectionIndex] = {
+      ...newSections[sectionIndex],
+      [field]: value
+    };
+    setDevotion({ ...devotion, reflectionSections: newSections });
   };
 
-  const addQuestion = () => {
+  const handleQuestionChange = (sectionIndex: number, questionIndex: number, value: string) => {
+    const newSections = [...devotion.reflectionSections];
+    const newQuestions = [...newSections[sectionIndex].questions];
+    newQuestions[questionIndex] = value;
+    newSections[sectionIndex] = {
+      ...newSections[sectionIndex],
+      questions: newQuestions
+    };
+    setDevotion({ ...devotion, reflectionSections: newSections });
+  };
+
+  const addQuestion = (sectionIndex: number) => {
+    const newSections = [...devotion.reflectionSections];
+    newSections[sectionIndex] = {
+      ...newSections[sectionIndex],
+      questions: [...newSections[sectionIndex].questions, ""]
+    };
+    setDevotion({ ...devotion, reflectionSections: newSections });
+  };
+
+  const removeQuestion = (sectionIndex: number, questionIndex: number) => {
+    const newSections = [...devotion.reflectionSections];
+    const newQuestions = newSections[sectionIndex].questions.filter(
+      (_, i) => i !== questionIndex
+    );
+    newSections[sectionIndex] = {
+      ...newSections[sectionIndex],
+      questions: newQuestions
+    };
+    setDevotion({ ...devotion, reflectionSections: newSections });
+  };
+
+  const addSection = () => {
     setDevotion({
       ...devotion,
-      reflectionQuestions: [...devotion.reflectionQuestions, ""],
+      reflectionSections: [
+        ...devotion.reflectionSections,
+        {
+          passage: "",
+          questions: [""]
+        }
+      ]
     });
   };
 
-  const removeQuestion = (index: number) => {
-    const newQuestions = devotion.reflectionQuestions.filter(
-      (_, i) => i !== index
-    );
-    setDevotion({ ...devotion, reflectionQuestions: newQuestions });
+  const removeSection = (index: number) => {
+    if (devotion.reflectionSections.length <= 1) {
+      toast.error("You must have at least one reflection section");
+      return;
+    }
+    
+    const newSections = devotion.reflectionSections.filter((_, i) => i !== index);
+    setDevotion({ ...devotion, reflectionSections: newSections });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -58,15 +109,30 @@ export default function NewDevotion() {
       return;
     }
 
+    // Validate that all sections have passages
+    const invalidSections = devotion.reflectionSections.filter(section => !section.passage);
+    if (invalidSections.length > 0) {
+      toast.error("All reflection sections must have a passage reference");
+      return;
+    }
+
     try {
       setSaving(true);
-      const devotionRef = safeDoc("devotions", devotion.date);
+      
+      // Format the date as YYYY-MM-DD for the document ID
+      const formattedDate = devotion.date;
+      const devotionRef = safeDoc("devotions", formattedDate);
+
+      // Create a flattened array of all questions for backward compatibility
+      const allQuestions = devotion.reflectionSections.flatMap(section => section.questions);
 
       await safeSetDoc(devotionRef, {
         ...devotion,
+        reflectionQuestions: allQuestions, // Keep for backward compatibility
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
         createdBy: user.email,
+        updatedBy: user.email,
       });
 
       toast.success("Devotion saved successfully!");
@@ -75,10 +141,16 @@ export default function NewDevotion() {
       setDevotion({
         date: "",
         title: "",
-        scriptureReference: "",
+        bibleText: "",
         scriptureText: "",
         content: "",
         prayer: "",
+        reflectionSections: [
+          {
+            passage: "",
+            questions: [""]
+          }
+        ],
         reflectionQuestions: [""],
       });
     } catch (error) {
@@ -129,12 +201,13 @@ export default function NewDevotion() {
             </label>
             <input
               type="text"
-              value={devotion.scriptureReference}
+              value={devotion.bibleText}
               onChange={(e) =>
-                setDevotion({ ...devotion, scriptureReference: e.target.value })
+                setDevotion({ ...devotion, bibleText: e.target.value })
               }
               className="w-full px-4 py-2 rounded-lg bg-zinc-900 border border-zinc-700"
               required
+              placeholder="e.g., Luke 24:1-12"
             />
           </div>
 
@@ -177,40 +250,80 @@ export default function NewDevotion() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium mb-2">
-              Reflection Questions
-            </label>
-            <div className="space-y-3">
-              {devotion.reflectionQuestions.map((question, index) => (
-                <div key={index} className="flex gap-2">
-                  <input
-                    type="text"
-                    value={question}
-                    onChange={(e) =>
-                      handleQuestionChange(index, e.target.value)
-                    }
-                    className="flex-1 px-4 py-2 rounded-lg bg-zinc-900 border border-zinc-700"
-                    placeholder={`Question ${index + 1}`}
-                    required
-                  />
-                  {devotion.reflectionQuestions.length > 1 && (
-                    <button
-                      type="button"
-                      onClick={() => removeQuestion(index)}
-                      className="px-3 py-2 rounded-lg bg-red-900/30 text-red-400 hover:bg-red-900/50"
-                    >
-                      Remove
-                    </button>
-                  )}
-                </div>
-              ))}
+            <label className="block text-sm font-medium mb-2 flex justify-between items-center">
+              <span>Reflection Sections</span>
               <button
                 type="button"
-                onClick={addQuestion}
-                className="w-full px-4 py-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 transition-colors"
+                onClick={addSection}
+                className="text-sm px-3 py-1 rounded-lg bg-blue-900/30 text-blue-400 hover:bg-blue-900/50"
               >
-                Add Question
+                Add Section
               </button>
+            </label>
+            
+            <div className="space-y-6">
+              {devotion.reflectionSections.map((section, sectionIndex) => (
+                <div key={sectionIndex} className="p-4 border border-zinc-700 rounded-lg">
+                  <div className="flex justify-between items-center mb-3">
+                    <h3 className="font-medium">Section {sectionIndex + 1}</h3>
+                    {devotion.reflectionSections.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => removeSection(sectionIndex)}
+                        className="text-sm px-3 py-1 rounded-lg bg-red-900/30 text-red-400 hover:bg-red-900/50"
+                      >
+                        Remove Section
+                      </button>
+                    )}
+                  </div>
+                  
+                  <div className="mb-4">
+                    <label className="block text-sm font-medium mb-2">Passage Reference</label>
+                    <input
+                      type="text"
+                      value={section.passage}
+                      onChange={(e) => handleSectionChange(sectionIndex, "passage", e.target.value)}
+                      className="w-full px-4 py-2 rounded-lg bg-zinc-900 border border-zinc-700"
+                      placeholder="e.g., Luke 24:1-2, 12"
+                      required
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium mb-2">Questions</label>
+                    <div className="space-y-3">
+                      {section.questions.map((question, questionIndex) => (
+                        <div key={questionIndex} className="flex gap-2">
+                          <input
+                            type="text"
+                            value={question}
+                            onChange={(e) => handleQuestionChange(sectionIndex, questionIndex, e.target.value)}
+                            className="flex-1 px-4 py-2 rounded-lg bg-zinc-900 border border-zinc-700"
+                            placeholder={`Question ${questionIndex + 1}`}
+                            required
+                          />
+                          {section.questions.length > 1 && (
+                            <button
+                              type="button"
+                              onClick={() => removeQuestion(sectionIndex, questionIndex)}
+                              className="px-3 py-2 rounded-lg bg-red-900/30 text-red-400 hover:bg-red-900/50"
+                            >
+                              Remove
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                      <button
+                        type="button"
+                        onClick={() => addQuestion(sectionIndex)}
+                        className="w-full px-4 py-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 transition-colors"
+                      >
+                        Add Question
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
 
