@@ -66,10 +66,25 @@ export default function DatePicker({
       const fetchAvailableDates = async () => {
         try {
           setIsLoadingDates(true);
+          // Log when we start fetching
+          console.log("DatePicker: Fetching available dates");
+          
           const dates = await getAvailableDates();
-          setAvailableDates(dates);
+          console.log(`DatePicker: Received ${dates.length} available dates`);
+          
+          if (dates.length > 0) {
+            setAvailableDates(dates);
+          } else {
+            console.warn("DatePicker: No available dates returned, using fallback");
+            // If no dates were returned, create fallback dates for the past 90 days
+            const fallbackDates = generateFallbackDates();
+            setAvailableDates(fallbackDates);
+          }
         } catch (error) {
-          console.error("Error fetching available dates:", error);
+          console.error("DatePicker: Error fetching available dates:", error);
+          // On error, create fallback dates for the past 90 days
+          const fallbackDates = generateFallbackDates();
+          setAvailableDates(fallbackDates);
         } finally {
           setIsLoadingDates(false);
         }
@@ -79,7 +94,28 @@ export default function DatePicker({
     }
   }, [isOpen, highlightAvailableDates]);
 
+  // Helper function to generate fallback dates
+  const generateFallbackDates = (): string[] => {
+    const fallbackDates: string[] = [];
+    const today = new Date();
+    // Generate dates for the past 90 days
+    for (let i = 0; i < 90; i++) {
+      const date = new Date(today);
+      date.setDate(date.getDate() - i);
+      const formattedDate = format(date, "yyyy-MM-dd");
+      fallbackDates.push(formattedDate);
+    }
+    console.log("DatePicker: Generated fallback dates:", fallbackDates.length);
+    return fallbackDates;
+  };
+
   const isDateAvailable = (date: Date): boolean => {
+    // If we're not highlighting available dates or dates are loading, consider all past dates available
+    if (!highlightAvailableDates || isLoadingDates) {
+      return !isFuture(date);
+    }
+    
+    // Otherwise, check if the date is in our list of available dates
     const dateString = format(date, "yyyy-MM-dd");
     return availableDates.includes(dateString);
   };

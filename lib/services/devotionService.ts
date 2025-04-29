@@ -304,20 +304,64 @@ export async function getLatestDevotion(): Promise<Devotion | null> {
  * @returns Array of dates in YYYY-MM-DD format
  */
 export async function getAvailableDates(): Promise<string[]> {
+  // Check if we have cached dates in sessionStorage
+  try {
+    const cachedDates = sessionStorage.getItem('availableDates');
+    if (cachedDates) {
+      console.log('Using cached available dates from sessionStorage');
+      return JSON.parse(cachedDates);
+    }
+  } catch (storageError) {
+    console.warn('Error accessing sessionStorage for dates cache:', storageError);
+  }
+
+  // If we don't have cached dates, fetch from API with error handling
   try {
     const baseUrl = getBaseUrl();
+    console.log('Fetching available dates from API:', `${baseUrl}/api/devotions/available-dates`);
+    
+    // Add timeout to prevent hanging requests
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+    
     const response = await fetch(`${baseUrl}/api/devotions/available-dates`, {
       credentials: 'include',
+      signal: controller.signal
     });
-
+    
+    clearTimeout(timeoutId);
+    
     if (!response.ok) {
+      console.warn(`API returned error status: ${response.status}`);
       throw new Error('Failed to fetch available dates');
     }
 
     const data = await response.json();
-    return data.dates || [];
+    const dates = data.dates || [];
+    
+    // Cache the result in sessionStorage
+    try {
+      sessionStorage.setItem('availableDates', JSON.stringify(dates));
+      console.log(`Cached ${dates.length} available dates in sessionStorage`);
+    } catch (storageError) {
+      console.warn('Error saving to sessionStorage:', storageError);
+    }
+    
+    return dates;
   } catch (error) {
     console.error('Error fetching available dates:', error);
-    return [];
+    
+    // Return hardcoded default dates for the past 30 days as a fallback
+    const fallbackDates: string[] = [];
+    const today = new Date();
+    for (let i = 0; i < 30; i++) {
+      const date = new Date(today);
+      date.setDate(date.getDate() - i);
+      const formattedDate = date.toISOString().split('T')[0];
+      fallbackDates.push(formattedDate);
+    }
+    
+    console.log('Using fallback dates due to error');
+    return fallbackDates;
   }
 } 

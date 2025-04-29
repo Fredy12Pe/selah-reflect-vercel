@@ -479,23 +479,100 @@ export default function ReflectionPage({
         // Fetch devotion data
         try {
           console.log('Reflection page: Fetching devotion for date:', params.date);
-          const devotion = await getDevotionByDate(params.date);
-          console.log('Reflection page: Devotion fetch result:', devotion);
+          let retryCount = 0;
+          const MAX_RETRIES = 2;
+          let lastError = null;
           
-          // Set the devotion data
-          setDevotionData(devotion);
-          
-          // If there's an error message in the devotion, show it
-          if (devotion && 'error' in devotion && devotion.error) {
-            toast.error(devotion.error);
+          // Retry loop for fetching devotion data
+          while (retryCount <= MAX_RETRIES) {
+            try {
+              console.log(`Reflection page: Attempt ${retryCount + 1} to fetch devotion`);
+              const devotion = await getDevotionByDate(params.date);
+              console.log('Reflection page: Devotion fetch result:', 
+                devotion ? (devotion.notFound ? 'Not found' : 'Found') : 'Null');
+              
+              // Set the devotion data
+              if (devotion) {
+                setDevotionData(devotion);
+                
+                // If there's an error message in the devotion, show it but don't stop execution
+                if ('error' in devotion && devotion.error) {
+                  console.warn('Devotion error:', devotion.error);
+                  toast.error(devotion.error);
+                } else if (!devotion.notFound) {
+                  // Cache successful devotion data for offline use
+                  try {
+                    const cachedDataKey = `devotion_${params.date}`;
+                    localStorage.setItem(cachedDataKey, JSON.stringify(devotion));
+                    console.log('Reflection page: Cached devotion data for future use');
+                  } catch (cacheError) {
+                    console.warn('Reflection page: Failed to cache devotion data', cacheError);
+                  }
+                }
+                
+                // Success - break out of retry loop
+                break;
+              } else {
+                // Empty response - try again
+                throw new Error('Empty devotion response');
+              }
+            } catch (fetchError) {
+              console.error(`Reflection page: Fetch error (attempt ${retryCount + 1})`, fetchError);
+              lastError = fetchError;
+              
+              // Check if this is a network error that we should retry
+              const isNetworkError = 
+                fetchError instanceof Error && 
+                (fetchError.message.includes('network') || 
+                 fetchError.message.includes('fetch') || 
+                 fetchError.message.includes('timeout'));
+                 
+              if (isNetworkError && retryCount < MAX_RETRIES) {
+                // Wait longer between retries (exponential backoff)
+                const delay = 1000 * Math.pow(2, retryCount);
+                console.log(`Reflection page: Retrying after ${delay}ms`);
+                await new Promise(resolve => setTimeout(resolve, delay));
+                retryCount++;
+                continue; // Try again
+              }
+              
+              // Either reached max retries or it's not a retryable error
+              throw fetchError; // Re-throw to be caught by the outer try/catch
+            }
           }
-    } catch (error) {
-          console.error('Error fetching devotion:', error);
-          if (error instanceof Error && error.message.includes('sign in')) {
-            // Authentication error
-            toast.error('Please sign in to view devotions');
-            router.push('/auth/login?from=' + encodeURIComponent(`/devotion/${params.date}/reflection`));
-          } else {
+        } catch (error) {
+          console.error('Reflection page: Error fetching devotion:', error);
+          
+          // Try to use cached data if available
+          try {
+            const cachedDataKey = `devotion_${params.date}`;
+            const cachedData = localStorage.getItem(cachedDataKey);
+            if (cachedData) {
+              console.log('Reflection page: Using cached devotion data');
+              const devotion = JSON.parse(cachedData);
+              setDevotionData(devotion);
+              toast.success('Using cached devotion data');
+            } else {
+              // No cached data, set a "not found" devotion to show appropriate UI
+              setDevotionData({ 
+                notFound: true, 
+                error: 'Failed to load devotion', 
+                bibleText: '',
+                date: params.date,
+                title: 'Could not load devotion'
+              } as PartialDevotion);
+              
+              // Show toast only for auth errors, to avoid error spam
+              if (error instanceof Error && error.message.includes('sign in')) {
+                toast.error('Please sign in to view devotions');
+                router.push('/auth/login?from=' + encodeURIComponent(`/devotion/${params.date}/reflection`));
+              } else {
+                toast.error('Failed to load devotion');
+              }
+            }
+          } catch (cacheError) {
+            console.error('Reflection page: Error using cached data:', cacheError);
+            setDevotionData({ notFound: true } as PartialDevotion);
             toast.error('Failed to load devotion');
           }
         }
