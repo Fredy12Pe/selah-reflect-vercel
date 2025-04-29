@@ -1402,7 +1402,7 @@ export default function ReflectionPage({
               className={`fixed inset-0 bg-black/50 ${isHymnModalClosing ? 'animate-fade-out' : 'animate-fade-in'}`}
             onClick={closeHymnModal}
             />
-            <div className={`relative w-full max-w-lg mx-4 bg-white rounded-lg shadow-xl ${isHymnModalClosing ? 'animate-slide-down' : 'animate-slide-up'}`}>
+            <div className={`relative w-full max-w-lg mx-4 bg-zinc-900 rounded-lg shadow-xl ${isHymnModalClosing ? 'animate-slide-down' : 'animate-slide-up'}`}>
               <div className="relative h-48">
                 <Image
                   src={hymnImage}
@@ -1437,7 +1437,7 @@ export default function ReflectionPage({
               className={`fixed inset-0 bg-black/50 ${isScriptureModalClosing ? 'animate-fade-out' : 'animate-fade-in'}`}
             onClick={closeScriptureModal}
             />
-            <div className={`relative w-full max-w-lg mx-4 bg-white rounded-lg shadow-xl ${isScriptureModalClosing ? 'animate-slide-down' : 'animate-slide-up'}`}>
+            <div className={`relative w-full max-w-lg mx-4 bg-zinc-900 rounded-lg shadow-xl ${isScriptureModalClosing ? 'animate-slide-down' : 'animate-slide-up'}`}>
               <div className="p-6">
                 <h2 className="text-sm font-medium text-white/80 mb-1">Today's Scripture</h2>
                 <p className="text-xl font-semibold mb-6">{devotionData?.bibleText}</p>
@@ -1470,7 +1470,7 @@ export default function ReflectionPage({
               className={`fixed inset-0 bg-black/50 ${isResourcesModalClosing ? 'animate-fade-out' : 'animate-fade-in'}`}
             onClick={closeResourcesModal}
             />
-            <div className={`relative w-full max-w-lg mx-4 bg-white rounded-lg shadow-xl ${isResourcesModalClosing ? 'animate-slide-down' : 'animate-slide-up'}`}>
+            <div className={`relative w-full max-w-lg mx-4 bg-zinc-900 rounded-lg shadow-xl ${isResourcesModalClosing ? 'animate-slide-down' : 'animate-slide-up'}`}>
               <div className="relative h-48">
                 <Image
                   src={resourcesImage}

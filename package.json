@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "update-hymn": "ts-node scripts/update-hymn.ts"
+    "update-hymn": "ts-node scripts/update-hymn.ts",
+    "upload-month-data": "ts-node scripts/upload-month-data.ts"
   },
   "dependencies": {
     "@babel/core": "7.23.3",
