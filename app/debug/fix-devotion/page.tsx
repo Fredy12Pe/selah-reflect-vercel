@@ -32,10 +32,22 @@ export default function FixDevotionPage() {
       
       // If we have reflection sections, set them for editing
       if (data.data?.reflectionSections) {
-        setReflectionSections(data.data.reflectionSections);
+        setReflectionSections(data.data.reflectionSections.map((section: any) => {
+          // If section is missing the passage field, create it with bible text as default
+          if (!section.passage && data.data?.bibleText) {
+            return {
+              ...section,
+              passage: data.data.bibleText
+            };
+          }
+          return section;
+        }));
       } else {
-        // Initialize with a single empty section
-        setReflectionSections([{ passage: '', questions: [''] }]);
+        // Initialize with a single empty section using bible text as passage
+        setReflectionSections([{ 
+          passage: data.data?.bibleText || data.data?.scriptureReference || '', 
+          questions: data.data?.reflectionQuestions || [''] 
+        }]);
       }
       
       // Set the Bible text if available
@@ -242,9 +254,14 @@ export default function FixDevotionPage() {
                       type="text"
                       value={section.passage || ''}
                       onChange={(e) => handleSectionChange(sectionIndex, 'passage', e.target.value)}
-                      className="w-full px-4 py-2 bg-black border border-zinc-700 rounded-lg"
+                      className={`w-full px-4 py-2 bg-black border ${!section.passage ? 'border-red-500' : 'border-zinc-700'} rounded-lg`}
                       placeholder="Enter passage reference or text"
                     />
+                    {!section.passage && (
+                      <p className="text-red-400 text-sm mt-1">
+                        Please enter a passage. This field is required and causing display issues.
+                      </p>
+                    )}
                   </div>
                   
                   <div>
