@@ -83,9 +83,15 @@ export async function POST(request: NextRequest) {
       ...data,
       // Add these fields if provided
       ...(bibleText && { bibleText }),
-      // If reflectionSections is provided, update or create them
+      // If reflectionSections is provided, update or create them with explicit passage fields
       ...(reflectionSections && { 
-        reflectionSections,
+        reflectionSections: reflectionSections.map(section => ({
+          passage: section.passage || bibleText || data.bibleText || '',
+          questions: section.questions || [],
+          // Add any other properties from the original section
+          ...(section.title && { title: section.title }),
+          ...(section.content && { content: section.content })
+        })),
         // Also update the legacy field for backward compatibility
         reflectionQuestions: reflectionSections.flatMap(section => section.questions || [])
       }),
