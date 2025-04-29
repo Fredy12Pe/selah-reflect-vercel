@@ -33,6 +33,18 @@ function getBaseUrl() {
 }
 
 export async function getDevotionByDate(date: string): Promise<Devotion | PartialDevotion | null> {
+  // Check if we have cached data first
+  try {
+    const cachedDataKey = `devotion_${date}`;
+    const cachedData = localStorage.getItem(cachedDataKey);
+    if (cachedData) {
+      console.log(`DevotionService: Using cached data for ${date}`);
+      return JSON.parse(cachedData);
+    }
+  } catch (cacheError) {
+    console.warn('DevotionService: Error accessing cache:', cacheError);
+  }
+
   // Maximum number of retry attempts
   const MAX_RETRIES = 2;
   let retryCount = 0;
@@ -67,12 +79,18 @@ export async function getDevotionByDate(date: string): Promise<Devotion | Partia
         } catch (tokenError) {
           console.warn('DevotionService: Could not get ID token:', tokenError);
         }
+
+        // Add timeout to the fetch request
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
         
         const response = await fetch(`${baseUrl}/api/devotions/${date}`, {
           credentials: 'include',
           headers,
+          signal: controller.signal
         });
 
+        clearTimeout(timeoutId);
         console.log('DevotionService: Fetch response status:', response.status);
 
         if (!response.ok) {
@@ -109,8 +127,24 @@ export async function getDevotionByDate(date: string): Promise<Devotion | Partia
 
         const devotionData = await response.json();
         console.log('DevotionService: Successfully fetched devotion data');
+        
+        // Cache the successful result
+        try {
+          localStorage.setItem(`devotion_${date}`, JSON.stringify(devotionData));
+          console.log('DevotionService: Cached devotion data for future use');
+        } catch (cacheError) {
+          console.warn('DevotionService: Failed to cache devotion data', cacheError);
+        }
+        
         return devotionData as Devotion;
       } catch (fetchError) {
+        // Handle abort errors specifically
+        if (fetchError instanceof DOMException && fetchError.name === 'AbortError') {
+          console.log('DevotionService: Request timed out, retrying');
+          retryCount++;
+          continue;
+        }
+        
         // Network errors or server errors should be retried
         const isNetworkError = fetchError instanceof Error && 
           (fetchError.message.includes('network') || 
@@ -118,7 +152,8 @@ export async function getDevotionByDate(date: string): Promise<Devotion | Partia
            fetchError.message.includes('Failed to fetch') ||
            fetchError.message.includes('Server error') ||
            fetchError.message.includes('Server configuration error') ||
-           fetchError.message.includes('Internal server error'));
+           fetchError.message.includes('Internal server error') ||
+           fetchError.message.includes('access control checks'));
            
         if (isNetworkError && retryCount < MAX_RETRIES) {
           console.log(`DevotionService: Network error, will retry (${retryCount + 1}/${MAX_RETRIES})`, fetchError);
@@ -161,6 +196,37 @@ export async function getDevotionByDate(date: string): Promise<Devotion | Partia
       }
       
       console.error('DevotionService: Error in getDevotionByDate after retries:', error);
+      
+      // Try fallback mechanism - direct Firestore access if API fails
+      try {
+        console.log('DevotionService: Attempting direct Firestore fallback');
+        const db = getFirebaseDb();
+        if (db) {
+          const devotionRef = doc(db, DEVOTIONS_COLLECTION, date);
+          const devotionSnap = await getDoc(devotionRef);
+          
+          if (devotionSnap.exists()) {
+            const data = devotionSnap.data();
+            const devotion = {
+              ...data,
+              id: devotionSnap.id,
+              date: devotionSnap.id
+            } as Devotion;
+            
+            // Cache this result
+            try {
+              localStorage.setItem(`devotion_${date}`, JSON.stringify(devotion));
+            } catch (cacheError) {
+              console.warn('DevotionService: Failed to cache fallback data', cacheError);
+            }
+            
+            console.log('DevotionService: Retrieved data directly from Firestore');
+            return devotion;
+          }
+        }
+      } catch (firestoreError) {
+        console.error('DevotionService: Firestore fallback failed:', firestoreError);
+      }
       
       // Only rethrow authentication and permission errors
       if (error.message.includes('sign in') || error.message.includes('permission')) {

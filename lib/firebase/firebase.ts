@@ -72,14 +72,16 @@ if (isBrowser() && !shouldSkipFirebaseInit) {
         firestore = getFirestore(app);
         console.log('[Firebase] Firestore initialized successfully');
         
-        // Apply settings synchronously
+        // Apply settings synchronously - more aggressive settings to avoid CORS issues
         if (typeof (firestore as any).settings === 'function') {
           (firestore as any).settings({
-            experimentalForceLongPolling: true,
-            useFetchStreams: false,
-            cacheSizeBytes: 50 * 1024 * 1024 // 50MB cache size
+            experimentalForceLongPolling: true, // Force long polling instead of WebSockets
+            useFetchStreams: false,             // Disable fetch streams which can cause CORS issues
+            cacheSizeBytes: 50 * 1024 * 1024,   // 50MB cache size
+            ignoreUndefinedProperties: true,    // Be more lenient with data
+            experimentalAutoDetectLongPolling: true // Auto-detect best connection method
           });
-          console.log('[Firebase] Firestore settings applied successfully');
+          console.log('[Firebase] Firestore settings applied successfully with CORS workarounds');
         }
       } catch (firestoreError) {
         console.error('[Firebase] Error initializing Firestore:', firestoreError);
@@ -192,23 +194,53 @@ export const getFirebaseDb = (): Firestore | null => {
     return null;
   }
   
-  // Try to initialize Firestore if not already done
+  // Try to initialize Firestore with basic error handling
   try {
     console.log('[Firebase] Initializing Firestore on demand');
     firestore = getFirestore(app);
     
-    // Apply settings
+    // Apply more aggressive settings to avoid CORS issues
     if (firestore && typeof (firestore as any).settings === 'function') {
       (firestore as any).settings({
-        experimentalForceLongPolling: true,
-        useFetchStreams: false,
-        cacheSizeBytes: 50 * 1024 * 1024 // 50MB cache size
+        experimentalForceLongPolling: true, // Force long polling instead of WebSockets
+        useFetchStreams: false,             // Disable fetch streams which can cause CORS issues
+        cacheSizeBytes: 50 * 1024 * 1024,   // 50MB cache size
+        ignoreUndefinedProperties: true,    // Be more lenient with data
+        experimentalAutoDetectLongPolling: true // Auto-detect best connection method
       });
+      console.log('[Firebase] Firestore settings applied successfully with CORS workarounds');
     }
     
     return firestore;
   } catch (error) {
     console.error('[Firebase] Error initializing Firestore on demand:', error);
+    
+    // For CORS errors, suggest a refresh approach instead of retrying here
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    if (errorMessage.includes('access control checks')) {
+      console.log('[Firebase] CORS issues detected, will try to recover in application code');
+      
+      // Schedule a refresh if this is a CORS issue and we're in the browser
+      if (typeof window !== 'undefined') {
+        const refreshKey = 'firebase_refresh_attempt';
+        const refreshAttempts = parseInt(localStorage.getItem(refreshKey) || '0', 10);
+        
+        if (refreshAttempts < 3) {
+          console.log(`[Firebase] Scheduling page refresh (attempt ${refreshAttempts + 1}/3)`);
+          localStorage.setItem(refreshKey, (refreshAttempts + 1).toString());
+          setTimeout(() => {
+            window.location.reload();
+          }, 1000);
+        } else {
+          console.log('[Firebase] Max refresh attempts reached, using fallback mechanisms');
+          // Reset counter after 5 minutes
+          setTimeout(() => {
+            localStorage.setItem(refreshKey, '0');
+          }, 5 * 60 * 1000);
+        }
+      }
+    }
+    
     return null;
   }
 };

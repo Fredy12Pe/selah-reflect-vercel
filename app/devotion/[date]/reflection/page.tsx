@@ -673,7 +673,7 @@ export default function ReflectionPage({
     loadImages();
   }, [params.date]);
 
-  // Update handleDateChange to allow future dates
+  // Update handleDateChange to use client-side navigation first, fallback to hard reload
   const handleDateChange = async (newDate: Date) => {
     // Don't do anything if we're already loading
     if (isLoading) {
@@ -709,7 +709,22 @@ export default function ReflectionPage({
       if (showResourcesModal) closeResourcesModal();
       if (showCalendar) setShowCalendar(false);
       
-      // Use a hard navigation instead of client-side to ensure a full remount
+      // Try first to use cached data if it exists
+      try {
+        const cachedDataKey = `devotion_${formattedDate}`;
+        const cachedData = localStorage.getItem(cachedDataKey);
+        
+        if (cachedData) {
+          console.log(`Using cached data for date: ${formattedDate}`);
+          // Use client-side navigation instead of hard reload
+          router.push(`/devotion/${formattedDate}/reflection`);
+          return;
+        }
+      } catch (cacheError) {
+        console.warn("Error checking cache:", cacheError);
+      }
+      
+      // No cached data, use a hard navigation instead of client-side to ensure a full remount
       window.location.href = `/devotion/${formattedDate}/reflection`;
     } catch (error) {
       console.error("Error changing date:", error);
