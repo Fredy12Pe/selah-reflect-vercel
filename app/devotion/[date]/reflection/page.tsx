@@ -260,28 +260,85 @@ export default function ReflectionPage({
         // Fetch hymn data
         const monthStr = format(currentDate, 'MMMM').toLowerCase();
         const db = getFirebaseDb();
+        console.log('Reflection page: Got Firestore instance:', !!db);
+        
         if (db) {
           try {
+            // Check if we can access Firestore methods
+            if (typeof (db as any).collection !== 'function' || 
+                typeof (db as any).doc !== 'function') {
+              console.error('Firestore methods not available');
+              throw new Error('Firestore not properly initialized');
+            }
+            
+            console.log('Reflection page: Fetching hymn for month:', monthStr);
             const hymnRef = doc(db, 'hymns', monthStr);
             const hymnSnap = await getDoc(hymnRef);
+            
             if (hymnSnap.exists()) {
+              console.log('Reflection page: Found hymn data for month:', monthStr);
               setHymn(hymnSnap.data() as Hymn);
+            } else {
+              console.log('Reflection page: No hymn found for month:', monthStr);
+              // Set default hymn data
+              setHymn({
+                title: "When I Survey the Wondrous Cross",
+                author: "Isaac Watts",
+                lyrics: hymnLyrics.flatMap((verse, verseIndex) => 
+                  verse.lines.map((line, lineIndex) => ({
+                    lineNumber: verseIndex * verse.lines.length + lineIndex + 1,
+                    text: line
+                  }))
+                )
+              });
             }
           } catch (error) {
-            console.error('Error fetching hymn:', error);
-            // Don't fail the whole load if hymn fails
+            console.error('Error fetching hymn from Firestore:', error);
+            // Set default hymn data on error
+            setHymn({
+              title: "When I Survey the Wondrous Cross",
+              author: "Isaac Watts",
+              lyrics: hymnLyrics.flatMap((verse, verseIndex) => 
+                verse.lines.map((line, lineIndex) => ({
+                  lineNumber: verseIndex * verse.lines.length + lineIndex + 1,
+                  text: line
+                }))
+              )
+            });
           }
+        } else {
+          console.log('Reflection page: No Firestore instance available, using default hymn');
+          // No Firestore instance, set default hymn
+          setHymn({
+            title: "When I Survey the Wondrous Cross",
+            author: "Isaac Watts",
+            lyrics: hymnLyrics.flatMap((verse, verseIndex) => 
+              verse.lines.map((line, lineIndex) => ({
+                lineNumber: verseIndex * verse.lines.length + lineIndex + 1,
+                text: line
+              }))
+            )
+          });
         }
 
         // Fetch devotion data
         try {
+          console.log('Reflection page: Fetching devotion for date:', params.date);
           const devotion = await getDevotionByDate(params.date);
+          console.log('Reflection page: Devotion fetch result:', !!devotion);
+          
           // Even if devotion is null or has notFound flag, we still set it
           // This allows us to show appropriate UI for missing devotions
           setDevotionData(devotion);
         } catch (error) {
           console.error('Error fetching devotion:', error);
-          toast.error('Failed to load devotion');
+          if (error instanceof Error && error.message.includes('sign in')) {
+            // Authentication error
+            toast.error('Please sign in to view devotions');
+            router.push('/auth/login?from=' + encodeURIComponent(`/devotion/${params.date}/reflection`));
+          } else {
+            toast.error('Failed to load devotion');
+          }
         }
       } catch (error) {
         console.error('Error in fetchData:', error);
@@ -294,8 +351,12 @@ export default function ReflectionPage({
     // Only fetch if we have a user and we're not already loading
     if (user && !isLoading) {
       fetchData();
+    } else if (!loading && !user) {
+      // If auth is done loading and we don't have a user, redirect to login
+      console.log('Reflection page: No user, redirecting to login');
+      router.push('/auth/login?from=' + encodeURIComponent(`/devotion/${params.date}/reflection`));
     }
-  }, [params.date, user, currentDate, router]);
+  }, [params.date, user, currentDate, router, loading, hymnLyrics, isLoading]);
 
   // Load background images for modals from Unsplash with error handling
   useEffect(() => {
