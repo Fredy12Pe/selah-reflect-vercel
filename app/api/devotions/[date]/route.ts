@@ -155,17 +155,10 @@ export async function GET(
     // Get the devotion using Admin SDK
     const devotionDoc = await db.collection('devotions').doc(params.date).get();
 
-    // Safely check if document exists - Admin SDK may implement exists differently
-    const docExists = devotionDoc && (
-      // As a property
-      (typeof devotionDoc.exists === 'boolean' && devotionDoc.exists) ||
-      // As a function - cast the function to avoid TypeScript complaints
-      (typeof devotionDoc.exists === 'function' && (devotionDoc.exists as () => boolean)()) ||
-      // Fallback - check if data() returns something
-      (devotionDoc.data && typeof devotionDoc.data === 'function' && devotionDoc.data() !== null && Object.keys(devotionDoc.data() || {}).length > 0)
-    );
-
-    if (!docExists) {
+    // Check if document exists by directly checking the data
+    // This avoids TypeScript issues with the exists() method/property
+    const data = devotionDoc.data() as Devotion;
+    if (!data) {
       // Return a structured response for missing devotions
       return NextResponse.json({
         id: params.date,
@@ -179,8 +172,6 @@ export async function GET(
         notFound: true
       }, { status: 200 });
     }
-
-    const data = devotionDoc.data() as Devotion;
 
     // Format the response to match the Devotion type
     const formattedData: Devotion = {

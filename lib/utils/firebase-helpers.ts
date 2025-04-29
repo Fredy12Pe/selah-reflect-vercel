@@ -128,21 +128,14 @@ export async function safeGetDocWithFallback<T = any>(
     
     const snapshot = await getDoc(docRef);
     
-    // Safely check if document exists - handles both SDK implementations
-    const docExists = snapshot && (
-      // Check if it's a function (client SDK)
-      (typeof snapshot.exists === 'function' && snapshot.exists()) ||
-      // Check if it's a property (admin SDK) 
-      (typeof snapshot.exists === 'boolean' && snapshot.exists) ||
-      // Fallback - check if data() returns something
-      (snapshot.data && snapshot.data() !== null && Object.keys(snapshot.data() || {}).length > 0)
-    );
-    
-    if (!docExists) {
+    // Check if document exists by directly checking the data
+    // This approach avoids the exists() function/property TypeScript issues
+    const data = snapshot.data();
+    if (!data) {
       return fallback;
     }
     
-    return snapshot.data() as T;
+    return data as T;
   } catch (error) {
     console.error('Error in safeGetDocWithFallback:', error);
     return fallback;
