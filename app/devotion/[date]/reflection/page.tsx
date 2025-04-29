@@ -1169,9 +1169,10 @@ export default function ReflectionPage({
                       {devotionData?.reflectionSections && devotionData.reflectionSections.length > 0 && devotionData.reflectionSections.map((section, sectionIndex) => (
                         <div key={sectionIndex} className="mb-6">
                           {section.passage && (
-                            <h3 className="text-lg font-medium text-white/90 mb-3">
-                              {section.passage}
-                            </h3>
+                            <div className="mb-4 p-4 bg-zinc-800 rounded-lg">
+                              <h3 className="text-lg font-medium text-white/90 mb-1">Passage:</h3>
+                              <p className="text-white/80">{section.passage}</p>
+                            </div>
                           )}
                           
                           <ol className="list-decimal ml-5 space-y-4">
