@@ -27,6 +27,7 @@
     "firebase-admin": "11.11.1",
     "js-cookie": "3.0.5",
     "next": "^13.4.19",
+    "node-fetch": "^2.7.0",
     "openai": "4.20.1",
     "pdfjs-dist": "3.11.174",
     "postcss": "8.4.32",
