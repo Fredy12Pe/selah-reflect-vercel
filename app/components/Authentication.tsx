@@ -158,24 +158,51 @@ export default function Authentication() {
     // Check if this is a first-time user who needs onboarding
     try {
       const userId = user?.uid || '';
-      const userOnboardingKey = `selah_onboarding_completed_${userId}`;
-      const hasCompletedOnboarding = localStorage.getItem(userOnboardingKey) === 'true';
-      
-      if (!hasCompletedOnboarding && userId) {
-        // First-time user, redirect to onboarding
-        router.push('/onboarding');
-        return;
+      if (userId) {
+        // Debug information about login and onboarding status
+        console.log("Authentication: Checking onboarding status for user:", userId);
+        
+        const userOnboardingKey = `selah_onboarding_completed_${userId}`;
+        const onboardingValue = localStorage.getItem(userOnboardingKey);
+        
+        console.log("Authentication: onboarding localStorage status:", {
+          key: userOnboardingKey,
+          value: onboardingValue,
+          isFirstTimeUser: onboardingValue === null || onboardingValue !== 'true'
+        });
+        
+        // CRITICAL FIX: For Google Sign-In where we might miss setting the value
+        // Ensure a value is always set for first-time users
+        if (onboardingValue === null) {
+          localStorage.setItem(userOnboardingKey, 'false');
+          console.log("Authentication: Setting explicit 'false' for first-time user in redirectAfterLogin");
+        }
+        
+        // AGGRESSIVE FIX: Only allow users with EXPLICIT 'true' value to bypass onboarding
+        // This ensures any edge cases are caught
+        if (onboardingValue !== 'true') {
+          // First-time user or undetermined status, redirect to onboarding
+          console.log("User needs onboarding: value is not explicitly 'true'", { onboardingValue });
+          
+          // Force set to 'false' to ensure consistent state
+          localStorage.setItem(userOnboardingKey, 'false');
+          
+          // Redirect to onboarding
+          router.push('/onboarding');
+          return;
+        }
       }
     } catch (error) {
       console.error("Error checking onboarding status:", error);
       // Continue with normal flow if there's an error checking onboarding status
     }
     
+    // Only get here if user has completed onboarding or we couldn't determine status
     // If 'from' is a valid URL path, redirect there
     if (from && from !== "/auth/login") {
       router.push(from);
     } else {
-      // Otherwise, redirect to today's devotion
+      // Otherwise, redirect to today's devotion with specific date format
       const today = format(new Date(), "yyyy-MM-dd");
       router.push(`/devotion/${today}`);
     }
@@ -232,6 +259,28 @@ export default function Authentication() {
         throw new Error("Authentication failed - no user returned");
       }
       
+      // CRITICAL FIX: Always check and set onboarding status for Google login
+      // This ensures that even if session handling has issues, onboarding will work
+      if (result.user) {
+        const userId = result.user.uid;
+        const userOnboardingKey = `selah_onboarding_completed_${userId}`;
+        
+        // Check if this is the very first login (no onboarding record yet)
+        const currentStatus = localStorage.getItem(userOnboardingKey);
+        console.log("Authentication Google: Checking onboarding status:", { userId, currentStatus });
+        
+        // SUPER AGGRESSIVE FIX: Force onboarding for any new user or any value that isn't 'true'
+        if (currentStatus !== 'true') {
+          console.log("Authentication Google: User needs onboarding - forcing onboarding flow");
+          localStorage.setItem(userOnboardingKey, 'false');
+          
+          // Skip all further processing and go straight to onboarding
+          // This bypasses all other logic that might redirect elsewhere
+          router.push('/onboarding');
+          return;
+        }
+      }
+      
       // Get the token
       let token;
       try {
@@ -251,6 +300,21 @@ export default function Authentication() {
         // Development fallback
         if (process.env.NODE_ENV !== 'production') {
           console.log("Authentication: Using development fallback");
+          
+          // WORKAROUND: In development, also set the onboarding status directly
+          // This helps with the mock session issue
+          if (result.user) {
+            const userId = result.user.uid;
+            const userOnboardingKey = `selah_onboarding_completed_${userId}`;
+            
+            // Check if this is the very first login (no onboarding record yet)
+            const currentStatus = localStorage.getItem(userOnboardingKey);
+            if (currentStatus === null) {
+              console.log("Authentication: First login detected, setting explicit onboarding status");
+              localStorage.setItem(userOnboardingKey, 'false');
+            }
+          }
+          
           redirectAfterLogin();
           return;
         }

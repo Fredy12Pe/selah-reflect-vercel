@@ -162,6 +162,48 @@ export default function DebugPage() {
       <h1 className="text-2xl font-bold mb-6">Firebase Debug Page</h1>
       
       <div className="mb-6 p-4 bg-gray-100 rounded">
+        <h2 className="text-xl font-semibold mb-4">Debug Tools</h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <a 
+            href="/debug/always-onboard" 
+            className="bg-red-600 text-white px-4 py-2 rounded text-center hover:bg-red-700 col-span-full font-bold text-lg"
+          >
+            🚨 FORCE ONBOARDING MODE (MOST RELIABLE) 🚨
+          </a>
+          <a 
+            href="/debug/reset-onboarding" 
+            className="bg-red-500 text-white px-4 py-2 rounded text-center hover:bg-red-600 col-span-full font-bold"
+          >
+            RESET ONBOARDING & GO TO ONBOARDING FLOW
+          </a>
+          <a 
+            href="/debug/onboarding-status" 
+            className="bg-indigo-500 text-white px-4 py-2 rounded text-center hover:bg-indigo-600"
+          >
+            Onboarding Status Debug
+          </a>
+          <a 
+            href="/debug/simple-auth" 
+            className="bg-blue-500 text-white px-4 py-2 rounded text-center hover:bg-blue-600"
+          >
+            Simple Auth Test
+          </a>
+          <a 
+            href="/debug/session-test" 
+            className="bg-green-500 text-white px-4 py-2 rounded text-center hover:bg-green-600"
+          >
+            Session Test
+          </a>
+          <a 
+            href="/debug/env-check" 
+            className="bg-purple-500 text-white px-4 py-2 rounded text-center hover:bg-purple-600"
+          >
+            Environment Check
+          </a>
+        </div>
+      </div>
+      
+      <div className="mb-6 p-4 bg-gray-100 rounded">
         <h2 className="text-xl font-semibold mb-2">Environment Variables</h2>
         <pre className="bg-black text-green-400 p-4 rounded overflow-auto">
           {JSON.stringify(envVars, null, 2)}

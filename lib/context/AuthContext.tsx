@@ -153,10 +153,32 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
               // But don't wait for it to complete
               setSessionCookie(authUser).catch(console.error);
 
-              // If on login page and authenticated, redirect to home
-              if (pathname === "/auth/login") {
-                router.push("/");
+              // CRITICAL: Ensure onboarding status is properly set for this user
+              if (isBrowser()) {
+                try {
+                  // This is crucial for first-time login detection in development mode
+                  const userId = authUser.uid;
+                  const userOnboardingKey = `selah_onboarding_completed_${userId}`;
+                  const currentStatus = localStorage.getItem(userOnboardingKey);
+                  
+                  console.log("AuthContext: Checking onboarding status after auth state change:", {
+                    userId,
+                    currentStatus
+                  });
+                  
+                  // If this is the first login ever, explicitly set onboarding status to false
+                  if (currentStatus === null) {
+                    console.log("AuthContext: First login detected, setting explicit onboarding status");
+                    localStorage.setItem(userOnboardingKey, 'false');
+                  }
+                } catch (error) {
+                  console.error("AuthContext: Error handling onboarding status:", error);
+                }
               }
+
+              // If on login page and authenticated, we'll let the login page component
+              // handle redirection based on onboarding status
+              // This ensures the onboarding check happens before redirect
             } else {
               console.log("No user authenticated");
               setUser(null);
