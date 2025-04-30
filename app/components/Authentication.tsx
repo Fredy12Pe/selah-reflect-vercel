@@ -99,7 +99,7 @@ function DebugPanel() {
 export default function Authentication() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { login, signup, loginAnonymously } = useAuth();
+  const { login, signup, loginAnonymously, user } = useAuth();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [debugVisible, setDebugVisible] = useState(false);
@@ -155,6 +155,22 @@ export default function Authentication() {
   }, []);
 
   const redirectAfterLogin = useCallback(() => {
+    // Check if this is a first-time user who needs onboarding
+    try {
+      const userId = user?.uid || '';
+      const userOnboardingKey = `selah_onboarding_completed_${userId}`;
+      const hasCompletedOnboarding = localStorage.getItem(userOnboardingKey) === 'true';
+      
+      if (!hasCompletedOnboarding && userId) {
+        // First-time user, redirect to onboarding
+        router.push('/onboarding');
+        return;
+      }
+    } catch (error) {
+      console.error("Error checking onboarding status:", error);
+      // Continue with normal flow if there's an error checking onboarding status
+    }
+    
     // If 'from' is a valid URL path, redirect there
     if (from && from !== "/auth/login") {
       router.push(from);
@@ -163,7 +179,7 @@ export default function Authentication() {
       const today = format(new Date(), "yyyy-MM-dd");
       router.push(`/devotion/${today}`);
     }
-  }, [router, from]);
+  }, [router, from, user]);
 
   // Handle anonymous sign-in (defined before handleSignIn to avoid circular dependency)
   const handleAnonymousSignIn = useCallback(async () => {
