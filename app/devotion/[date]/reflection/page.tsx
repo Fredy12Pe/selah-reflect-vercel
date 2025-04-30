@@ -1234,12 +1234,18 @@ export default function ReflectionPage({
           <>
             {/* Admin Tools Link */}
             {isAdmin() && (
-              <div className="absolute top-2 right-4 z-50">
+              <div className="absolute top-2 right-4 z-50 flex space-x-4">
                 <Link 
                   href="/debug/cache-tools" 
                   className="text-xs text-white/30 hover:text-white/80"
                 >
                   Cache Tools
+                </Link>
+                <Link 
+                  href="/history" 
+                  className="text-xs text-white/30 hover:text-white/80"
+                >
+                  History
                 </Link>
               </div>
             )}
@@ -1417,7 +1423,7 @@ export default function ReflectionPage({
                       />
                       <div className="absolute inset-0 bg-gradient-to-b from-black/30 to-black/70" />
                       <div className="absolute inset-0 p-6 flex flex-col justify-end">
-                        <h2 className="text-2xl font-bold mb-1">Resources for today's text</h2>
+                        <h2 className="text-2xl font-medium mb-1">Resources for today's text</h2>
                         <p className="text-white/80">Bible Commentaries, Videos, and Podcasts</p>
                 </div>
                     </div>
@@ -1445,13 +1451,13 @@ export default function ReflectionPage({
         {/* Modals (outside of loading check) */}
       {/* Hymn Modal */}
       {showHymnModal && (
-          <div className="fixed inset-0 z-50 flex items-end justify-center">
+          <div className="fixed inset-0 z-50 flex items-center justify-center">
         <div
               className={`fixed inset-0 bg-black/50 ${isHymnModalClosing ? 'animate-fade-out' : 'animate-fade-in'}`}
           onClick={closeHymnModal}
             />
             <div 
-              className={`relative w-full h-3/4 bg-zinc-900 rounded-t-2xl shadow-xl overflow-hidden flex flex-col
+              className={`relative w-full h-4/5 max-h-[85vh] bg-zinc-900 rounded-2xl shadow-xl overflow-hidden flex flex-col mt-auto
                 ${isHymnModalClosing ? 'animate-slide-down' : 'animate-slide-up'}`}
             >
               <div className="relative h-36 flex-shrink-0">
@@ -1489,25 +1495,25 @@ export default function ReflectionPage({
 
       {/* Scripture Modal */}
       {showScriptureModal && (
-          <div className="fixed inset-0 z-50 flex items-end justify-center">
+          <div className="fixed inset-0 z-50 flex items-center justify-center">
         <div
               className={`fixed inset-0 bg-black/50 ${isScriptureModalClosing ? 'animate-fade-out' : 'animate-fade-in'}`}
           onClick={closeScriptureModal}
             />
             <div 
-              className={`relative w-full h-3/4 bg-zinc-900 rounded-t-2xl shadow-xl overflow-hidden flex flex-col
+              className={`relative w-full h-4/5 max-h-[85vh] bg-zinc-900 rounded-2xl shadow-xl overflow-hidden flex flex-col mt-auto
                 ${isScriptureModalClosing ? 'animate-slide-down' : 'animate-slide-up'}`}
             >
               <div className="p-6 flex-shrink-0 border-b border-zinc-800 relative">
                 <h2 className="text-sm font-medium text-white/80 mb-1">Today's Scripture</h2>
                 <p className="text-xl font-semibold pr-6">{devotionData?.bibleText}</p>
-              <button
-                onClick={closeScriptureModal}
+                <button
+                  onClick={closeScriptureModal}
                   className="absolute top-4 right-4 p-1 rounded-full bg-black/30 hover:bg-black/50"
                 >
                   <XMarkIcon className="w-6 h-6 text-white" />
-              </button>
-            </div>
+                </button>
+              </div>
 
               <div className="overflow-y-auto flex-grow p-6">
               {isFetchingBibleVerse ? (
@@ -1533,13 +1539,13 @@ export default function ReflectionPage({
 
       {/* Resources Modal */}
       {showResourcesModal && (
-          <div className="fixed inset-0 z-50 flex items-end justify-center">
+          <div className="fixed inset-0 z-50 flex items-center justify-center">
         <div
               className={`fixed inset-0 bg-black/50 ${isResourcesModalClosing ? 'animate-fade-out' : 'animate-fade-in'}`}
           onClick={closeResourcesModal}
             />
             <div 
-              className={`relative w-full h-3/4 bg-zinc-900 rounded-t-2xl shadow-xl overflow-hidden flex flex-col
+              className={`relative w-full h-4/5 max-h-[85vh] bg-zinc-900 rounded-2xl shadow-xl overflow-hidden flex flex-col mt-auto
                 ${isResourcesModalClosing ? 'animate-slide-down' : 'animate-slide-up'}`}
             >
               <div className="relative h-36 flex-shrink-0">
