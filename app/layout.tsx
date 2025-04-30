@@ -59,16 +59,19 @@ export default function RootLayout({
 
         <meta name="application-name" content="Selah" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
-        <meta
-          name="apple-mobile-web-app-status-bar-style"
-          content="black-translucent"
-        />
+        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
         <meta name="apple-mobile-web-app-title" content="Selah" />
         <meta name="format-detection" content="telephone=no" />
         <meta name="mobile-web-app-capable" content="yes" />
         
-        {/* Icon for PWA */}
+        {/* iOS icons with precomposed to prevent iOS from adding effects */}
         <link rel="icon" href="/icons/favicon.ico" />
+        <link rel="apple-touch-icon-precomposed" href="/icons/icon-192.png" />
+        <link rel="apple-touch-icon-precomposed" sizes="152x152" href="/icons/icon-152.png" />
+        <link rel="apple-touch-icon-precomposed" sizes="180x180" href="/icons/icon-180.png" />
+        <link rel="apple-touch-icon-precomposed" sizes="167x167" href="/icons/icon-167.png" />
+        
+        {/* Standard apple-touch-icon as fallback */}
         <link rel="apple-touch-icon" href="/icons/icon-192.png" />
         <link rel="apple-touch-icon" sizes="152x152" href="/icons/icon-152.png" />
         <link rel="apple-touch-icon" sizes="180x180" href="/icons/icon-180.png" />
