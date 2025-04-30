@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { format, parseISO } from "date-fns";
@@ -117,6 +117,32 @@ export default function JournalPage({ params }: { params: { date: string } }) {
   const [isScriptureModalClosing, setIsScriptureModalClosing] = useState(false);
   const [bibleVerse, setBibleVerse] = useState<BibleVerse | null>(null);
   const [isFetchingBibleVerse, setIsFetchingBibleVerse] = useState(false);
+  
+  // Add ref for modal and touch state
+  const scriptureModalRef = useRef<HTMLDivElement>(null);
+  const [touchStartY, setTouchStartY] = useState<number | null>(null);
+  
+  // Pull-to-close handlers
+  const handleTouchStart = (e: React.TouchEvent) => {
+    setTouchStartY(e.touches[0].clientY);
+  };
+  
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (touchStartY === null) return;
+    
+    const touchY = e.touches[0].clientY;
+    const deltaY = touchY - touchStartY;
+    
+    // Increased threshold from 50px to 100px to make it less sensitive
+    if (deltaY > 100) {
+      setTouchStartY(null);
+      closeScriptureModal();
+    }
+  };
+  
+  const handleTouchEnd = () => {
+    setTouchStartY(null);
+  };
 
   // Function to close scripture modal with animation
   const closeScriptureModal = () => {
@@ -462,7 +488,11 @@ export default function JournalPage({ params }: { params: { date: string } }) {
             onClick={closeScriptureModal}
           />
           <div 
-            className={`relative w-full h-4/5 max-h-[85vh] bg-zinc-900 rounded-2xl shadow-xl overflow-hidden flex flex-col mt-auto
+            ref={scriptureModalRef}
+            onTouchStart={handleTouchStart}
+            onTouchMove={handleTouchMove}
+            onTouchEnd={handleTouchEnd}
+            className={`relative w-full h-4/5 max-h-[85vh] bg-zinc-900 rounded-t-2xl shadow-xl overflow-hidden flex flex-col mt-auto
               ${isScriptureModalClosing ? 'animate-slide-down' : 'animate-slide-up'}`}
           >
             <div className="p-6 flex-shrink-0 border-b border-zinc-800 relative">

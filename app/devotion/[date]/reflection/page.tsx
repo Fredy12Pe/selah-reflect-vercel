@@ -297,34 +297,6 @@ export default function ReflectionPage({
     }, 300); // Match animation duration
   };
 
-  // Define CalendarWrapper inside the component
-  const CalendarWrapper = ({ children }: { children: React.ReactNode }) => (
-    <div
-      ref={calendarRef}
-      className={`fixed inset-0 z-50 flex items-center justify-center bg-black/80 
-        ${isCalendarClosing ? 'animate-fade-out' : 'animate-fade-in'}`}
-      onClick={(e) => {
-        if (e.target === e.currentTarget) {
-          closeCalendar();
-        }
-      }}
-    >
-      <div className={`w-full max-w-xs bg-zinc-900 p-4 rounded-xl shadow-xl border border-zinc-800 mx-4
-        ${isCalendarClosing ? 'animate-slide-down' : 'animate-slide-up'}`}>
-        <div className="flex justify-between items-center mb-4">
-          <h2 className="text-lg font-medium text-white">Select Date</h2>
-          <button 
-            onClick={closeCalendar}
-            className="p-1 rounded-full bg-black/30 hover:bg-black/50"
-          >
-            <XMarkIcon className="w-6 h-6 text-white" />
-          </button>
-        </div>
-        {children}
-      </div>
-    </div>
-  );
-  
   // Parse date once and handle errors
   const [currentDate, setCurrentDate] = useState<Date>(() => {
     try {
@@ -1192,6 +1164,64 @@ export default function ReflectionPage({
            user?.email === 'fredy12pe@gmail.com';
   };
 
+  // Add refs for the modal touch handling
+  const hymnModalRef = useRef<HTMLDivElement>(null);
+  const scriptureModalRef = useRef<HTMLDivElement>(null);
+  const resourcesModalRef = useRef<HTMLDivElement>(null);
+  
+  // Add touch state tracking variables
+  const [touchStartY, setTouchStartY] = useState<number | null>(null);
+  
+  // Pull-to-close handler for modals
+  const handleTouchStart = (e: React.TouchEvent) => {
+    setTouchStartY(e.touches[0].clientY);
+  };
+  
+  const handleTouchMove = (e: React.TouchEvent, closeModal: () => void) => {
+    if (touchStartY === null) return;
+    
+    const touchY = e.touches[0].clientY;
+    const deltaY = touchY - touchStartY;
+    
+    // Increased threshold from 50px to 100px to make it less sensitive
+    if (deltaY > 100) {
+      setTouchStartY(null);
+      closeModal();
+    }
+  };
+  
+  const handleTouchEnd = () => {
+    setTouchStartY(null);
+  };
+
+  // Define CalendarWrapper inside the component
+  const CalendarWrapper = ({ children }: { children: React.ReactNode }) => (
+    <div
+      ref={calendarRef}
+      className={`fixed inset-0 z-50 flex items-center justify-center bg-black/80 
+        ${isCalendarClosing ? 'animate-fade-out' : 'animate-fade-in'}`}
+      onClick={(e) => {
+        if (e.target === e.currentTarget) {
+          closeCalendar();
+        }
+      }}
+    >
+      <div className={`w-full max-w-xs bg-zinc-900 p-4 rounded-xl shadow-xl border border-zinc-800 mx-4
+        ${isCalendarClosing ? 'animate-slide-down' : 'animate-slide-up'}`}>
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-lg font-medium text-white">Select Date</h2>
+          <button 
+            onClick={closeCalendar}
+            className="p-1 rounded-full bg-black/30 hover:bg-black/50"
+          >
+            <XMarkIcon className="w-6 h-6 text-white" />
+          </button>
+        </div>
+        {children}
+      </div>
+    </div>
+  );
+
   if (!user) {
     return (
       <div className="min-h-screen bg-black text-white flex items-center justify-center p-4">
@@ -1457,7 +1487,11 @@ export default function ReflectionPage({
           onClick={closeHymnModal}
             />
             <div 
-              className={`relative w-full h-4/5 max-h-[85vh] bg-zinc-900 rounded-2xl shadow-xl overflow-hidden flex flex-col mt-auto
+              ref={hymnModalRef}
+              onTouchStart={handleTouchStart}
+              onTouchMove={(e) => handleTouchMove(e, closeHymnModal)}
+              onTouchEnd={handleTouchEnd}
+              className={`relative w-full h-4/5 max-h-[85vh] bg-zinc-900 rounded-t-2xl shadow-xl overflow-hidden flex flex-col mt-auto
                 ${isHymnModalClosing ? 'animate-slide-down' : 'animate-slide-up'}`}
             >
               <div className="relative h-36 flex-shrink-0">
@@ -1501,7 +1535,11 @@ export default function ReflectionPage({
           onClick={closeScriptureModal}
             />
             <div 
-              className={`relative w-full h-4/5 max-h-[85vh] bg-zinc-900 rounded-2xl shadow-xl overflow-hidden flex flex-col mt-auto
+              ref={scriptureModalRef}
+              onTouchStart={handleTouchStart}
+              onTouchMove={(e) => handleTouchMove(e, closeScriptureModal)}
+              onTouchEnd={handleTouchEnd}
+              className={`relative w-full h-4/5 max-h-[85vh] bg-zinc-900 rounded-t-2xl shadow-xl overflow-hidden flex flex-col mt-auto
                 ${isScriptureModalClosing ? 'animate-slide-down' : 'animate-slide-up'}`}
             >
               <div className="p-6 flex-shrink-0 border-b border-zinc-800 relative">
@@ -1545,7 +1583,11 @@ export default function ReflectionPage({
           onClick={closeResourcesModal}
             />
             <div 
-              className={`relative w-full h-4/5 max-h-[85vh] bg-zinc-900 rounded-2xl shadow-xl overflow-hidden flex flex-col mt-auto
+              ref={resourcesModalRef}
+              onTouchStart={handleTouchStart}
+              onTouchMove={(e) => handleTouchMove(e, closeResourcesModal)}
+              onTouchEnd={handleTouchEnd}
+              className={`relative w-full h-4/5 max-h-[85vh] bg-zinc-900 rounded-t-2xl shadow-xl overflow-hidden flex flex-col mt-auto
                 ${isResourcesModalClosing ? 'animate-slide-down' : 'animate-slide-up'}`}
             >
               <div className="relative h-36 flex-shrink-0">
