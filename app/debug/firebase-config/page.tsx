@@ -121,7 +121,7 @@ export default function FirebaseConfigDebugPage() {
                         <div key={key} className="flex justify-between">
                           <span>{key}:</span>
                           <span className={value === '✓' ? 'text-green-400' : 'text-red-400'}>
-                            {value}
+                            {value as React.ReactNode}
                           </span>
                         </div>
                       ))}

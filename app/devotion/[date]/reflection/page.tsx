@@ -46,6 +46,45 @@ import { getFirebaseDb } from "@/lib/firebase/firebase";
 import dynamic from 'next/dynamic';
 import { safeDoc, safeGetDocWithFallback } from "@/lib/utils/firebase-helpers";
 
+// CSS animations
+const modalAnimations = `
+  @keyframes slideUp {
+    from { transform: translateY(100%); }
+    to { transform: translateY(0); }
+  }
+  
+  @keyframes slideDown {
+    from { transform: translateY(0); }
+    to { transform: translateY(100%); }
+  }
+  
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+  
+  @keyframes fadeOut {
+    from { opacity: 1; }
+    to { opacity: 0; }
+  }
+  
+  .animate-slide-up {
+    animation: slideUp 0.3s ease-out forwards;
+  }
+  
+  .animate-slide-down {
+    animation: slideDown 0.3s ease-out forwards;
+  }
+  
+  .animate-fade-in {
+    animation: fadeIn 0.3s ease-out forwards;
+  }
+  
+  .animate-fade-out {
+    animation: fadeOut 0.3s ease-out forwards;
+  }
+`;
+
 // Bible verse interface
 interface BibleVerse {
   text: string;
@@ -246,13 +285,43 @@ export default function ReflectionPage({
   // Add reload protection
   const fetchAttemptCountRef = useRef(0);
   
+  // Additional animation class for calendar
+  const [isCalendarClosing, setIsCalendarClosing] = useState(false);
+  
+  // Updated function to close calendar with animation
+  const closeCalendar = () => {
+    setIsCalendarClosing(true);
+    setTimeout(() => {
+      setShowCalendar(false);
+      setIsCalendarClosing(false);
+    }, 300); // Match animation duration
+  };
+
   // Define CalendarWrapper inside the component
   const CalendarWrapper = ({ children }: { children: React.ReactNode }) => (
     <div
       ref={calendarRef}
-      className="absolute top-20 left-1/2 -translate-x-1/2 z-50 bg-zinc-900 p-4 rounded-2xl shadow-xl border border-zinc-800"
+      className={`fixed inset-0 z-50 flex items-center justify-center bg-black/80 
+        ${isCalendarClosing ? 'animate-fade-out' : 'animate-fade-in'}`}
+      onClick={(e) => {
+        if (e.target === e.currentTarget) {
+          closeCalendar();
+        }
+      }}
     >
-      {children}
+      <div className={`w-full max-w-xs bg-zinc-900 p-4 rounded-xl shadow-xl border border-zinc-800 mx-4
+        ${isCalendarClosing ? 'animate-slide-down' : 'animate-slide-up'}`}>
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-lg font-medium text-white">Select Date</h2>
+          <button 
+            onClick={closeCalendar}
+            className="p-1 rounded-full bg-black/30 hover:bg-black/50"
+          >
+            <XMarkIcon className="w-6 h-6 text-white" />
+          </button>
+        </div>
+        {children}
+      </div>
     </div>
   );
   
@@ -540,7 +609,7 @@ export default function ReflectionPage({
               throw fetchError; // Re-throw to be caught by the outer try/catch
             }
           }
-        } catch (error) {
+    } catch (error) {
           console.error('Reflection page: Error fetching devotion:', error);
           
           // Try to use cached data if available
@@ -585,7 +654,7 @@ export default function ReflectionPage({
         toast.error('Failed to load data');
       } finally {
         console.log('ReflectionPage: Setting isLoading to false');
-        setIsLoading(false);
+      setIsLoading(false);
     }
   };
 
@@ -718,12 +787,12 @@ export default function ReflectionPage({
           console.log(`Using cached data for date: ${formattedDate}`);
           // Use client-side navigation instead of hard reload
           router.push(`/devotion/${formattedDate}/reflection`);
-          return;
+        return;
         }
       } catch (cacheError) {
         console.warn("Error checking cache:", cacheError);
       }
-      
+
       // No cached data, use a hard navigation instead of client-side to ensure a full remount
       window.location.href = `/devotion/${formattedDate}/reflection`;
     } catch (error) {
@@ -1110,7 +1179,11 @@ export default function ReflectionPage({
   }, [showCalendar]);
 
   const toggleCalendar = () => {
-    setShowCalendar(!showCalendar);
+    if (showCalendar) {
+      closeCalendar();
+    } else {
+      setShowCalendar(true);
+    }
   };
 
   // Add a function to check if user is admin
@@ -1133,7 +1206,7 @@ export default function ReflectionPage({
   }
 
   if (isLoading) {
-    return (
+  return (
       <div className="min-h-screen bg-black/90 flex items-center justify-center">
         <div className="text-center">
           <div className="w-8 h-8 border-4 border-white border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
@@ -1148,11 +1221,12 @@ export default function ReflectionPage({
 
   return (
     <ClientOnly>
-      <div key={`reflection-${params.date}`} className="min-h-screen bg-black text-white relative pb-20 font-outfit">
+      <style dangerouslySetInnerHTML={{ __html: modalAnimations }} />
+      <div key={`reflection-${params.date}`} className="min-h-screen bg-black text-white relative pb-8 font-outfit">
         {isLoading ? (
           <div className="min-h-screen flex items-center justify-center">
             <div className="text-center">
-              <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-white mx-auto"></div>
+              <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-white mx-auto mb-4"></div>
               <p className="mt-4">Loading devotion...</p>
             </div>
           </div>
@@ -1170,57 +1244,59 @@ export default function ReflectionPage({
               </div>
             )}
             
-            {/* Date Navigation */}
+      {/* Date Navigation */}
             <div className="pt-6 pb-4 px-6 flex items-center justify-center">
               <div className="relative w-full max-w-xs">
-                <button
-                  onClick={() => handleDateChange(subDays(currentDate, 1))}
+        <button
+          onClick={() => handleDateChange(subDays(currentDate, 1))}
                   className="p-3 rounded-full hover:bg-zinc-800 absolute left-0 top-1/2 -translate-y-1/2"
-                  aria-label="Previous day"
-                >
-                  <ChevronLeftIcon className="w-6 h-6" />
-                </button>
+          aria-label="Previous day"
+        >
+          <ChevronLeftIcon className="w-6 h-6" />
+        </button>
 
-                <button
-                  ref={dateButtonRef}
-                  onClick={toggleCalendar}
+        <button
+          ref={dateButtonRef}
+          onClick={toggleCalendar}
                   className="w-full text-center py-3 px-4 bg-zinc-800 rounded-full text-lg font-medium"
-                >
+        >
                   {format(currentDate, "EEEE, MMMM d")}
-                </button>
+        </button>
 
-                <button
-                  onClick={() => handleDateChange(addDays(currentDate, 1))}
+        <button
+          onClick={() => handleDateChange(addDays(currentDate, 1))}
                   disabled={isNextDisabled}
                   className={`p-3 rounded-full absolute right-0 top-1/2 -translate-y-1/2 ${
                     isNextDisabled
                       ? "text-white/30 cursor-not-allowed"
                       : "hover:bg-zinc-800"
                   }`}
-                  aria-label="Next day"
-                >
-                  <ChevronRightIcon className="w-6 h-6" />
-                </button>
-              </div>
-            </div>
+          aria-label="Next day"
+        >
+          <ChevronRightIcon className="w-6 h-6" />
+        </button>
+      </div>
+          </div>
 
             {/* Main Content */}
-            <div className="px-6 pb-16 space-y-6">
+            <div className="px-6 pb-6 space-y-4">
               {showCalendar && (
                 <CalendarWrapper>
                   <DatePicker 
                     initialDate={currentDate} 
-                    onDateSelect={handleDateChange} 
+                    onDateSelect={handleDateChange}
+                    className="text-white"
+                    inline={true}
                   />
                 </CalendarWrapper>
               )}
               
-              {/* Hymn of the Month */}
+            {/* Hymn of the Month */}
               <div 
                 className="rounded-xl overflow-hidden relative cursor-pointer"
                 onClick={handleOpenHymnModal}
               >
-                <div className="relative h-48">
+                <div className="relative h-40">
                   <Image
                     src={hymnImage}
                     alt="Hymn background"
@@ -1230,8 +1306,8 @@ export default function ReflectionPage({
                   <div className="absolute inset-0 bg-gradient-to-b from-black/30 to-black/70" />
                   <div className="absolute inset-0 p-6 flex flex-col justify-end">
                     <p className="text-lg font-medium text-white/80 mb-1">Hymn of the Month:</p>
-                    <h2 className="text-4xl font-bold">{hymn?.title}</h2>
-                  </div>
+                    <h2 className="text-3xl font-medium">{hymn?.title}</h2>
+              </div>
                 </div>
               </div>
 
@@ -1249,118 +1325,90 @@ export default function ReflectionPage({
               {!isFuture(currentDate) && devotionData && !('notFound' in devotionData) ? (
                 <>
                   {/* Scripture Reference */}
-                  <div>
+            <div>
                     <p className="text-white/70 text-lg mb-2">Today's Scripture</p>
-                    <div className="bg-zinc-900 p-6 rounded-xl">
-                      <h2 className="text-3xl font-semibold text-center">{devotionData.bibleText}</h2>
-                      <div className="flex justify-center mt-3">
-                        <button
-                          onClick={handleOpenScriptureModal}
-                          className="text-blue-400 hover:text-blue-300 font-medium"
-                        >
-                          Read
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                  
-                  {/* Reflection Questions */}
-                  <div>
+              <div
+                      className="bg-[#0F1211] p-6 rounded-2xl cursor-pointer relative min-h-[100px] flex items-center justify-center"
+                onClick={handleOpenScriptureModal}
+              >
+                      <h2 className="text-2xl font-medium text-center">{devotionData.bibleText}</h2>
+              </div>
+            </div>
+
+            {/* Reflection Questions */}
+            <div>
                     <p className="text-white/70 text-lg mb-2">Reflection Questions</p>
-                    <div className="bg-zinc-900 p-6 rounded-xl">
-                      {devotionData?.reflectionSections && devotionData.reflectionSections.length > 0 && devotionData.reflectionSections.map((section, sectionIndex) => (
-                        <div key={sectionIndex} className="mb-6">
-                          {section.passage && (
-                            <div className="mb-4 p-4 bg-zinc-800 rounded-lg">
-                              <h3 className="text-lg font-medium text-white/90 mb-1">Passage:</h3>
-                              <p className="text-white/80">{section.passage}</p>
-                            </div>
-                          )}
-                          
-                          <ol className="list-decimal ml-5 space-y-4">
-                            {section.questions?.map((q: string, idx: number) => (
-                              <li key={idx} className="text-xl pl-2">
-                                {q}
-                              </li>
-                            ))}
-                          </ol>
-                        </div>
-                      ))}
+                    <div className="bg-[#0F1211] p-6 rounded-2xl">
+                      <ol className="list-decimal ml-5 space-y-6">
+                        {getAllQuestions().slice(0, 2).map((q: string, idx: number) => (
+                          <li key={idx} className="text-lg pl-2">
+                            {q}
+                          </li>
+                        ))}
+                      </ol>
                       
-                      {/* Fallback for no sections or simple question list */}
-                      {(!devotionData?.reflectionSections || devotionData.reflectionSections.length === 0) && reflectionQuestions.length > 0 && (
-                        <ol className="list-decimal ml-5 space-y-6">
-                          {reflectionQuestions.slice(0, 2).map((q: string, idx: number) => (
-                            <li key={idx} className="text-xl pl-2">
-                              {q}
-                            </li>
-                          ))}
-                        </ol>
-                      )}
-                      
-                      <div className="mt-8 flex justify-start">
-                        <button
-                          className="px-6 py-3 bg-white/10 rounded-full hover:bg-white/20 flex items-center space-x-2"
-                        >
+                      <div className="mt-10 flex justify-start">
+                <Link
+                  href={`/devotion/${params.date}/journal`}
+                          className="px-6 py-2 bg-white rounded-full hover:bg-white/90 flex items-center space-x-2 text-black"
+                >
                           <span className="font-medium">Journal Entry</span>
-                          <ChevronRightIcon className="w-5 h-5" />
-                        </button>
+                          <ChevronRightIcon className="w-5 h-5 ml-2" />
+                </Link>
                       </div>
-                    </div>
-                  </div>
-                  
+              </div>
+            </div>
+
                   {/* AI Reflection */}
-                  <div>
+                  <div className="mt-6 mb-2">
                     <p className="text-white/70 text-lg mb-2">Reflect with AI</p>
-                    <div className="bg-zinc-900 rounded-xl p-4">
-                      <div className="flex items-center gap-2">
-                        <input
-                          type="text"
-                          value={aiQuestion}
-                          onChange={(e) => setAiQuestion(e.target.value)}
-                          onKeyPress={handleReflectionKeyPress}
-                          placeholder="Ask questions about today's text..."
-                          className="flex-1 bg-black/30 border-none outline-none rounded-full px-4 py-3 text-white placeholder-white/50"
-                        />
-                        <button
-                          onClick={handleReflectionGeneration}
-                          disabled={isAiLoading || !aiQuestion.trim()}
-                          className={`p-3 rounded-full ${
-                            isAiLoading || !aiQuestion.trim()
-                              ? "bg-white/10 cursor-not-allowed"
-                              : "bg-white/20 hover:bg-white/30"
-                          }`}
-                        >
-                          <ArrowRightIcon className="w-5 h-5" />
-                        </button>
+                    <div className="flex items-center gap-4">
+                <input
+                  type="text"
+                        value={aiQuestion}
+                        onChange={(e) => setAiQuestion(e.target.value)}
+                  onKeyPress={handleReflectionKeyPress}
+                        placeholder="Ask questions about today's text..."
+                        className="flex-1 bg-[#0F1211] border-none outline-none rounded-2xl px-6 py-5 text-white placeholder-white/50"
+                />
+                <button
+                  onClick={handleReflectionGeneration}
+                        disabled={isAiLoading || !aiQuestion.trim()}
+                        className={`w-16 h-16 rounded-2xl flex items-center justify-center ${
+                          isAiLoading || !aiQuestion.trim()
+                            ? "bg-[#0F1211] cursor-not-allowed"
+                            : "bg-white hover:bg-white/90"
+                        }`}
+                      >
+                        <ArrowRightIcon className={`w-7 h-7 ${isAiLoading || !aiQuestion.trim() ? "text-white" : "text-black"}`} />
+                </button>
+              </div>
+                    
+                    {aiResponse && (
+                      <div className="mt-6 p-4 bg-[#0F1211] rounded-xl">
+                        <p className="text-white/90 whitespace-pre-line">{aiResponse}</p>
                       </div>
-                      
-                      {aiResponse && (
-                        <div className="mt-4 p-4 bg-white/5 rounded-xl">
-                          <p className="text-white/90 whitespace-pre-line">{aiResponse}</p>
-                        </div>
-                      )}
-                      
-                      {aiError && (
-                        <div className="mt-4 p-4 bg-red-900/20 rounded-xl">
-                          <p className="text-red-400">{aiError}</p>
-                        </div>
-                      )}
-                      
-                      {isAiLoading && (
-                        <div className="mt-4 flex justify-center">
-                          <div className="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                  
-                  {/* Resources */}
+                    )}
+
+              {aiError && (
+                      <div className="mt-6 p-4 bg-red-900/20 rounded-xl">
+                        <p className="text-red-400">{aiError}</p>
+                </div>
+              )}
+
+                    {isAiLoading && (
+                      <div className="mt-6 flex justify-center">
+                        <div className="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                </div>
+              )}
+            </div>
+
+            {/* Resources */}
                   <div 
-                    className="rounded-xl overflow-hidden relative cursor-pointer"
+                    className="rounded-xl overflow-hidden relative cursor-pointer mt-4"
                     onClick={handleOpenResourcesModal}
                   >
-                    <div className="relative h-48">
+                    <div className="relative h-40">
                       <Image
                         src={resourcesImage}
                         alt="Resources background"
@@ -1371,10 +1419,10 @@ export default function ReflectionPage({
                       <div className="absolute inset-0 p-6 flex flex-col justify-end">
                         <h2 className="text-2xl font-bold mb-1">Resources for today's text</h2>
                         <p className="text-white/80">Bible Commentaries, Videos, and Podcasts</p>
-                      </div>
+                </div>
                     </div>
-                  </div>
-                </>
+            </div>
+          </>
               ) : (
                 !isFuture(currentDate) && showNoDevotionContent && (
                   <div className="text-center pt-10">
@@ -1389,21 +1437,24 @@ export default function ReflectionPage({
                     </p>
                   </div>
                 )
-              )}
-            </div>
+        )}
+      </div>
           </>
         )}
-        
+
         {/* Modals (outside of loading check) */}
-        {/* Hymn Modal */}
-        {showHymnModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center">
-          <div
+      {/* Hymn Modal */}
+      {showHymnModal && (
+          <div className="fixed inset-0 z-50 flex items-end justify-center">
+        <div
               className={`fixed inset-0 bg-black/50 ${isHymnModalClosing ? 'animate-fade-out' : 'animate-fade-in'}`}
-            onClick={closeHymnModal}
+          onClick={closeHymnModal}
             />
-            <div className={`relative w-full max-w-lg mx-4 bg-zinc-900 rounded-lg shadow-xl ${isHymnModalClosing ? 'animate-slide-down' : 'animate-slide-up'}`}>
-              <div className="relative h-48">
+            <div 
+              className={`relative w-full h-3/4 bg-zinc-900 rounded-t-2xl shadow-xl overflow-hidden flex flex-col
+                ${isHymnModalClosing ? 'animate-slide-down' : 'animate-slide-up'}`}
+            >
+              <div className="relative h-36 flex-shrink-0">
                 <Image
                   src={hymnImage}
                   alt="Hymn background"
@@ -1413,65 +1464,85 @@ export default function ReflectionPage({
                 <div className="absolute inset-0 bg-gradient-to-b from-black/40 to-black/90" />
                 <div className="absolute inset-0 p-6 flex flex-col justify-end">
                   <p className="text-sm font-medium text-white/80 mb-1">Hymn of the Month</p>
-                  <h2 className="text-2xl font-semibold">{hymn?.title}</h2>
-              </div>
-              </div>
-              <div className="p-6 space-y-6">
+                  <h2 className="text-xl font-medium">{hymn?.title}</h2>
+                </div>
+              <button
+                onClick={closeHymnModal}
+                  className="absolute top-4 right-4 p-1 rounded-full bg-black/30 hover:bg-black/50"
+                >
+                  <XMarkIcon className="w-6 h-6 text-white" />
+              </button>
+            </div>
+              <div className="p-6 space-y-6 overflow-y-auto flex-grow">
                 {hymnLyrics.map((verse, index) => (
                   <div key={index} className="space-y-2">
                     <p className="text-sm font-medium text-white/60">Verse {verse.verse}</p>
                     {verse.lines.map((line, lineIndex) => (
                       <p key={lineIndex} className="text-lg">{line}</p>
-                    ))}
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              ))}
             </div>
           </div>
-        )}
+        </div>
+      )}
 
-        {/* Scripture Modal */}
-        {showScriptureModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center">
-          <div
+      {/* Scripture Modal */}
+      {showScriptureModal && (
+          <div className="fixed inset-0 z-50 flex items-end justify-center">
+        <div
               className={`fixed inset-0 bg-black/50 ${isScriptureModalClosing ? 'animate-fade-out' : 'animate-fade-in'}`}
-            onClick={closeScriptureModal}
+          onClick={closeScriptureModal}
             />
-            <div className={`relative w-full max-w-lg mx-4 bg-zinc-900 rounded-lg shadow-xl ${isScriptureModalClosing ? 'animate-slide-down' : 'animate-slide-up'}`}>
-              <div className="p-6">
+            <div 
+              className={`relative w-full h-3/4 bg-zinc-900 rounded-t-2xl shadow-xl overflow-hidden flex flex-col
+                ${isScriptureModalClosing ? 'animate-slide-down' : 'animate-slide-up'}`}
+            >
+              <div className="p-6 flex-shrink-0 border-b border-zinc-800 relative">
                 <h2 className="text-sm font-medium text-white/80 mb-1">Today's Scripture</h2>
-                <p className="text-xl font-semibold mb-6">{devotionData?.bibleText}</p>
-                
-                {isFetchingBibleVerse ? (
-                  <div className="flex justify-center py-8">
+                <p className="text-xl font-semibold pr-6">{devotionData?.bibleText}</p>
+              <button
+                onClick={closeScriptureModal}
+                  className="absolute top-4 right-4 p-1 rounded-full bg-black/30 hover:bg-black/50"
+                >
+                  <XMarkIcon className="w-6 h-6 text-white" />
+              </button>
+            </div>
+
+              <div className="overflow-y-auto flex-grow p-6">
+              {isFetchingBibleVerse ? (
+                <div className="flex justify-center py-8">
                     <div className="w-8 h-8 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                  </div>
+                </div>
                 ) : bibleVerse ? (
-                  <div className="space-y-4">
-                    {bibleVerse.verses.map((verse) => (
+                <div className="space-y-4">
+                  {bibleVerse.verses.map((verse) => (
                       <div key={verse.verse} className="flex">
                         <span className="text-white/40 mr-4">{verse.verse}</span>
                         <p>{verse.text}</p>
                       </div>
-                    ))}
-                  </div>
-                ) : (
+                  ))}
+                </div>
+              ) : (
                   <p className="text-white/60">Failed to load Bible verses</p>
-                )}
-              </div>
+              )}
             </div>
           </div>
-        )}
+        </div>
+      )}
 
-        {/* Resources Modal */}
-        {showResourcesModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center">
-          <div
+      {/* Resources Modal */}
+      {showResourcesModal && (
+          <div className="fixed inset-0 z-50 flex items-end justify-center">
+        <div
               className={`fixed inset-0 bg-black/50 ${isResourcesModalClosing ? 'animate-fade-out' : 'animate-fade-in'}`}
-            onClick={closeResourcesModal}
+          onClick={closeResourcesModal}
             />
-            <div className={`relative w-full max-w-lg mx-4 bg-zinc-900 rounded-lg shadow-xl ${isResourcesModalClosing ? 'animate-slide-down' : 'animate-slide-up'}`}>
-              <div className="relative h-48">
+            <div 
+              className={`relative w-full h-3/4 bg-zinc-900 rounded-t-2xl shadow-xl overflow-hidden flex flex-col
+                ${isResourcesModalClosing ? 'animate-slide-down' : 'animate-slide-up'}`}
+            >
+              <div className="relative h-36 flex-shrink-0">
                 <Image
                   src={resourcesImage}
                   alt="Resources background"
@@ -1480,31 +1551,37 @@ export default function ReflectionPage({
                 />
                 <div className="absolute inset-0 bg-gradient-to-b from-black/40 to-black/90" />
                 <div className="absolute inset-0 p-6 flex flex-col justify-end">
-                  <h2 className="text-2xl font-semibold mb-1">Resources</h2>
+                  <h2 className="text-xl font-medium mb-1">Resources</h2>
                   <p className="text-white/80">For {devotionData?.bibleText}</p>
                 </div>
-              </div>
+              <button
+                onClick={closeResourcesModal}
+                  className="absolute top-4 right-4 p-1 rounded-full bg-black/30 hover:bg-black/50"
+                >
+                  <XMarkIcon className="w-6 h-6 text-white" />
+              </button>
+            </div>
 
-              <div className="p-6">
-              {isFetchingResources ? (
+              <div className="p-6 overflow-y-auto flex-grow">
+            {isFetchingResources ? (
                   <div className="flex justify-center py-8">
                     <div className="w-8 h-8 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                </div>
-              ) : resourcesError ? (
+              </div>
+            ) : resourcesError ? (
                   <p className="text-red-400">{resourcesError}</p>
                 ) : resources ? (
-                <div className="space-y-8">
+              <div className="space-y-8">
                     {/* Commentaries */}
                     {resources.commentaries && resources.commentaries.length > 0 && (
-                      <div>
+                    <div>
                         <h3 className="text-lg font-semibold mb-4">Bible Commentaries</h3>
-                        <div className="space-y-4">
-                          {resources.commentaries.map((item, index) => (
+                      <div className="space-y-4">
+                        {resources.commentaries.map((item, index) => (
                             <a
                               key={index}
                               href={isValidUrl(item.url) ? item.url : getFallbackUrl(item.type, item.title)}
-                                target="_blank"
-                                rel="noopener noreferrer"
+                              target="_blank"
+                              rel="noopener noreferrer"
                               className="block bg-black/30 rounded-xl p-4 hover:bg-black/50 transition-colors"
                             >
                               <h4 className="font-medium mb-1">{item.title}</h4>
@@ -1512,61 +1589,61 @@ export default function ReflectionPage({
                                 <p className="text-sm text-white/60 mb-2">by {item.author}</p>
                               )}
                               <p className="text-sm text-white/80">{item.description}</p>
-                              </a>
-                          ))}
-                        </div>
+                            </a>
+                        ))}
                       </div>
-                    )}
+                    </div>
+                  )}
 
                     {/* Videos */}
-                  {resources.videos && resources.videos.length > 0 && (
-                    <div>
+                {resources.videos && resources.videos.length > 0 && (
+                  <div>
                         <h3 className="text-lg font-semibold mb-4">Videos</h3>
-                      <div className="space-y-4">
-                        {resources.videos.map((item, index) => (
+                    <div className="space-y-4">
+                      {resources.videos.map((item, index) => (
                             <a
-                            key={index}
+                              key={index}
                               href={isValidUrl(item.url) ? item.url : getFallbackUrl(item.type, item.title)}
-                              target="_blank"
-                              rel="noopener noreferrer"
+                            target="_blank"
+                            rel="noopener noreferrer"
                               className="block bg-black/30 rounded-xl p-4 hover:bg-black/50 transition-colors"
                             >
                               <h4 className="font-medium mb-2">{item.title}</h4>
                               <p className="text-sm text-white/80">{item.description}</p>
                             </a>
-                        ))}
-                      </div>
+                      ))}
                     </div>
-                  )}
+                  </div>
+                )}
 
                     {/* Podcasts */}
-                  {resources.podcasts && resources.podcasts.length > 0 && (
-                    <div>
+                {resources.podcasts && resources.podcasts.length > 0 && (
+                  <div>
                         <h3 className="text-lg font-semibold mb-4">Podcasts</h3>
-                      <div className="space-y-4">
-                        {resources.podcasts.map((item, index) => (
+                    <div className="space-y-4">
+                      {resources.podcasts.map((item, index) => (
                             <a
-                            key={index}
+                          key={index}
                               href={isValidUrl(item.url) ? item.url : getFallbackUrl(item.type, item.title)}
-                              target="_blank"
-                              rel="noopener noreferrer"
+                            target="_blank"
+                            rel="noopener noreferrer"
                               className="block bg-black/30 rounded-xl p-4 hover:bg-black/50 transition-colors"
                             >
                               <h4 className="font-medium mb-2">{item.title}</h4>
                               <p className="text-sm text-white/80">{item.description}</p>
                             </a>
-                        ))}
-                      </div>
+                      ))}
                     </div>
-                  )}
-                </div>
+                  </div>
+                )}
+              </div>
                 ) : (
                   <p className="text-white/60">No resources available</p>
-              )}
+            )}
               </div>
-            </div>
           </div>
-        )}
+        </div>
+      )}
       </div>
     </ClientOnly>
   );

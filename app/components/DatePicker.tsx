@@ -131,79 +131,104 @@ export default function DatePicker({
     }
   };
 
+  // Define max allowed date (prevent selecting far future dates)
+  const maxAllowedDate = addMonths(new Date(), 1);
+
   if (!isOpen) return null;
 
   if (inline) {
     return (
-      <div className={`bg-white dark:bg-gray-800 p-4 rounded-lg shadow-lg ${className}`}>
-        <div className="flex justify-between items-center mb-4">
+      <div className={`p-2 rounded-lg text-white ${className}`}>
+        <div className="flex justify-between items-center mb-6">
           <button
             onClick={prevMonth}
-            className="p-1 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700"
+            className="p-2 rounded-full hover:bg-zinc-800"
+            aria-label="Previous month"
           >
-            <ChevronLeftIcon className="w-5 h-5" />
+            <ChevronLeftIcon className="w-5 h-5 text-white" />
           </button>
 
-          <span className="font-medium">
+          <span className="font-medium text-white text-lg">
             {format(currentMonth, "MMMM yyyy")}
           </span>
 
           <button
             onClick={nextMonth}
-            className="p-1 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700"
+            disabled={isSameMonth(currentMonth, maxAllowedDate)}
+            className={`p-2 rounded-full ${
+              isSameMonth(currentMonth, maxAllowedDate)
+                ? "text-white/30 cursor-not-allowed"
+                : "hover:bg-zinc-800 text-white"
+            }`}
+            aria-label="Next month"
           >
             <ChevronRightIcon className="w-5 h-5" />
           </button>
         </div>
 
-        <div className="grid grid-cols-7 gap-1 mb-2">
-          {["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"].map((day) => (
+        <div className="grid grid-cols-7 gap-2 mb-4">
+          {["S", "M", "T", "W", "T", "F", "S"].map((day, idx) => (
             <div
-              key={day}
-              className="text-center text-sm font-medium text-gray-500"
+              key={idx}
+              className="text-center text-sm font-medium text-white/70"
             >
               {day}
             </div>
           ))}
         </div>
 
-        <div className="grid grid-cols-7 gap-1">
-          {isLoadingDates ? (
-            <div className="col-span-7 py-8 flex justify-center">
-              <div className="animate-spin h-5 w-5 border-2 border-primary border-t-transparent rounded-full"></div>
-            </div>
-          ) : (
-            daysInMonth.map((day) => {
-              const isCurrentMonth = isSameMonth(day, currentMonth);
-              const isSelected = isSameDay(day, selectedDate);
-              const isTodayDate = isToday(day);
-              const hasDevotional = isDateAvailable(day);
+        <div className="grid grid-cols-7 gap-y-2 gap-x-1">
+          {Array.from({ length: startOfMonth(currentMonth).getDay() }).map((_, idx) => (
+            <div key={`empty-start-${idx}`} className="h-9 w-9"></div>
+          ))}
+          
+          {daysInMonth.map((day) => {
+            const isCurrentMonth = isSameMonth(day, currentMonth);
+            const isSelected = isSameDay(day, selectedDate);
+            const isTodayDate = isToday(day);
+            const hasDevotional = isDateAvailable(day);
+            const isFutureDate = isFuture(day);
 
-              return (
-                <button
-                  key={day.toString()}
-                  onClick={() => handleDateClick(day)}
-                  className={`
-                    h-8 w-8 text-sm rounded-full flex items-center justify-center
-                    ${!isCurrentMonth ? "text-gray-400 dark:text-gray-600" : ""}
-                    ${
-                      isSelected
-                        ? "bg-primary text-white"
-                        : "hover:bg-gray-100 dark:hover:bg-gray-700"
-                    }
-                    ${isTodayDate && !isSelected ? "border border-primary" : ""}
-                    ${
-                      hasDevotional && !isSelected
-                        ? "border-2 border-green-500 text-green-500 dark:border-green-400 dark:text-green-400"
-                        : ""
-                    }
-                  `}
-                >
-                  {format(day, "d")}
-                </button>
-              );
-            })
-          )}
+            // Only show current month's days
+            if (!isCurrentMonth) return null;
+
+            return (
+              <button
+                key={day.toString()}
+                onClick={() => handleDateClick(day)}
+                disabled={isFutureDate && !isDateAvailable(day)}
+                className={`
+                  h-9 w-9 text-sm rounded-full flex items-center justify-center mx-auto
+                  ${
+                    isSelected
+                      ? "bg-white text-black font-medium"
+                      : isFutureDate && !hasDevotional
+                      ? "text-white/30 cursor-not-allowed"
+                      : "text-white hover:bg-zinc-800"
+                  }
+                  ${isTodayDate && !isSelected ? "border border-white" : ""}
+                  ${
+                    hasDevotional && !isSelected
+                      ? "border border-green-500"
+                      : ""
+                  }
+                `}
+              >
+                {format(day, "d")}
+              </button>
+            );
+          })}
+        </div>
+        
+        <div className="mt-4 flex items-center justify-between">
+          <div className="flex items-center space-x-2">
+            <div className="w-3 h-3 border border-green-500 rounded-full"></div>
+            <span className="text-xs text-white/60">Devotional available</span>
+          </div>
+          <div className="flex items-center space-x-2">
+            <div className="w-3 h-3 border border-white rounded-full"></div>
+            <span className="text-xs text-white/60">Today</span>
+          </div>
         </div>
       </div>
     );

@@ -5,23 +5,40 @@ import { useAuth } from "@/lib/context/AuthContext";
 import { toast, Toaster } from "react-hot-toast";
 import { useRouter } from "next/navigation";
 
+// Updated interfaces to match the new JSON structure
+interface HymnData {
+  title: string;
+  lyrics: string[];
+  author?: string;
+}
+
 interface MonthData {
-  month: string;
-  hymn: {
-    title: string;
-    lyrics: string[];
-    author?: string;
-  };
-  devotions: DevotionData[];
+  id: string;
+  name: string;
+  order: number;
+  hymn: HymnData;
+}
+
+interface ReflectionSection {
+  passage: string;
+  questions: string[];
 }
 
 interface DevotionData {
+  monthId: string;
   date: string;
+  displayDate: string;
   bibleText: string;
-  reflectionSections: {
-    passage: string;
-    questions: string[];
-  }[];
+  reflectionSections: ReflectionSection[];
+}
+
+interface FirebaseData {
+  months: {
+    [key: string]: MonthData;
+  };
+  devotions: {
+    [key: string]: DevotionData;
+  };
 }
 
 const ADMIN_EMAILS = ["fredy12pe@gmail.com", "fredypedro3@gmail.com"];
@@ -66,36 +83,51 @@ export default function BulkUploadDevotions() {
         try {
           const data = event.target?.result as string;
           // Parse and validate JSON format
-          const parsedData = JSON.parse(data);
+          const parsedData = JSON.parse(data) as FirebaseData;
           
-          // Convert object format to array format if needed
-          let monthsArray: MonthData[];
-          if (Array.isArray(parsedData)) {
-            monthsArray = parsedData;
+          // Check if the data has the new format with "months" and "devotions" keys
+          if (parsedData.months && parsedData.devotions) {
+            // New format validation
+            const isValid = validateNewFormat(parsedData);
+            if (!isValid) {
+              toast.error("Invalid data structure in JSON");
+              return;
+            }
+            
+            // Transform to the format expected by the API
+            const transformedData = transformDataForApi(parsedData);
+            setJsonData(JSON.stringify(transformedData));
+            toast.success("JSON file validated successfully");
           } else {
-            // Convert object format to array
-            monthsArray = Object.values(parsedData);
+            // Try to validate the old format
+            let monthsArray;
+            if (Array.isArray(parsedData)) {
+              monthsArray = parsedData;
+            } else {
+              // Convert object format to array
+              monthsArray = Object.values(parsedData);
+            }
+
+            // Validate each month's structure
+            const isValid = monthsArray.every((month: any) => {
+              return (
+                month.month &&
+                month.hymn &&
+                month.hymn.title &&
+                Array.isArray(month.hymn.lyrics) &&
+                Array.isArray(month.devotions)
+              );
+            });
+
+            if (!isValid) {
+              toast.error("Invalid data structure in JSON");
+              return;
+            }
+
+            // Store as stringified array for old format
+            setJsonData(JSON.stringify(monthsArray));
+            toast.success("JSON file validated successfully");
           }
-
-          // Validate each month's structure
-          const isValid = monthsArray.every((month: MonthData) => {
-            return (
-              month.month &&
-              month.hymn &&
-              month.hymn.title &&
-              Array.isArray(month.hymn.lyrics) &&
-              Array.isArray(month.devotions)
-            );
-          });
-
-          if (!isValid) {
-            toast.error("Invalid data structure in JSON");
-            return;
-          }
-
-          // Store as stringified array
-          setJsonData(JSON.stringify(monthsArray));
-          toast.success("JSON file validated successfully");
         } catch (error) {
           console.error("Error parsing JSON:", error);
           toast.error("Invalid JSON format");
@@ -103,6 +135,66 @@ export default function BulkUploadDevotions() {
       };
       reader.readAsText(file);
     }
+  };
+  
+  // Helper function to validate the new JSON format
+  const validateNewFormat = (data: FirebaseData): boolean => {
+    // Check months structure
+    const months = Object.values(data.months);
+    const isMonthsValid = months.every(month => 
+      month.name && 
+      typeof month.order === 'number' && 
+      month.hymn && 
+      month.hymn.title && 
+      Array.isArray(month.hymn.lyrics)
+    );
+    
+    if (!isMonthsValid) return false;
+    
+    // Check devotions structure
+    const devotions = Object.values(data.devotions);
+    const isDevotionsValid = devotions.every(devotion => 
+      devotion.monthId && 
+      devotion.date && 
+      devotion.displayDate && 
+      devotion.bibleText && 
+      Array.isArray(devotion.reflectionSections) &&
+      devotion.reflectionSections.every(section => 
+        section.passage && 
+        Array.isArray(section.questions)
+      )
+    );
+    
+    return isDevotionsValid;
+  };
+  
+  // Transform the new data format to the format expected by the API
+  const transformDataForApi = (data: FirebaseData) => {
+    const result: Record<string, any> = {};
+    
+    // Process each month
+    Object.entries(data.months).forEach(([monthId, monthData]) => {
+      // Create month entry with related devotions
+      const devotionsForMonth = Object.values(data.devotions)
+        .filter(devotion => devotion.monthId === monthId)
+        .map(devotion => ({
+          date: devotion.displayDate,
+          bibleText: devotion.bibleText,
+          reflectionSections: devotion.reflectionSections
+        }));
+      
+      result[monthId] = {
+        month: monthData.name,
+        hymn: {
+          title: monthData.hymn.title,
+          lyrics: monthData.hymn.lyrics,
+          author: monthData.hymn.author
+        },
+        devotions: devotionsForMonth
+      };
+    });
+    
+    return result;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -120,7 +212,7 @@ export default function BulkUploadDevotions() {
           'Content-Type': 'application/json',
         },
         body: jsonData,
-            });
+      });
 
       if (!response.ok) {
         const errorData = await response.json();
@@ -158,8 +250,8 @@ export default function BulkUploadDevotions() {
               required
             />
             <p className="mt-2 text-sm text-zinc-400">
-              Upload a JSON file containing devotion data organized by month.
-              The file should include hymns and devotions for each month.
+              Upload a JSON file containing devotion data. Supports both the traditional format
+              and the new format with "months" and "devotions" as top-level keys.
             </p>
           </div>
 

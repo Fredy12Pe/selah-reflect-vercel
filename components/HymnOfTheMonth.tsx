@@ -21,7 +21,7 @@ export default function HymnOfTheMonth({
         }}
       >
         <div className="absolute inset-0 flex items-center justify-center">
-          <h2 className="text-2xl font-bold text-white text-center px-4">
+          <h2 className="text-2xl font-medium text-white text-center px-4">
             {title}
           </h2>
         </div>

@@ -187,7 +187,7 @@ export async function POST(request: NextRequest) {
 
               await devotionRef.set(devotionDoc);
               console.log(`Successfully saved devotion for ${dateKey}`);
-        successCount++;
+              successCount++;
             } catch (error) {
               console.error(`Error saving devotion for date ${devotion.date}:`, error);
               errorItems.push({
@@ -222,4 +222,4 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     );
   }
-} 
+}
