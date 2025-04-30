@@ -40,6 +40,23 @@ export default function RootLayout({
         {/* Single Firebase patch to fix initialization issues */}
         <script src="/firebase-fix.js" />
 
+        {/* Register Service Worker for PWA support */}
+        <script dangerouslySetInnerHTML={{
+          __html: `
+            if ('serviceWorker' in navigator) {
+              window.addEventListener('load', function() {
+                navigator.serviceWorker.register('/sw.js')
+                  .then(function(registration) {
+                    console.log('Service Worker registered with scope:', registration.scope);
+                  })
+                  .catch(function(error) {
+                    console.log('Service Worker registration failed:', error);
+                  });
+              });
+            }
+          `
+        }} />
+
         <meta name="application-name" content="Selah" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta
@@ -49,11 +66,20 @@ export default function RootLayout({
         <meta name="apple-mobile-web-app-title" content="Selah" />
         <meta name="format-detection" content="telephone=no" />
         <meta name="mobile-web-app-capable" content="yes" />
-        <link rel="apple-touch-icon" href="/icon-192.png" />
-        <link rel="icon" type="image/png" sizes="32x32" href="/icon-192.png" />
-        <link rel="icon" type="image/png" sizes="16x16" href="/icon-192.png" />
+        
+        {/* Icon for PWA */}
+        <link rel="icon" href="/icons/favicon.ico" />
+        <link rel="apple-touch-icon" href="/icons/icon-192.png" />
+        <link rel="apple-touch-icon" sizes="152x152" href="/icons/icon-152.png" />
+        <link rel="apple-touch-icon" sizes="180x180" href="/icons/icon-180.png" />
+        <link rel="apple-touch-icon" sizes="167x167" href="/icons/icon-167.png" />
+        
+        {/* Icons for various devices */}
+        <link rel="icon" type="image/png" sizes="32x32" href="/icons/icon-32.png" />
+        <link rel="icon" type="image/png" sizes="16x16" href="/icons/icon-16.png" />
         <link rel="manifest" href="/manifest.json" />
         <meta name="msapplication-TileColor" content="#000000" />
+        <meta name="msapplication-TileImage" content="/icons/icon-144.png" />
         <meta name="theme-color" content="#000000" />
 
         {/* Add Google Fonts using link instead of next/font */}

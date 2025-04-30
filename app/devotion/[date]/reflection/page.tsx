@@ -978,82 +978,71 @@ export default function ReflectionPage({
   const fetchBibleVerse = async (reference: string) => {
     if (!reference) return null;
 
+    // First check if we already have the verse in state
+    if (bibleVerse && bibleVerse.reference === reference) {
+      return bibleVerse;
+    }
+
     setIsFetchingBibleVerse(true);
     try {
-      // Try ESV API first
-      const esvApiKey = process.env.NEXT_PUBLIC_ESV_BIBLE_API_KEY;
-      
-      if (esvApiKey) {
+      let retryCount = 0;
+      const maxRetries = 1; // Only retry once for Bible text
+
+      while (retryCount <= maxRetries) {
         try {
-          const esvResponse = await fetch(
-            `https://api.esv.org/v3/passage/text/?q=${encodeURIComponent(reference)}&include-passage-references=true&include-verse-numbers=true&include-footnotes=false`,
-            {
-              headers: {
-                'Authorization': `Token ${esvApiKey}`
-              }
-            }
-          );
+          // Import utility for getting cached verses
+          const { getVerse, getCachedVerse } = await import('@/lib/bibleApi');
           
-          if (esvResponse.ok) {
-            const esvData = await esvResponse.json();
-            
-            if (esvData.passages && esvData.passages.length > 0) {
-              // Process ESV data into our standard format
-              const text = esvData.passages[0];
-              const verseRegex = /\[(\d+)\](.*?)(?=\[\d+\]|$)/g;
-              const verses = [];
-              let match;
-              
-              while ((match = verseRegex.exec(text)) !== null) {
-                verses.push({
-                  verse: parseInt(match[1]),
-                  text: match[2].trim(),
-                });
-              }
-              
-              return {
-                text: text,
-                reference: esvData.passage_meta[0]?.canonical || reference,
-                verses: verses.length > 0 ? verses : [{verse: 1, text}],
-              };
+          // Try to get from cache first
+          try {
+            // Check if we have this verse in localStorage
+            const cachedESV = getCachedVerse(reference, 'esv');
+            if (cachedESV) {
+              console.log('Found Bible verse in cache:', reference);
+              return cachedESV;
             }
+            
+            const cachedBibleApi = getCachedVerse(reference, 'bible-api');
+            if (cachedBibleApi) {
+              console.log('Found Bible verse in cache (bible-api):', reference);
+              return cachedBibleApi;
+            }
+          } catch (cacheError) {
+            console.warn('Cache retrieval error:', cacheError);
+            // Continue to fetch from API
           }
-        } catch (esvError) {
-          console.error("Error with ESV API:", esvError);
-          // Fall back to Bible API
+          
+          console.log('Fetching Bible verse from API:', reference);
+          const verse = await getVerse(reference);
+          return verse;
+        } catch (error) {
+          console.error(`Error fetching Bible verse (attempt ${retryCount + 1}):`, error);
+          
+          // Check if we have at least a simple reference to show
+          if (retryCount === maxRetries) {
+            console.log('Creating fallback Bible verse after failed attempts');
+            // Create a simple verse object as fallback after retries are exhausted
+            const fallbackVerse = {
+              text: reference,
+              reference: reference,
+              verses: [{ verse: 1, text: "Could not load verse text. Please check your connection and try again." }]
+            };
+            
+            // Try to save even this fallback to cache with a short expiration
+            try {
+              const { cacheVerse } = await import('@/lib/bibleApi');
+              cacheVerse(reference, 'fallback', fallbackVerse);
+            } catch (e) {}
+            
+            return fallbackVerse;
+          }
+          
+          // Wait before retrying
+          await new Promise(resolve => setTimeout(resolve, 1000));
+          retryCount++;
         }
       }
       
-      // Fallback to Bible API
-      const response = await fetch(
-        `https://bible-api.com/${encodeURIComponent(reference)}?verse_numbers=true`
-      );
-
-      if (!response.ok) {
-        throw new Error(`Bible API error: ${response.statusText}`);
-      }
-
-      const data = await response.json();
-
-      if (!data.verses || data.verses.length === 0) {
-        console.error("No verses found for reference:", reference);
-        return null;
-      }
-
-      // Format the verses from the API response
-      const verses = data.verses.map((v: any) => ({
-        verse: v.verse,
-        text: v.text.trim(),
-      }));
-
-      return {
-        text: data.text,
-        reference: data.reference,
-        verses,
-      };
-    } catch (error) {
-      console.error("Error fetching Bible verse:", error);
-      toast.error("Failed to load Bible verses");
       return null;
     } finally {
       setIsFetchingBibleVerse(false);

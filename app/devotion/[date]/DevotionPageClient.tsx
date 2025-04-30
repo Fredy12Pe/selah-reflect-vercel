@@ -57,32 +57,45 @@ export default function DevotionPageClient({ date }: DevotionPageClientProps) {
 
   const fetchBibleVerse = useCallback(async (reference: string, signal?: AbortSignal) => {
       try {
-        const response = await fetch(
-        `https://bible-api.com/${encodeURIComponent(reference)}?verse_numbers=true`,
-        { signal }
-        );
-
-        if (!response.ok) {
-          throw new Error(`Bible API error: ${response.statusText}`);
+        // Import utility for getting cached verses
+        const { getVerse, getCachedVerse } = await import('@/lib/bibleApi');
+        
+        // Try to get from cache first (not affected by AbortController)
+        try {
+          // Check if we have this verse in localStorage
+          const cachedESV = getCachedVerse(reference, 'esv');
+          if (cachedESV) {
+            console.log('DevotionPageClient: Found Bible verse in cache:', reference);
+            return cachedESV;
+          }
+          
+          const cachedBibleApi = getCachedVerse(reference, 'bible-api');
+          if (cachedBibleApi) {
+            console.log('DevotionPageClient: Found Bible verse in cache (bible-api):', reference);
+            return cachedBibleApi;
+          }
+        } catch (cacheError) {
+          console.warn('DevotionPageClient: Cache retrieval error:', cacheError);
+          // Continue to fetch from API
         }
-
-        const data = await response.json();
-        if (!data.verses || data.verses.length === 0) {
-          return null;
-        }
-
-      return {
-        text: data.text,
-        reference: data.reference,
-        verses: data.verses.map((v: any) => ({
-          verse: v.verse,
-          text: v.text.trim(),
-        })),
+        
+        // Check if request was aborted
+        if (signal?.aborted) return null;
+        
+        console.log('DevotionPageClient: Fetching Bible verse from API:', reference);
+        
+        // Use our helper function which handles API calls and caching
+        return await getVerse(reference);
+      } catch (error: any) {
+        if (error.name === 'AbortError') return null;
+        console.error("DevotionPageClient: Error fetching Bible verse:", error);
+        
+        // Try to at least show a basic verse object
+        return {
+          text: reference,
+          reference: reference,
+          verses: [{ verse: 1, text: "Could not load verse text." }]
         };
-    } catch (error: any) {
-      if (error.name === 'AbortError') return null;
-        console.error("Error fetching Bible verse:", error);
-        return null;
       }
   }, []);
 

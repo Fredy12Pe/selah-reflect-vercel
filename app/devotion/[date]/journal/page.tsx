@@ -194,33 +194,49 @@ export default function JournalPage({ params }: { params: { date: string } }) {
         cleanReference = `${match[1]} ${match[2]}`;
       }
       
-      // Fallback to Bible API
-      const response = await fetch(
-        `https://bible-api.com/${encodeURIComponent(cleanReference)}`
-      );
-
-      if (!response.ok) {
-        throw new Error(`Bible API error: ${response.statusText}`);
+      // Import utility for getting cached verses
+      const { getVerse, getCachedVerse } = await import('@/lib/bibleApi');
+      
+      // Try to get from cache first
+      try {
+        // Check if we have this verse in localStorage
+        const cachedESV = getCachedVerse(cleanReference, 'esv');
+        if (cachedESV) {
+          console.log('Found Bible verse in cache:', cleanReference);
+          return cachedESV;
+        }
+        
+        const cachedBibleApi = getCachedVerse(cleanReference, 'bible-api');
+        if (cachedBibleApi) {
+          console.log('Found Bible verse in cache (bible-api):', cleanReference);
+          return cachedBibleApi;
+        }
+      } catch (cacheError) {
+        console.warn('Cache retrieval error:', cacheError);
+        // Continue to fetch from API
       }
-
-      const data = await response.json();
-
-      if (!data.verses || data.verses.length === 0) {
-        console.error("No verses found for reference:", cleanReference);
-        return null;
+      
+      console.log('Fetching Bible verse from API:', cleanReference);
+      try {
+        const verse = await getVerse(cleanReference);
+        return verse;
+      } catch (apiError) {
+        console.error('Error fetching from API:', apiError);
+        // Create a simple verse object as fallback
+        const fallbackVerse = {
+          text: reference,
+          reference: "Scripture",
+          verses: [{ verse: 1, text: reference }]
+        };
+        
+        // Try to save even this fallback to cache
+        try {
+          const { cacheVerse } = await import('@/lib/bibleApi');
+          cacheVerse(cleanReference, 'fallback', fallbackVerse);
+        } catch (e) {}
+        
+        return fallbackVerse;
       }
-
-      // Format the verses from the API response
-      const verses = data.verses.map((v: any) => ({
-        verse: v.verse,
-        text: v.text.trim(),
-      }));
-
-      return {
-        text: data.text,
-        reference: data.reference,
-        verses,
-      };
     } catch (error) {
       console.error("Error fetching Bible verse:", error);
       // Create a simple verse object as fallback

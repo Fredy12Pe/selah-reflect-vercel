@@ -71,38 +71,39 @@ export default function DevotionPage({ params }: { params: { date: string } }) {
     const fetchBibleVerse = async (reference: string) => {
       try {
         console.log("Fetching Bible verse for reference:", reference);
-        const response = await fetch(
-          `https://bible-api.com/${encodeURIComponent(
-            reference
-          )}?verse_numbers=true`
-        );
-
-        if (!response.ok) {
-          throw new Error(`Bible API error: ${response.statusText}`);
+        
+        // Import utility for getting cached verses
+        const { getVerse, getCachedVerse } = await import('@/lib/bibleApi');
+        
+        // Try to get from cache first
+        try {
+          // Check if we have this verse in localStorage
+          const cachedESV = getCachedVerse(reference, 'esv');
+          if (cachedESV) {
+            console.log('Found Bible verse in cache:', reference);
+            return cachedESV;
+          }
+          
+          const cachedBibleApi = getCachedVerse(reference, 'bible-api');
+          if (cachedBibleApi) {
+            console.log('Found Bible verse in cache (bible-api):', reference);
+            return cachedBibleApi;
+          }
+        } catch (cacheError) {
+          console.warn('Cache retrieval error:', cacheError);
+          // Continue to fetch from API
         }
-
-        const data = await response.json();
-        console.log("Bible API response:", data);
-
-        if (!data.verses || data.verses.length === 0) {
-          console.error("No verses found for reference:", reference);
-          return null;
-        }
-
-        // Format the verses from the API response
-        const verses = data.verses.map((v: any) => ({
-          verse: v.verse,
-          text: v.text.trim(),
-        }));
-
-        return {
-          text: data.text,
-          reference: data.reference,
-          verses,
-        };
+        
+        console.log('Fetching Bible verse from API:', reference);
+        return await getVerse(reference);
       } catch (error) {
         console.error("Error fetching Bible verse:", error);
-        return null;
+        // Create a simple verse object as fallback
+        return {
+          text: reference,
+          reference: "Scripture",
+          verses: [{ verse: 1, text: reference }]
+        };
       }
     };
 

@@ -1,0 +1,783 @@
+{
+  "months": {
+    "april": {
+      "id": "april",
+      "name": "April",
+      "order": 4,
+      "hymn": {
+        "title": "When I Survey the Wondrous Cross",
+        "lyrics": [
+          "When I survey the wondrous cross,",
+          "On which the Prince of glory died,",
+          "My richest gain I count but loss,",
+          "And pour contempt on all my pride.",
+          "Forbid it, Lord, that I should boast,",
+          "Save in the death of Christ, my God;",
+          "All the vain things that charm me most,",
+          "I sacrifice them to His blood.",
+          "See, from His head, His hands, His feet,",
+          "Sorrow and love flow mingled down;",
+          "Did e'er such love and sorrow meet,",
+          "Or thorns compose so rich a crown?",
+          "Were the whole realm of nature mine,",
+          "That were a present far too small;",
+          "Love so amazing, so divine,",
+          "Demands my soul, my life, my all."
+        ]
+      }
+    },
+    "may": {
+      "id": "may",
+      "name": "May",
+      "order": 5,
+      "hymn": {
+        "title": "O Master, Let Me Walk With Thee",
+        "lyrics": [
+          "O Master, let me walk with Thee",
+          "In lowly paths of service free;",
+          "Tell me Thy secret, help me bear",
+          "The strain of toil, the fret of care.",
+          "Help me the slow of heart to move",
+          "By some clear, winning word of love;",
+          "Teach me the wayward feet to stay,",
+          "And guide them in the homeward way.",
+          "Teach me Thy patience, still with Thee",
+          "In closer, dearer company,",
+          "In work that keeps faith sweet and strong",
+          "In trust that triumphs over wrong.",
+          "In hope that sends a shining ray",
+          "Far down the future's broad'ning way,",
+          "In peace that only Thou canst give",
+          "With Thee, O Master, let me live."
+        ]
+      }
+    }
+  },
+  "devotions": {
+    "april21": {
+      "monthId": "april",
+      "date": "2023-04-21",
+      "displayDate": "Monday, April 21",
+      "bibleText": "Luke 24:1-12",
+      "reflectionSections": [
+        {
+          "passage": "Luke 24:1-2, 12",
+          "questions": [
+            "What is the difference between the women and Peter vs. the disciples who did not go to the tomb? What can I learn about what is the best way to deal with rejection and disappointment?"
+          ]
+        },
+        {
+          "passage": "Luke 24:5-8",
+          "questions": [
+            "What did the angels remind the women?",
+            "What is the role of remembering God's word in enabling us to recognize him at work?"
+          ]
+        }
+      ]
+    },
+    "april22": {
+      "monthId": "april",
+      "date": "2023-04-22",
+      "displayDate": "Tuesday, April 22",
+      "bibleText": "Luke 24:13-35",
+      "reflectionSections": [
+        {
+          "passage": "Luke 24:21",
+          "questions": [
+            "Think about the words: \"we had hoped....\" How did the crucifixion of Jesus dash their hope?",
+            "What are my false hopes? In what ways do they get in the way of my recognizing my true need?"
+          ]
+        },
+        {
+          "passage": "Luke 24:32-35",
+          "questions": [
+            "What made their hearts burn?",
+            "The disciples had no option but to hasten back to Jerusalem and share with others how they had encountered Jesus. How does the gospel have this kind of effect on a person's life, turning him from the path that he is on and returning him to community?",
+            "How have I experienced this to be true of my life?"
+          ]
+        }
+      ]
+    },
+    "april23": {
+      "id": "april23",
+      "date": "2023-04-23",
+      "displayDate": "Wednesday, April 23",
+      "bibleText": "Luke 24:36-44",
+      "monthId": "april",
+      "reflectionSections": [
+        {
+          "id": "april23_1",
+          "passage": "General",
+          "questions": [
+            "Reflect on Jesus' greeting to his disciples.",
+            "The disciples were frightened because they thought they were seeing a ghost when Jesus appeared. What does Jesus do to settle the disciples' doubts about his resurrection (vv. 36, 39, 43, 44)?",
+            "Reflect on Jesus' question: \"Why are you troubled, and why do doubts arise in your hearts?\" (v. 38). How does the reality of the resurrection give me peace in the midst of fears?"
+          ]
+        }
+      ]
+    },
+    "april24": {
+      "id": "april24",
+      "date": "2023-04-24",
+      "displayDate": "Thursday, April 24",
+      "bibleText": "Luke 24:44-53",
+      "monthId": "april",
+      "reflectionSections": [
+        {
+          "id": "april24_1",
+          "passage": "General",
+          "questions": [
+            "What does this passage teach about the importance of understanding Scripture?",
+            "Reflect on the basic gospel message in the words \"repentance and forgiveness of sins should be proclaimed in his name to all nations.\" How does this apply to me?"
+          ]
+        }
+      ]
+    },
+    "april25": {
+      "id": "april25",
+      "date": "2023-04-25",
+      "displayDate": "Friday, April 25",
+      "bibleText": "1 Corinthians 1:1-9",
+      "monthId": "april",
+      "reflectionSections": [
+        {
+          "id": "april25_1",
+          "passage": "General",
+          "questions": [
+            "What phrases does Apostle Paul use to address his audience? What implications about Christian living does each phrase suggest?",
+            "What are some aspects of the Corinthians that Apostle Paul was thankful about (vv. 4-7)? What was the basis of his confidence regarding them (vv. 8-9)? Write a prayer thanking God for those same realities in your own life.",
+            "When Paul tells them, \"you were enriched\" in Christ \"in all speech and all knowledge\" (v. 5) so that you are not lacking in any gift, he implies that many spiritual gifts are \"enrichments\" of speaking abilities, knowledge, or skills that people had before they became Christians. As you wait for the revealing of our Lord Jesus Christ implies that spiritual gifts are given as temporary provisions until Christ returns (see 13:10).",
+            "How can I use my gifts and riches in Christ to prepare for the return of our Lord Jesus Christ?"
+          ]
+        },
+        {
+          "id": "april25_2",
+          "passage": "1 Corinthians 1:8-9",
+          "questions": [
+            "What has God called me into? How can I make fellowship with Jesus more central in my life?"
+          ]
+        }
+      ]
+    },
+    "april28": {
+      "id": "april28",
+      "date": "2023-04-28",
+      "displayDate": "Monday, April 28",
+      "bibleText": "1 Corinthians 1:10-17",
+      "monthId": "april",
+      "reflectionSections": [
+        {
+          "id": "april28_1",
+          "passage": "1 Corinthians 1:13-16",
+          "questions": [
+            "What must have been important to the Corinthians for them to have divided along quarreling factions like they did?",
+            "What are some possible causes for divisions within the modern-day church?"
+          ]
+        },
+        {
+          "id": "april28_2",
+          "passage": "1 Corinthians 1:17",
+          "questions": [
+            "How might depending on \"words of eloquent wisdom\" lead to the cross of Christ being emptied of its power?",
+            "What concrete steps can I take in my current ministry context in order to depend less on \"words of eloquent wisdom\" and more on the cross of Christ and its power?"
+          ]
+        }
+      ]
+    },
+    "april29": {
+      "id": "april29",
+      "date": "2023-04-29",
+      "displayDate": "Tuesday, April 29",
+      "bibleText": "1 Corinthians 1:18-25",
+      "monthId": "april",
+      "reflectionSections": [
+        {
+          "id": "april29_1",
+          "passage": "1 Corinthians 1:18-19",
+          "questions": [
+            "Why is the cross foolishness to the world?"
+          ]
+        },
+        {
+          "id": "april29_2",
+          "passage": "1 Corinthians 1:20-25",
+          "questions": [
+            "According to this passage, why is worldly power and worldly wisdom not really all that powerful or wise?",
+            "Which worldviews would consider Christ crucified to be a stumbling block and folly?",
+            "In what situations have I experienced God working against my \"worldly wisdom\" in order to do something good in my life?"
+          ]
+        }
+      ]
+    },
+    "april30": {
+      "id": "april30",
+      "date": "2023-04-30",
+      "displayDate": "Wednesday, April 30",
+      "bibleText": "1 Corinthians 1:26-31",
+      "monthId": "april",
+      "reflectionSections": [
+        {
+          "id": "april30_1",
+          "passage": "General",
+          "questions": [
+            "Recall stories of God choosing what is foolish in the world to shame the wise, and the weak to shame the strong. If God chose what is low and despised in order to powerfully advance his kingdom during the early church period, what does that tell me about the legitimacy of human valuations? How does this challenge what qualities I personally value?",
+            "Think about my own journey. How did the \"low\" and \"despised\" aspects of myself or my life prepare me to receive the gospel?",
+            "In what ways are my current weaknesses or undesirable status/situation actually a blessing, in light of the gospel?"
+          ]
+        }
+      ]
+    },
+    "may01": {
+      "id": "may01",
+      "date": "2023-05-01",
+      "displayDate": "Thursday, May 1",
+      "bibleText": "1 Corinthians 2:1-5 (ESV)",
+      "monthId": "may",
+      "reflectionSections": [
+        {
+          "id": "may01_1",
+          "passage": "1 Corinthians 2:1-2",
+          "questions": [
+            "Why did Apostle Paul avoid lofty speech and human wisdom when preaching the gospel (v. 1, 5)? What was at stake?",
+            "What would it look like in my life to \"know nothing except Jesus Christ and him crucified\"?",
+            "How would this affect how I relate to people? What would I be freed from as a result?"
+          ]
+        },
+        {
+          "id": "may01_2",
+          "passage": "1 Corinthians 2:3",
+          "questions": [
+            "Why would doing ministry in weakness, fear and trembling result from focusing on the cross? How does this challenge my idea of what it should feel like to be in God's will?"
+          ]
+        }
+      ]
+    },
+    "may02": {
+      "id": "may02",
+      "date": "2023-05-02",
+      "displayDate": "Friday, May 2",
+      "bibleText": "1 Corinthians 2:6-9",
+      "monthId": "may",
+      "reflectionSections": [
+        {
+          "id": "may02_1",
+          "passage": "1 Corinthians 2:7",
+          "questions": [
+            "What is the wisdom of this age vs. God's secret wisdom?",
+            "What kind of maturity is required for people to understand the \"secret and hidden wisdom of God\"? In what sense am I still immature with respect to this?"
+          ]
+        },
+        {
+          "id": "may02_2",
+          "passage": "1 Corinthians 2:9",
+          "questions": [
+            "What God prepared for mankind is something that the heart of man could not imagine. Write out a prayer praising God for his salvation plan that is completely contrary to our values and beyond our wildest imagination."
+          ]
+        }
+      ]
+    },
+    "may05": {
+      "id": "may05",
+      "date": "2023-05-05",
+      "displayDate": "Monday, May 5",
+      "bibleText": "1 Corinthians 2:10-16",
+      "monthId": "may",
+      "reflectionSections": [
+        {
+          "id": "may05_1",
+          "passage": "1 Corinthians 2:10-14",
+          "questions": [
+            "If God reveals spiritual things to us through the Spirit, what are the implications for myself, as well as for ministry?",
+            "Reflect on the amazing fact that I have been given the Spirit, who searches everything, even the depths of God.",
+            "What are some spiritual truths that appear as folly to the world? Is there evidence of me embodying any of those spiritual truths in my own life?"
+          ]
+        },
+        {
+          "id": "may05_2",
+          "passage": "1 Corinthians 2:15-16",
+          "questions": [
+            "What should be the basis of every Christian's judgment? How does this challenge today's orthodoxy of \"tolerance\"?"
+          ]
+        }
+      ]
+    },
+    "may06": {
+      "id": "may06",
+      "date": "2023-05-06",
+      "displayDate": "Tuesday, May 6",
+      "bibleText": "1 Corinthians 3:1-9",
+      "monthId": "may",
+      "reflectionSections": [
+        {
+          "id": "may06_1",
+          "passage": "1 Corinthians 3:1-4",
+          "questions": [
+            "What two categories of Christians does this passage mention, and how are they different?",
+            "The text closely links \"infants in Christ\" and \"people of the flesh\" with being \"merely human,\" that is, acting according to unredeemed human nature. What does this teach us about what maturing in the faith entails?"
+          ]
+        },
+        {
+          "id": "may06_2",
+          "passage": "1 Corinthians 3:5-9",
+          "questions": [
+            "In light of these verses, how should I view others in Christ, considering the \"one\" role Apostle Paul speaks of in v. 8?",
+            "What is God's role vis-à-vis Paul and Apollos? How does remembering God and his role among us help me avoid the trap of worldliness the Corinthians fell into, and to be more faithful with my own role?"
+          ]
+        }
+      ]
+    },
+    "may07": {
+      "id": "may07",
+      "date": "2023-05-07",
+      "displayDate": "Wednesday, May 7",
+      "bibleText": "1 Corinthians 3:10-17",
+      "monthId": "may",
+      "reflectionSections": [
+        {
+          "id": "may07_1",
+          "passage": "1 Corinthians 3:12-15",
+          "questions": [
+            "What will be judged on that Day? How will it be judged?",
+            "What do the two different types of building materials represent?",
+            "What have I been building with?"
+          ]
+        },
+        {
+          "id": "may07_2",
+          "passage": "1 Corinthians 3:16-17",
+          "questions": [
+            "Do I live with a clear identity of being God's temple? What is the evidence that God's Spirit dwells in me?",
+            "Apostle Paul makes it very clear that those who would destroy God's temple will themselves be destroyed. What kind of responsibility do I have towards God's church and towards myself which is God's temple?"
+          ]
+        }
+      ]
+    },
+    "may08": {
+      "id": "may08",
+      "date": "2023-05-08",
+      "displayDate": "Thursday, May 8",
+      "bibleText": "1 Corinthians 3:18-23",
+      "monthId": "may",
+      "reflectionSections": [
+        {
+          "id": "may08_1",
+          "passage": "1 Corinthians 3:18-20",
+          "questions": [
+            "Why does thinking of myself as worldly-wise lead to self-deception and futile thinking?",
+            "According to v.18, how can I avoid self-deception? What does it mean to become a \"fool\" so that I may become wise?",
+            "Paul is not condemning all wise people but rather those who think they can be wise without God. How have I experienced the folly of this kind of thinking in my own life and in the lives of others?"
+          ]
+        },
+        {
+          "id": "may08_2",
+          "passage": "1 Corinthians 3:21-23",
+          "questions": [
+            "What did the people of Corinth boast of? What do I boast of?",
+            "According to this passage, belonging to Christ and therefore to God means that all things belong to me. How does this truth put an end to my need to establish my worth? How is boasting about men, which causes division, inappropriate in light of this truth?"
+          ]
+        }
+      ]
+    },
+    "may09": {
+      "id": "may09",
+      "date": "2023-05-09",
+      "displayDate": "Friday, May 9",
+      "bibleText": "1 Corinthians 4:1-7",
+      "monthId": "may",
+      "reflectionSections": [
+        {
+          "id": "may09_1",
+          "passage": "1 Corinthians 4:1-2",
+          "questions": [
+            "As a Christian, what kind of stewardship have I been given?",
+            "According to v.2, what is the crucial criterion for ministry? Does this match what I think is most important for ministry?"
+          ]
+        },
+        {
+          "id": "may09_2",
+          "passage": "1 Corinthians 4:3-4",
+          "questions": [
+            "Why is the sentiment, \"I am not aware of anything against myself,\" insufficient grounds to establish one's innocence? How would awareness that \"it is the Lord who judges me\" shape my approach to life and others?"
+          ]
+        },
+        {
+          "id": "may09_3",
+          "passage": "1 Corinthians 4:5-7",
+          "questions": [
+            "How do I feel about the fact that God will one day bring to light what is hidden in darkness and disclose the purposes of the heart? How does this passage discourage me from passing final judgment on another person?",
+            "Why is it inappropriate to ever feel superior to others, or to be puffed up in favor of one against another?"
+          ]
+        }
+      ]
+    },
+    "may12": {
+      "id": "may12",
+      "date": "2023-05-12",
+      "displayDate": "Monday, May 12",
+      "bibleText": "1 Corinthians 4:8-13",
+      "monthId": "may",
+      "reflectionSections": [
+        {
+          "id": "may12_1",
+          "passage": "1 Corinthians 4:8-9",
+          "questions": [
+            "What happened to the Corinthians that led to this kind of boasting? Why is suffering necessary in the life of a Christian to prevent boasting?"
+          ]
+        },
+        {
+          "id": "may12_2",
+          "passage": "1 Corinthians 4:10-13",
+          "questions": [
+            "Compare and contrast the life of the apostles to that of the Corinthians described here. How am I challenged or convicted regarding my expectations of Christian life?"
+          ]
+        }
+      ]
+    },
+    "may13": {
+      "id": "may13",
+      "date": "2023-05-13",
+      "displayDate": "Tuesday, May 13",
+      "bibleText": "1 Corinthians 4:14-21",
+      "monthId": "may",
+      "reflectionSections": [
+        {
+          "id": "may13_1",
+          "passage": "1 Corinthians 4:14-15",
+          "questions": [
+            "What is the difference between a guide and a father? Who are the spiritual fathers and mothers in my life?",
+            "How do I feel about the fact that there are going to be Timothys in my life who will imitate my life and remind others about my way of life? How am I challenged and spurred on by this reality?"
+          ]
+        },
+        {
+          "id": "may13_2",
+          "passage": "1 Corinthians 4:18-21",
+          "questions": [
+            "Apostle Paul's life displayed power, because his \"ways in Christ\" were in agreement with what he taught \"everywhere in every church\" (v. 17). In what areas do I hold back from fully obeying what I am preaching, or, what do I hold back from teaching others in order to not have to fully live it out?"
+          ]
+        }
+      ]
+    },
+    "may14": {
+      "id": "may14",
+      "date": "2023-05-14",
+      "displayDate": "Wednesday, May 14",
+      "bibleText": "1 Corinthians 5:1-5",
+      "monthId": "may",
+      "reflectionSections": [
+        {
+          "id": "may14_1",
+          "passage": "1 Corinthians 5:1-2",
+          "questions": [
+            "Why might the Corinthians have felt arrogant about themselves despite the sin that had been exposed in their midst?",
+            "In what areas might I be susceptible to a similar dynamic of arrogance coexisting with glaring sin in my life?"
+          ]
+        },
+        {
+          "id": "may14_2",
+          "passage": "1 Corinthians 5:3",
+          "questions": [
+            "How did Apostle Paul model the role of a true spiritual leader?"
+          ]
+        },
+        {
+          "id": "may14_3",
+          "passage": "1 Corinthians 5:4-5",
+          "questions": [
+            "\"Deliver this man to Satan\" referred to excommunication, not eternal destruction. Paul recommended excommunication with the aim that the man, desperate not to be shut out of the vital church community, would be shocked back to his senses.",
+            "What was the end goal of this action? What does this action reveal about what is ultimately important?"
+          ]
+        }
+      ]
+    },
+    "may15": {
+      "id": "may15",
+      "date": "2023-05-15",
+      "displayDate": "Thursday, May 15",
+      "bibleText": "1 Corinthians 5:6-8",
+      "monthId": "may",
+      "reflectionSections": [
+        {
+          "id": "may15_1",
+          "passage": "General",
+          "questions": [
+            "How is sin like a little leaven? Given this, how can I be more vigilant about guarding against sin in my life?",
+            "The emphasis of sincerity and truth \"is not on our perfection and sinlessness, but our openness and honesty....\" What are the ways I need to uphold sincerity and truth in my battle against sin? What would a church that upholds sincerity and truth look like?"
+          ]
+        }
+      ]
+    },
+    "may16": {
+      "id": "may16",
+      "date": "2023-05-16",
+      "displayDate": "Friday, May 16",
+      "bibleText": "1 Corinthians 5:9-13",
+      "monthId": "may",
+      "reflectionSections": [
+        {
+          "id": "may16_1",
+          "passage": "1 Corinthians 5:9-11",
+          "questions": [
+            "What does the content of Apostle Paul's letters to the Corinthians reveal about the nature of Christian life?",
+            "What negative effects are caused by those who call themselves Christian but do not live according to the teachings of God's Word?"
+          ]
+        },
+        {
+          "id": "may16_2",
+          "passage": "1 Corinthians 5:12-13",
+          "questions": [
+            "What is it they were to hold one another responsible for? With what level of responsibility do I relate to my brothers and sisters in the church?"
+          ]
+        }
+      ]
+    },
+    "may19": {
+      "id": "may19",
+      "date": "2023-05-19",
+      "displayDate": "Monday, May 19",
+      "bibleText": "1 Corinthians 6:1-11 (ESV)",
+      "monthId": "may",
+      "reflectionSections": [
+        {
+          "id": "may19_1",
+          "passage": "1 Corinthians 6:1-7",
+          "questions": [
+            "How should grievances be handled among believers according to this passage? How does having lawsuits among believers represent defeat?"
+          ]
+        },
+        {
+          "id": "may19_2",
+          "passage": "1 Corinthians 6:9-11",
+          "questions": [
+            "In v. 9, \"Paul is not talking about isolated acts of unrighteousness, but about a whole way of life pursued persistently by those who thus indicate that they would be aliens in the kingdom of truth and light\" (cf. I John 3:4-10). The sins listed represent some form of indulgent self-gratification or disregard and recklessness towards other people. Is there this kind of persistent sin or self-centered way of living that I need to repent of?",
+            "How might the Corinthians have felt as they read this specific list of what they used to be? And how might they have felt afterwards, as they read words like \"washed,\" \"sanctified,\" \"justified\"?",
+            "How does understanding the depth of my own sinfulness, and the fact that I have undeservedly inherited the kingdom of God, enable me to rather be wronged and defrauded?"
+          ]
+        }
+      ]
+    },
+    "may20": {
+      "id": "may20",
+      "date": "2023-05-20",
+      "displayDate": "Tuesday, May 20",
+      "bibleText": "1 Corinthians 6:12-20",
+      "monthId": "may",
+      "reflectionSections": [
+        {
+          "id": "may20_1",
+          "passage": "1 Corinthians 6:12",
+          "questions": [
+            "How does a sense of entitlement to things that are lawful but not necessarily helpful lead to being dominated by those things?",
+            "What are some \"lawful\" behaviors or habits I am engaged in that may not be helpful for me?"
+          ]
+        },
+        {
+          "id": "may20_2",
+          "passage": "1 Corinthians 6:13-20",
+          "questions": [
+            "In what ways does Apostle Paul describe God's view of our body? How do these descriptions differ from the world's view of our body and what it is for?",
+            "What can I learn about the nature of sexual sin and how to deal with sexual temptation, according to v. 18?",
+            "Reflect on vv. 19-20. What does it mean to \"glorify God in your body\"?"
+          ]
+        }
+      ]
+    },
+    "may21": {
+      "id": "may21",
+      "date": "2023-05-21",
+      "displayDate": "Wednesday, May 21",
+      "bibleText": "1 Corinthians 7:1-16",
+      "monthId": "may",
+      "reflectionSections": [
+        {
+          "id": "may21_1",
+          "passage": "1 Corinthians 7:1-4",
+          "questions": [
+            "How does this passage challenge the world's view of marriage and sex? What obligations do unmarried people have toward God and toward their future spouses with respect to their bodies?"
+          ]
+        },
+        {
+          "id": "may21_2",
+          "passage": "1 Corinthians 7:5-9",
+          "questions": [
+            "Given that lack of self-control is a reality of our sinful nature, what are some ways I can guard against common temptations I encounter?"
+          ]
+        },
+        {
+          "id": "may21_3",
+          "passage": "1 Corinthians 7:7",
+          "questions": [
+            "Reflect on the fact that Apostle Paul describes both marriage and singlehood as a gift from God. How can I grow in appreciation of the gift God has given to me today?"
+          ]
+        }
+      ]
+    },
+    "may22": {
+      "id": "may22",
+      "date": "2023-05-22",
+      "displayDate": "Thursday, May 22",
+      "bibleText": "1 Corinthians 7:17-24",
+      "monthId": "may",
+      "reflectionSections": [
+        {
+          "id": "may22_1",
+          "passage": "1 Corinthians 7:20-24",
+          "questions": [
+            "What message is Apostle Paul communicating by telling them that they should remain in the condition in which they were called?",
+            "What life circumstances and conditions do people wish and try hard to change in their lives? What does our frequent desire to change our conditions reveal about human nature?",
+            "Based upon the phrases \"the Lord assigned to him\" (v. 17) and \"to which God has called him\" (v. 24), what can I learn about God?",
+            "What may God want to teach me through my present condition?"
+          ]
+        }
+      ]
+    },
+    "may23": {
+      "id": "may23",
+      "date": "2023-05-23",
+      "displayDate": "Friday, May 23",
+      "bibleText": "1 Corinthians 7:25-31",
+      "monthId": "may",
+      "reflectionSections": [
+        {
+          "id": "may23_1",
+          "passage": "1 Corinthians 7:28",
+          "questions": [
+            "How does this text challenge the world's view of marriage?"
+          ]
+        },
+        {
+          "id": "may23_2",
+          "passage": "1 Corinthians 7:29-31",
+          "questions": [
+            "What is the relationship between the brevity of life and the life Apostle Paul exhorts them to live?",
+            "What temporal issues and possessions do I need to let go of and no longer be engrossed with?"
+          ]
+        }
+      ]
+    },
+    "may26": {
+      "id": "may26",
+      "date": "2023-05-26",
+      "displayDate": "Monday, May 26",
+      "bibleText": "1 Corinthians 7:32-40",
+      "monthId": "may",
+      "reflectionSections": [
+        {
+          "id": "may26_1",
+          "passage": "1 Corinthians 7:32-35",
+          "questions": [
+            "What \"anxieties\" do I need to be \"free from\" in order to have an \"undivided devotion to the Lord\"?",
+            "What warnings have I interpreted as a restraint, when it was really for my benefit?",
+            "What are practical ways I can \"promote good order\" in my life so that I can be fully devoted to God?"
+          ]
+        }
+      ]
+    },
+    "may27": {
+      "id": "may27",
+      "date": "2023-05-27",
+      "displayDate": "Tuesday, May 27",
+      "bibleText": "1 Corinthians 8:1-8",
+      "monthId": "may",
+      "reflectionSections": [
+        {
+          "id": "may27_1",
+          "passage": "1 Corinthians 8:1-3",
+          "questions": [
+            "What is the effect of knowledge on a person, and what is the effect of love? Describe how that happens.",
+            "Are there ways I have been \"puffing\" myself up before others because of some knowledge, talent or anything else I may possess? How can I use these things to build up others instead?"
+          ]
+        },
+        {
+          "id": "may27_2",
+          "passage": "1 Corinthians 8:4-8",
+          "questions": [
+            "What \"knowledge\" is Apostle Paul talking about in v.7?",
+            "How can a sinful past or broken background impair our ability to live in the freedom of the gospel? What are some steps I can take to apply gospel truths to areas of pain/shame in my life?"
+          ]
+        }
+      ]
+    },
+    "may28": {
+      "id": "may28",
+      "date": "2023-05-28",
+      "displayDate": "Wednesday, May 28",
+      "bibleText": "1 Corinthians 8:9-13",
+      "monthId": "may",
+      "reflectionSections": [
+        {
+          "id": "may28_1",
+          "passage": "1 Corinthians 8:9-10",
+          "questions": [
+            "What is the relationship between love and refraining from exercising my freedom?",
+            "What are some ways I can limit myself in order to love others (cf. Galatians 5:13-14)?"
+          ]
+        },
+        {
+          "id": "may28_2",
+          "passage": "1 Corinthians 8:12-13",
+          "questions": [
+            "How is sinning against another brother a sin against Christ (cf. Psalm 51, Matthew 18:5)?",
+            "How seriously did Apostle Paul take the issue of sinning against other brothers? To what length am I prepared to go in order to not cause others to sin?"
+          ]
+        }
+      ]
+    },
+    "may29": {
+      "id": "may29",
+      "date": "2023-05-29",
+      "displayDate": "Thursday, May 29",
+      "bibleText": "1 Corinthians 9:1-12",
+      "monthId": "may",
+      "reflectionSections": [
+        {
+          "id": "may29_1",
+          "passage": "General",
+          "questions": [
+            "In what ways did Apostle Paul and Barnabas deny themselves of privileges they had a legitimate right to claim? In what ways did people who labored in the Lord on my behalf deny themselves of their many \"rights\"?",
+            "It was Paul's practice to support himself materially by tent-making (Acts 18:2, 3; 1 Cor 4:12) in order not to be a burden to the church. Some apparently misunderstood this to mean that he was not on a par with other apostles and Christian workers who depended on the church to support them.",
+            "Are there ways I might not fully appreciate the gospel, the church, and relationships because they are freely given to me?"
+          ]
+        },
+        {
+          "id": "may29_2",
+          "passage": "1 Corinthians 9:11-12",
+          "questions": [
+            "Why is it only right that the Corinthians who received \"spiritual things\" from Apostle Paul should provide financial support for him? If some at Corinth begrudged providing financially for Apostle Paul, what would that reveal about their value system regarding spiritual vs. material things?"
+          ]
+        }
+      ]
+    },
+    "may30": {
+      "id": "may30",
+      "date": "2023-05-30",
+      "displayDate": "Friday, May 30",
+      "bibleText": "1 Corinthians 9:12-18",
+      "monthId": "may",
+      "reflectionSections": [
+        {
+          "id": "may30_1",
+          "passage": "1 Corinthians 9:12",
+          "questions": [
+            "What were some things Apostle Paul endured for the sake of the gospel? (See 2 Corinthians 11:24-28)",
+            "Are there hardships, setbacks, insults, etc., I have endured so that the gospel could be spread without hindrance?"
+          ]
+        },
+        {
+          "id": "may30_2",
+          "passage": "1 Corinthians 9:14-16",
+          "questions": [
+            "Why does Apostle Paul say that he cannot boast when he preaches the gospel?"
+          ]
+        },
+        {
+          "id": "may30_3",
+          "passage": "1 Corinthians 9:12-18",
+          "questions": [
+            "What can I learn about Apostle Paul's heart and attitude toward the gospel based on vv. 12, 16 and 18? How am I challenged and inspired?"
+          ]
+        }
+      ]
+    }
+  }
+}
+  

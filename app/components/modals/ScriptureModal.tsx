@@ -7,6 +7,7 @@ import {
 } from "@heroicons/react/24/outline";
 
 const BIBLE_VERSIONS = [
+  { id: "esv", name: "English Standard Version" },
   { id: "kjv", name: "King James Version" },
   { id: "web", name: "World English Bible" },
   { id: "bbe", name: "Basic Bible in English" },
@@ -36,6 +37,37 @@ export default function ScriptureModal({
       setError("");
 
       try {
+        // Try ESV API first if ESV is selected
+        if (selectedVersion.id === "esv") {
+          const esvApiKey = process.env.NEXT_PUBLIC_ESV_BIBLE_API_KEY;
+          
+          if (esvApiKey) {
+            try {
+              const esvResponse = await fetch(
+                `https://api.esv.org/v3/passage/text/?q=${encodeURIComponent(reference)}&include-passage-references=false&include-verse-numbers=true&include-footnotes=false`,
+                {
+                  headers: {
+                    'Authorization': `Token ${esvApiKey}`
+                  }
+                }
+              );
+              
+              if (esvResponse.ok) {
+                const esvData = await esvResponse.json();
+                
+                if (esvData.passages && esvData.passages.length > 0) {
+                  setScripture(esvData.passages[0]);
+                  return;
+                }
+              }
+            } catch (esvError) {
+              console.error("Error with ESV API:", esvError);
+              // Fall back to Bible API
+            }
+          }
+        }
+        
+        // Use Bible API for other translations or as fallback
         const response = await fetch(
           `https://bible-api.com/${reference}?translation=${selectedVersion.id}`
         );
