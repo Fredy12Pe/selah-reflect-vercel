@@ -4,7 +4,14 @@
  */
 
 import { initializeApp, getApps, FirebaseApp } from 'firebase/app';
-import { getAuth, setPersistence, browserLocalPersistence, Auth, connectAuthEmulator } from 'firebase/auth';
+import { 
+  getAuth, 
+  setPersistence, 
+  browserLocalPersistence, 
+  Auth, 
+  connectAuthEmulator, 
+  signInAnonymously 
+} from 'firebase/auth';
 import { getFirestore, Firestore, connectFirestoreEmulator } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 
@@ -48,6 +55,20 @@ const createEmptyFirestore = (): Firestore => ({
   doc: () => ({}),
 } as unknown as Firestore);
 
+// Function to sign in anonymously
+export const signInAnonymousUser = async () => {
+  if (typeof window === 'undefined' || !auth) return null;
+  
+  try {
+    const userCredential = await signInAnonymously(auth);
+    console.log('[Firebase] Anonymous sign-in successful');
+    return userCredential.user;
+  } catch (error) {
+    console.error('[Firebase] Anonymous sign-in error:', error);
+    return null;
+  }
+};
+
 // Only initialize Firebase in the client
 if (typeof window !== 'undefined') {
   try {
@@ -67,8 +88,19 @@ if (typeof window !== 'undefined') {
     try {
       // Initialize Auth with local persistence
       auth = getAuth(app);
+      
+      // Ensure persistence is set to local storage - this is critical for maintaining sessions
       setPersistence(auth, browserLocalPersistence)
-        .then(() => console.log('[Firebase] Auth persistence set to local'))
+        .then(() => {
+          console.log('[Firebase] Auth persistence set to local');
+          
+          // Check if user is already signed in
+          if (!auth.currentUser) {
+            console.log('[Firebase] No user currently signed in');
+          } else {
+            console.log('[Firebase] User already signed in:', auth.currentUser.uid);
+          }
+        })
         .catch(error => console.error('[Firebase] Error setting auth persistence:', error));
     } catch (authError) {
       console.error('[Firebase] Auth initialization error:', authError);

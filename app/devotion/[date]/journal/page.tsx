@@ -10,6 +10,7 @@ import {
   ChevronDownIcon,
   ChevronUpIcon,
   XMarkIcon,
+  ChevronRightIcon,
 } from "@heroicons/react/24/outline";
 import { useAuth } from "@/lib/context/AuthContext";
 import { getDevotionByDate } from "@/lib/services/devotionService";
@@ -105,7 +106,7 @@ const modalAnimations = `
 
 export default function JournalPage({ params }: { params: { date: string } }) {
   const router = useRouter();
-  const { user, loading } = useAuth();
+  const { user, loading, isAnonymous } = useAuth();
   const [devotionData, setDevotionData] = useState<PartialDevotion | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [journalEntries, setJournalEntries] = useState<{ [key: string]: string }>({});
@@ -352,6 +353,20 @@ export default function JournalPage({ params }: { params: { date: string } }) {
     return () => clearTimeout(autoSaveTimer);
   }, [journalEntries]);
 
+  // Auth prompt component for anonymous users
+  const AuthPrompt = () => (
+    <div className="bg-[#0F1211] rounded-2xl p-8 text-center">
+      <p className="text-white/70 mb-4">Sign in to access your personal journal</p>
+      <Link 
+        href={`/auth/login?from=${encodeURIComponent(`/devotion/${params.date}/journal`)}`}
+        className="px-6 py-2 bg-white rounded-full hover:bg-white/90 inline-flex items-center text-black font-medium"
+      >
+        <span>Sign In</span>
+        <ChevronRightIcon className="w-5 h-5 ml-2" />
+      </Link>
+    </div>
+  );
+
   if (loading || isLoading) {
     return (
       <div className="min-h-screen bg-black text-white flex items-center justify-center">
@@ -369,6 +384,91 @@ export default function JournalPage({ params }: { params: { date: string } }) {
             Sign In
           </Link>
         </div>
+      </div>
+    );
+  }
+
+  if (isAnonymous) {
+    return (
+      <div className="min-h-screen bg-black text-white pb-20 font-outfit">
+        <style dangerouslySetInnerHTML={{ __html: modalAnimations }} />
+        <div className="container mx-auto px-4 py-8 max-w-3xl">
+          {/* Header */}
+          <div className="mb-6 flex items-center justify-between">
+            <Link 
+              href={`/devotion/${params.date}/reflection`}
+              className="text-white/70 hover:text-white flex items-center"
+            >
+              <ArrowLeftIcon className="w-5 h-5 mr-2" />
+              <span>Back to Reflection</span>
+            </Link>
+          </div>
+          
+          {/* Journal Title */}
+          <div className="mb-8">
+            <h1 className="text-3xl font-bold mb-2">Journal</h1>
+            <p className="text-white/70">{formattedDate()}</p>
+            {devotionData?.bibleText && (
+              <div 
+                className="bg-[#0F1211] p-4 rounded-2xl cursor-pointer mt-2"
+                onClick={handleOpenScriptureModal}
+              >
+                <p className="text-white/90 text-xl">{devotionData.bibleText}</p>
+                <p className="text-white/50 text-sm mt-1">Tap to view full scripture</p>
+              </div>
+            )}
+          </div>
+          
+          <AuthPrompt />
+        </div>
+        
+        {/* Scripture Modal */}
+        {showScriptureModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center">
+            <div
+              className={`fixed inset-0 bg-black/50 ${isScriptureModalClosing ? 'animate-fade-out' : 'animate-fade-in'}`}
+              onClick={closeScriptureModal}
+            />
+            <div 
+              ref={scriptureModalRef}
+              onTouchStart={handleTouchStart}
+              onTouchMove={handleTouchMove}
+              onTouchEnd={handleTouchEnd}
+              className={`relative w-full h-4/5 max-h-[85vh] bg-zinc-900 rounded-t-2xl shadow-xl overflow-hidden flex flex-col mt-auto
+                ${isScriptureModalClosing ? 'animate-slide-down' : 'animate-slide-up'}`}
+            >
+              <div className="p-6 flex-shrink-0 border-b border-zinc-800 relative">
+                <h2 className="text-sm font-medium text-white/80 mb-1">Today's Scripture</h2>
+                <p className="text-xl font-semibold pr-6">{devotionData?.bibleText}</p>
+                <button
+                  onClick={closeScriptureModal}
+                  className="absolute top-4 right-4 p-1 rounded-full bg-black/30 hover:bg-black/50"
+                >
+                  <XMarkIcon className="w-6 h-6 text-white" />
+                </button>
+              </div>
+
+              <div className="overflow-y-auto flex-grow p-6">
+                {isFetchingBibleVerse ? (
+                  <div className="flex justify-center py-8">
+                    <div className="w-8 h-8 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  </div>
+                ) : bibleVerse ? (
+                  <div className="space-y-4">
+                    {bibleVerse.verses.map((verse) => (
+                      <div key={verse.verse} className="flex">
+                        <span className="text-white/40 mr-4">{verse.verse}</span>
+                        <p>{verse.text}</p>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-white/60">Failed to load Bible verses</p>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     );
   }

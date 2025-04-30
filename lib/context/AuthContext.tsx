@@ -17,6 +17,9 @@ import {
   reauthenticateWithCredential,
   EmailAuthProvider,
   Auth,
+  signInAnonymously,
+  isSignInWithEmailLink,
+  linkWithCredential,
 } from "firebase/auth";
 import { useRouter, usePathname } from "next/navigation";
 import { auth } from "../firebase/config";
@@ -27,18 +30,25 @@ type AuthContextType = {
   user: User | null;
   loading: boolean;
   error: string | null;
+  isAnonymous: boolean;
   login: (email: string, password: string) => Promise<void>;
   signup: (
     email: string,
     password: string,
     displayName: string
   ) => Promise<void>;
+  loginAnonymously: () => Promise<void>;
   logout: () => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
   updateUserProfile: (displayName: string) => Promise<void>;
   changePassword: (
     currentPassword: string,
     newPassword: string
+  ) => Promise<void>;
+  convertAnonymousAccount: (
+    email: string, 
+    password: string, 
+    displayName: string
   ) => Promise<void>;
 };
 
@@ -59,6 +69,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [initAttempted, setInitAttempted] = useState(false);
+  const [isAnonymous, setIsAnonymous] = useState(false);
   const router = useRouter();
   const pathname = usePathname();
 
@@ -70,7 +81,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       // Set the cookie with the token
       setCookie("session", idToken, {
         path: "/",
-        maxAge: 60 * 60 * 24 * 7, // 7 days
+        maxAge: 60 * 60 * 24 * 30, // 30 days for longer persistence
         sameSite: "lax",
         secure: process.env.NODE_ENV === "production",
         httpOnly: true
@@ -100,13 +111,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     }
 
     let authInitialized = false;
-    
+
     // Safety timeout to prevent infinite loading
     const safetyTimeout = setTimeout(() => {
       if (!authInitialized) {
         console.warn("AuthProvider: Safety timeout reached, continuing without auth");
-        setLoading(false);
-        setInitAttempted(true);
+      setLoading(false);
+      setInitAttempted(true);
       }
     }, 5000);
 
@@ -132,8 +143,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 
           try {
             if (authUser) {
-              console.log("User authenticated:", authUser.uid);
+              console.log("User authenticated:", authUser.uid, "Anonymous:", authUser.isAnonymous);
               setUser(authUser);
+              setIsAnonymous(authUser.isAnonymous);
 
               // Set the session cookie whenever the user is authenticated
               // But don't wait for it to complete
@@ -146,18 +158,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
             } else {
               console.log("No user authenticated");
               setUser(null);
+              setIsAnonymous(false);
               clearSessionCookie();
 
-              // Only redirect to login if on protected route and not already on login page
-              const isPublicPath = pathname?.startsWith("/auth/") || 
-                                 pathname?.includes("_next") ||
-                                 pathname?.includes("api/") ||
-                                 pathname === "/";
-              
-              if (pathname && !isPublicPath) {
-                console.log("Redirecting to login from:", pathname);
-                router.push("/auth/login");
-              }
+              // For anonymous auth, we won't redirect to login automatically
+              // Instead, we'll handle restricted content within components
+              // This allows anonymous users to browse public content
             }
           } catch (err) {
             console.error("Error processing auth state:", err);
@@ -217,10 +223,74 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       );
       await setSessionCookie(userCredential.user);
       setUser(userCredential.user);
+      setIsAnonymous(false);
 
       return;
     } catch (error: any) {
       console.error("Login error:", error);
+      setError(error.message);
+      throw error;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loginAnonymously = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      if (!auth || Object.keys(auth).length === 0) {
+        throw new Error("Auth is not initialized");
+      }
+
+      const userCredential = await signInAnonymously(auth);
+      await setSessionCookie(userCredential.user);
+      setUser(userCredential.user);
+      setIsAnonymous(true);
+      
+      return;
+    } catch (error: any) {
+      console.error("Anonymous login error:", error);
+      setError(error.message);
+      throw error;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const convertAnonymousAccount = async (
+    email: string,
+    password: string,
+    displayName: string
+  ) => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      if (!auth || !auth.currentUser || !auth.currentUser.isAnonymous) {
+        throw new Error("No anonymous user to convert");
+      }
+
+      // Create credential
+      const credential = EmailAuthProvider.credential(email, password);
+      
+      // Link anonymous account with credential
+      const result = await linkWithCredential(auth.currentUser, credential);
+      
+      // Update profile with display name
+      await updateProfile(result.user, { displayName });
+      
+      // Update state
+      setUser(result.user);
+      setIsAnonymous(false);
+      
+      // Update session cookie
+      await setSessionCookie(result.user);
+      
+      return;
+    } catch (error: any) {
+      console.error("Account conversion error:", error);
       setError(error.message);
       throw error;
     } finally {
@@ -248,12 +318,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       );
 
       // Update the user's profile with displayName
-      await updateProfile(userCredential.user, { displayName });
+      await updateProfile(userCredential.user, {
+        displayName: displayName,
+      });
 
-      // Set the session cookie
+      // Set the user in state
+      setUser(userCredential.user);
+      setIsAnonymous(false);
       await setSessionCookie(userCredential.user);
 
-      setUser(userCredential.user);
       return;
     } catch (error: any) {
       console.error("Signup error:", error);
@@ -267,6 +340,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   const logout = async () => {
     try {
       setLoading(true);
+      setError(null);
 
       if (!auth || Object.keys(auth).length === 0) {
         throw new Error("Auth is not initialized");
@@ -275,7 +349,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       await signOut(auth);
       clearSessionCookie();
       setUser(null);
-      router.push("/auth/login");
+      setIsAnonymous(false);
+
+      return;
     } catch (error: any) {
       console.error("Logout error:", error);
       setError(error.message);
@@ -295,6 +371,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       }
 
       await sendPasswordResetEmail(auth, email);
+      return;
     } catch (error: any) {
       console.error("Reset password error:", error);
       setError(error.message);
@@ -309,17 +386,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       setLoading(true);
       setError(null);
 
-      if (!auth || Object.keys(auth).length === 0) {
-        throw new Error("Auth is not initialized");
+      if (!auth?.currentUser) {
+        throw new Error("No authenticated user");
       }
 
-      const currentUser = auth.currentUser;
-      if (!currentUser) {
-        throw new Error("User not authenticated");
-      }
+      await updateProfile(auth.currentUser, {
+        displayName: displayName,
+      });
 
-      await updateProfile(currentUser, { displayName });
-      setUser(currentUser);
+      // Update local user state
+      setUser({ ...auth.currentUser });
+
+      return;
     } catch (error: any) {
       console.error("Update profile error:", error);
       setError(error.message);
@@ -337,27 +415,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       setLoading(true);
       setError(null);
 
-      if (!auth || Object.keys(auth).length === 0) {
-        throw new Error("Auth is not initialized");
+      if (!auth?.currentUser) {
+        throw new Error("No authenticated user");
       }
 
-      const currentUser = auth.currentUser;
-      if (!currentUser) {
-        throw new Error("User not authenticated");
-      }
-      if (!currentUser.email) {
-        throw new Error("User email is not available");
+      if (!auth.currentUser.email) {
+        throw new Error("User has no email");
       }
 
-      // Re-authenticate the user
+      // Re-authenticate user before changing password
       const credential = EmailAuthProvider.credential(
-        currentUser.email,
+        auth.currentUser.email,
         currentPassword
       );
-      await reauthenticateWithCredential(currentUser, credential);
 
-      // Update the password
-      await updatePassword(currentUser, newPassword);
+      await reauthenticateWithCredential(auth.currentUser, credential);
+      await updatePassword(auth.currentUser, newPassword);
+
+      return;
     } catch (error: any) {
       console.error("Change password error:", error);
       setError(error.message);
@@ -371,12 +446,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     user,
     loading,
     error,
+    isAnonymous,
     login,
     signup,
+    loginAnonymously,
     logout,
     resetPassword,
     updateUserProfile,
     changePassword,
+    convertAnonymousAccount,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

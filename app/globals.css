@@ -91,16 +91,16 @@ body {
 @layer utilities {
   .animate-fade-in {
     animation: fade-in 0.2s ease-out;
-  }
-  
+}
+
   .animate-fade-out {
     animation: fade-out 0.2s ease-out;
-  }
-  
+}
+
   .animate-slide-up {
     animation: slide-up 0.3s ease-out;
-  }
-  
+}
+
   .animate-slide-down {
     animation: slide-down 0.3s ease-out;
   }

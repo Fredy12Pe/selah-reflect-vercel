@@ -13,7 +13,7 @@
  * Example: /devotion/2024-03-19/reflection
  */
 
-import { useState, useEffect, useRef, createRef } from "react";
+import { useState, useEffect, useRef, createRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import {
   format,
@@ -267,7 +267,7 @@ export default function ReflectionPage({
   console.log('ReflectionPage: Component starting render for date:', params.date);
   
   const router = useRouter();
-  const { user, loading } = useAuth();
+  const { user, loading, isAnonymous } = useAuth();
   console.log('ReflectionPage: Auth state:', { userExists: !!user, loading });
   
   const [devotionData, setDevotionData] = useState<Devotion | PartialDevotion | null>(null);
@@ -1222,6 +1222,36 @@ export default function ReflectionPage({
     </div>
   );
 
+  // Add an authentication prompt component for anonymous users
+  const AuthPrompt = ({ feature }: { feature: string }) => (
+    <div className="bg-[#0F1211] p-6 rounded-2xl text-center">
+      <p className="text-lg mb-4">Sign in to use {feature}</p>
+      <Link 
+        href={`/auth/login?from=${encodeURIComponent(`/devotion/${params.date}/reflection`)}`}
+        className="px-6 py-2 bg-white rounded-full hover:bg-white/90 inline-flex items-center text-black font-medium"
+      >
+        <span>Sign In</span>
+        <ChevronRightIcon className="w-5 h-5 ml-2" />
+      </Link>
+    </div>
+  );
+
+  // Function to handle auth gating for features
+  const isFeatureAccessible = useCallback((featureName: string) => {
+    // If the user is fully authenticated, all features are accessible
+    if (user && !isAnonymous) return true;
+    
+    // If anonymous, only basic features are accessible
+    if (user && isAnonymous) {
+      // Basic features that anonymous users can access
+      const anonymousFeatures = ['hymn', 'scripture', 'questions'];
+      return anonymousFeatures.includes(featureName.toLowerCase());
+    }
+    
+    // No user at all
+    return false;
+  }, [user, isAnonymous]);
+
   if (!user) {
     return (
       <div className="min-h-screen bg-black text-white flex items-center justify-center p-4">
@@ -1398,67 +1428,82 @@ export default function ReflectionPage({
                   {/* AI Reflection */}
                   <div className="mt-6 mb-2">
                     <p className="text-white/70 text-lg mb-2">Reflect with AI</p>
-                    <div className="flex items-center gap-4">
-                <input
-                  type="text"
-                        value={aiQuestion}
-                        onChange={(e) => setAiQuestion(e.target.value)}
-                  onKeyPress={handleReflectionKeyPress}
-                        placeholder="Ask questions about today's text..."
-                        className="flex-1 bg-[#0F1211] border-none outline-none rounded-2xl px-6 py-5 text-white placeholder-white/50"
-                />
-                <button
-                  onClick={handleReflectionGeneration}
-                        disabled={isAiLoading || !aiQuestion.trim()}
-                        className={`w-16 h-16 rounded-2xl flex items-center justify-center ${
-                          isAiLoading || !aiQuestion.trim()
-                            ? "bg-[#0F1211] cursor-not-allowed"
-                            : "bg-white hover:bg-white/90"
-                        }`}
-                      >
-                        <ArrowRightIcon className={`w-7 h-7 ${isAiLoading || !aiQuestion.trim() ? "text-white" : "text-black"}`} />
-                </button>
-              </div>
                     
-                    {aiResponse && (
-                      <div className="mt-6 p-4 bg-[#0F1211] rounded-xl">
-                        <p className="text-white/90 whitespace-pre-line">{aiResponse}</p>
-                      </div>
+                    {isFeatureAccessible('ai') ? (
+                      <>
+                        <div className="flex items-center gap-4">
+                          <input
+                            type="text"
+                            value={aiQuestion}
+                            onChange={(e) => setAiQuestion(e.target.value)}
+                            onKeyPress={handleReflectionKeyPress}
+                            placeholder="Ask questions about today's text..."
+                            className="flex-1 bg-[#0F1211] border-none outline-none rounded-2xl px-6 py-5 text-white placeholder-white/50"
+                          />
+                          <button
+                            onClick={handleReflectionGeneration}
+                            disabled={isAiLoading || !aiQuestion.trim()}
+                            className={`w-16 h-16 rounded-2xl flex items-center justify-center ${
+                              isAiLoading || !aiQuestion.trim()
+                                ? "bg-[#0F1211] cursor-not-allowed"
+                                : "bg-white hover:bg-white/90"
+                            }`}
+                          >
+                            <ArrowRightIcon className={`w-7 h-7 ${isAiLoading || !aiQuestion.trim() ? "text-white" : "text-black"}`} />
+                          </button>
+                        </div>
+                        
+                        {aiResponse && (
+                          <div className="mt-6 p-4 bg-[#0F1211] rounded-xl">
+                            <p className="text-white/90 whitespace-pre-line">{aiResponse}</p>
+                          </div>
+                        )}
+
+                        {aiError && (
+                          <div className="mt-6 p-4 bg-red-900/20 rounded-xl">
+                            <p className="text-red-400">{aiError}</p>
+                          </div>
+                        )}
+
+                        {isAiLoading && (
+                          <div className="mt-6 flex justify-center">
+                            <div className="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                          </div>
+                        )}
+                      </>
+                    ) : (
+                      <AuthPrompt feature="AI Reflection" />
                     )}
-
-              {aiError && (
-                      <div className="mt-6 p-4 bg-red-900/20 rounded-xl">
-                        <p className="text-red-400">{aiError}</p>
-                </div>
-              )}
-
-                    {isAiLoading && (
-                      <div className="mt-6 flex justify-center">
-                        <div className="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                </div>
-              )}
-            </div>
+                  </div>
 
             {/* Resources */}
-                  <div 
-                    className="rounded-xl overflow-hidden relative cursor-pointer mt-4"
-                    onClick={handleOpenResourcesModal}
-                  >
-                    <div className="relative h-40">
-                      <Image
-                        src={resourcesImage}
-                        alt="Resources background"
-                        fill
-                        className="object-cover"
-                      />
-                      <div className="absolute inset-0 bg-gradient-to-b from-black/30 to-black/70" />
-                      <div className="absolute inset-0 p-6 flex flex-col justify-end">
-                        <h2 className="text-2xl font-medium mb-1">Resources for today's text</h2>
-                        <p className="text-white/80">Bible Commentaries, Videos, and Podcasts</p>
-                </div>
-                    </div>
-            </div>
-          </>
+                  <div className="mt-4">
+                    <p className="text-white/70 text-lg mb-2">Resources</p>
+                    
+                    {isFeatureAccessible('resources') ? (
+                      <div 
+                        className="rounded-xl overflow-hidden relative cursor-pointer"
+                        onClick={handleOpenResourcesModal}
+                      >
+                        <div className="relative h-40">
+                          <Image
+                            src={resourcesImage}
+                            alt="Resources background"
+                            fill
+                            className="object-cover"
+                          />
+                          <div className="absolute inset-0 bg-gradient-to-b from-black/30 to-black/70" />
+                          <div className="absolute inset-0 p-6 flex flex-col justify-end">
+                            <h2 className="text-2xl font-medium mb-1">Resources for today's text</h2>
+                            <p className="text-white/80">Bible Commentaries, Videos, and Podcasts</p>
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <AuthPrompt feature="Resources" />
+                    )}
+                  </div>
+                </>
               ) : (
                 !isFuture(currentDate) && showNoDevotionContent && (
                   <div className="text-center pt-10">
@@ -1545,13 +1590,13 @@ export default function ReflectionPage({
               <div className="p-6 flex-shrink-0 border-b border-zinc-800 relative">
                 <h2 className="text-sm font-medium text-white/80 mb-1">Today's Scripture</h2>
                 <p className="text-xl font-semibold pr-6">{devotionData?.bibleText}</p>
-                <button
-                  onClick={closeScriptureModal}
+              <button
+                onClick={closeScriptureModal}
                   className="absolute top-4 right-4 p-1 rounded-full bg-black/30 hover:bg-black/50"
                 >
                   <XMarkIcon className="w-6 h-6 text-white" />
-                </button>
-              </div>
+              </button>
+            </div>
 
               <div className="overflow-y-auto flex-grow p-6">
               {isFetchingBibleVerse ? (
