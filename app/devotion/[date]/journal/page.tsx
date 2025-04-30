@@ -53,605 +53,258 @@ const getReflectionStorageKey = (dateString: string) => {
   return `aiReflection_${dateString}`;
 };
 
+interface PartialDevotion {
+  id?: string;
+  date?: string;
+  bibleText?: string;
+  reflectionSections?: ReflectionSection[];
+  title?: string;
+  notFound?: boolean;
+  error?: string;
+}
+
 export default function JournalPage({ params }: { params: { date: string } }) {
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
+  const [devotionData, setDevotionData] = useState<PartialDevotion | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [isSaving, setIsSaving] = useState(false);
-  const [devotion, setDevotion] = useState<Devotion | null>(null);
-  const [entries, setEntries] = useState<JournalEntry>({});
-  const [hasChanges, setHasChanges] = useState(false);
+  const [journalEntries, setJournalEntries] = useState<{ [key: string]: string }>({});
+  const [expandedSections, setExpandedSections] = useState<{ [key: number]: boolean }>({});
+  const [saveStatus, setSaveStatus] = useState<"saved" | "saving" | "error" | "">("");
 
-  // Scripture modal state
-  const [showScriptureModal, setShowScriptureModal] = useState(false);
-  const [isScriptureModalClosing, setIsScriptureModalClosing] = useState(false);
-  const [bibleVerse, setBibleVerse] = useState<BibleVerse | null>(null);
-  const [isFetchingBibleVerse, setIsFetchingBibleVerse] = useState(false);
+  // Get all questions from all sections
+  const getAllQuestionsAndSections = () => {
+    if (!devotionData?.reflectionSections?.length) {
+      console.log("No reflection sections found");
+      return [];
+    }
 
-  // AI Reflection states
-  const [aiReflections, setAiReflections] = useState<AIReflection[]>([]);
-  const [expandedReflection, setExpandedReflection] = useState<number | null>(
-    null
-  );
-  const [aiQuestion, setAiQuestion] = useState("");
-  const [aiAnswer, setAiAnswer] = useState("");
-  const [isAiDropdownOpen, setIsAiDropdownOpen] = useState(false);
+    return devotionData.reflectionSections;
+  };
 
-  const currentDate = parseISO(params.date);
-  const formattedDate = format(currentDate, "EEEE, MMMM d, yyyy");
+  // Format date for display
+  const formattedDate = () => {
+    try {
+      const date = parseISO(params.date);
+      return format(date, "EEEE, MMMM d, yyyy");
+    } catch (error) {
+      console.error("Error formatting date:", error);
+      return params.date;
+    }
+  };
 
-  // Load devotion and existing journal entries
+  // Load journal entries from localStorage
+  const loadJournalEntries = () => {
+    try {
+      const key = `journal_${params.date}`;
+      const saved = localStorage.getItem(key);
+      if (saved) {
+        setJournalEntries(JSON.parse(saved));
+      }
+    } catch (error) {
+      console.error("Error loading journal entries:", error);
+    }
+  };
+
+  // Save journal entries to localStorage
+  const saveJournalEntries = () => {
+    try {
+      setSaveStatus("saving");
+      const key = `journal_${params.date}`;
+      localStorage.setItem(key, JSON.stringify(journalEntries));
+      setSaveStatus("saved");
+      
+      // Reset save status after 2 seconds
+      setTimeout(() => {
+        setSaveStatus("");
+      }, 2000);
+    } catch (error) {
+      console.error("Error saving journal entries:", error);
+      setSaveStatus("error");
+      toast.error("Failed to save journal entries");
+    }
+  };
+
+  // Handle text area changes
+  const handleTextChange = (questionId: string, value: string) => {
+    setJournalEntries(prev => ({
+      ...prev,
+      [questionId]: value
+    }));
+  };
+
+  // Toggle section expansion
+  const toggleSection = (sectionIndex: number) => {
+    setExpandedSections(prev => ({
+      ...prev,
+      [sectionIndex]: !prev[sectionIndex]
+    }));
+  };
+
+  // Fetch devotion data
   useEffect(() => {
-    const loadData = async () => {
+    const fetchData = async () => {
       if (!user) return;
-
+      
       setIsLoading(true);
       try {
-        // Load devotion data
-        const devotionData = await getDevotionByDate(params.date);
-        if (!devotionData) {
-          toast.error("Could not find devotion for this date");
-          router.push(`/devotion/${params.date}/reflection`);
-          return;
-        }
-        
-        // TypeScript cast to handle the complex Devotion type
-        setDevotion(devotionData as any);
-
-        // Load existing journal entries
-        const journalRef = safeDoc(user.uid, "journalEntries", params.date);
-        const journalSnap = await safeGetDoc(journalRef);
-        const journalData = journalSnap.data();
-
-        if (journalData) {
-          setEntries(journalData.entries || {});
-
-          // Load AI reflections if they exist
-          if (journalData.aiReflections) {
-            setAiReflections(journalData.aiReflections);
-          }
-        } else {
-          // Initialize empty entries for all questions
-          const initialEntries: JournalEntry = {};
-          if (devotionData.reflectionSections) {
-            devotionData.reflectionSections.forEach((section, sectionIndex) => {
-              initialEntries[sectionIndex.toString()] = {};
-              section.questions.forEach((_, questionIndex) => {
-                initialEntries[sectionIndex.toString()][
-                  questionIndex.toString()
-                ] = "";
-              });
-            });
-          }
-          setEntries(initialEntries);
-        }
-
-        // Check for and import AI reflections from localStorage
-        const reflectionState = localStorage.getItem(
-          getReflectionStorageKey(params.date)
-        );
-        console.log(
-          "[DEBUG-JOURNAL] Getting localStorage for key:",
-          getReflectionStorageKey(params.date)
-        );
-        console.log(
-          "[DEBUG-JOURNAL] Raw data from localStorage:",
-          reflectionState
-        );
-
-        if (reflectionState) {
-          try {
-            const parsedData = JSON.parse(reflectionState);
-            console.log("[DEBUG-JOURNAL] Parsed data:", parsedData);
-
-            // Handle both array format and old single-item format
-            const reflectionsToImport = Array.isArray(parsedData)
-              ? parsedData
-              : [parsedData];
-            console.log(
-              "[DEBUG-JOURNAL] Reflections to import:",
-              reflectionsToImport
-            );
-
-            if (reflectionsToImport.length > 0) {
-              let hasNewReflections = false;
-              let newReflections = [...aiReflections]; // Start with existing reflections
-              console.log(
-                "[DEBUG-JOURNAL] Starting with existing reflections:",
-                newReflections
-              );
-
-              // Process each reflection
-              reflectionsToImport.forEach((data) => {
-                console.log(
-                  "[DEBUG-JOURNAL] Processing reflection item:",
-                  data
-                );
-
-                if (data.question && data.reflection) {
-                  // Check if we already have this reflection
-                  const alreadyExists =
-                    newReflections.some((r) => r.question === data.question) ||
-                    (journalData && 
-                      journalData.aiReflections?.some(
-                        (r: AIReflection) => r.question === data.question
-                      ));
-
-                  console.log(
-                    "[DEBUG-JOURNAL] Already exists check:",
-                    alreadyExists
-                  );
-
-                  if (!alreadyExists) {
-                    const newReflection: AIReflection = {
-                      question: data.question,
-                      answer: data.reflection,
-                      timestamp: data.timestamp || new Date().toISOString(),
-                    };
-
-                    console.log(
-                      "[DEBUG-JOURNAL] Adding new reflection:",
-                      newReflection
-                    );
-                    newReflections.push(newReflection);
-                    hasNewReflections = true;
-                  }
-                }
-              });
-
-              console.log(
-                "[DEBUG-JOURNAL] Has new reflections:",
-                hasNewReflections
-              );
-              console.log(
-                "[DEBUG-JOURNAL] Final reflections array:",
-                newReflections
-              );
-
-              if (hasNewReflections) {
-                setAiReflections(newReflections);
-                setHasChanges(true);
-                toast.success("AI reflections imported");
-              }
-
-              // Clear from localStorage after importing
-              console.log(
-                "[DEBUG-JOURNAL] Keeping data in localStorage for reflection page"
-              );
-            }
-          } catch (error) {
-            console.error(
-              "[DEBUG-JOURNAL] Error parsing stored AI reflection:",
-              error
-            );
+        const devotion = await getDevotionByDate(params.date);
+        if (devotion) {
+          setDevotionData(devotion);
+          
+          // Initialize expanded sections
+          if (devotion.reflectionSections) {
+            const initialExpandedState = devotion.reflectionSections.reduce((acc, _, index) => {
+              acc[index] = true; // Start with all expanded
+              return acc;
+            }, {} as { [key: number]: boolean });
+            setExpandedSections(initialExpandedState);
           }
         }
       } catch (error) {
-        console.error("Error loading data:", error);
-        toast.error("Failed to load journal data");
+        console.error("Error fetching devotion:", error);
+        toast.error("Failed to load devotion data");
       } finally {
         setIsLoading(false);
       }
     };
 
-    loadData();
-  }, [user, params.date, router]);
+    if (user && !loading) {
+      fetchData();
+      loadJournalEntries();
+    }
+  }, [params.date, user, loading]);
 
-  // Update an entry for a specific question
-  const updateEntry = (
-    sectionIndex: number,
-    questionIndex: number,
-    value: string
-  ) => {
-    setEntries((prev) => {
-      const newEntries = { ...prev };
-      if (!newEntries[sectionIndex.toString()]) {
-        newEntries[sectionIndex.toString()] = {};
+  // Redirect if not authenticated
+  useEffect(() => {
+    if (!loading && !user) {
+      router.push(`/auth/login?from=${encodeURIComponent(`/devotion/${params.date}/journal`)}`);
+    }
+  }, [user, loading, router, params.date]);
+
+  // Auto-save when entries change
+  useEffect(() => {
+    const autoSaveTimer = setTimeout(() => {
+      if (Object.keys(journalEntries).length > 0) {
+        saveJournalEntries();
       }
-      newEntries[sectionIndex.toString()][questionIndex.toString()] = value;
-      return newEntries;
-    });
-    setHasChanges(true);
-  };
+    }, 2000);
+    
+    return () => clearTimeout(autoSaveTimer);
+  }, [journalEntries]);
 
-  // Add an AI reflection
-  const addAiReflection = () => {
-    if (!aiQuestion.trim() || !aiAnswer.trim()) return;
-
-    const newReflection: AIReflection = {
-      question: aiQuestion.trim(),
-      answer: aiAnswer.trim(),
-      timestamp: new Date().toISOString(),
-    };
-
-    setAiReflections((prev) => [...prev, newReflection]);
-    setAiQuestion("");
-    setAiAnswer("");
-    setHasChanges(true);
-  };
-
-  // Toggle AI reflection expansion
-  const toggleReflection = (index: number) => {
-    setExpandedReflection(expandedReflection === index ? null : index);
-  };
-
-  // Delete an AI reflection
-  const deleteReflection = (index: number, e: React.MouseEvent) => {
-    e.stopPropagation(); // Prevent triggering the accordion toggle
-
-    try {
-      // Create a new array without the reflection to delete
-      const updatedReflections = aiReflections.filter((_, i) => i !== index);
-
-      // Update the state
-      setAiReflections(updatedReflections);
-
-      // Mark as having changes that need to be saved
-      setHasChanges(true);
-
-      // Show success message
-      toast.success("Reflection deleted");
-    } catch (error) {
-      console.error("[DEBUG-JOURNAL] Error deleting reflection:", error);
-      toast.error("Failed to delete reflection");
-    }
-  };
-
-  // Save all entries to Firebase
-  const saveEntries = async () => {
-    if (!user) {
-      toast.error("You must be signed in to save");
-      return;
-    }
-
-    setIsSaving(true);
-    try {
-      const journalRef = safeDoc(user.uid, "journalEntries", params.date);
-
-      await safeSetDoc(
-        journalRef,
-        {
-          entries,
-          aiReflections,
-          date: params.date,
-          updatedAt: new Date().toISOString(),
-        },
-        { merge: true }
-      );
-
-      toast.success("Journal entries saved");
-      setHasChanges(false);
-    } catch (error) {
-      console.error("Error saving journal entries:", error);
-      toast.error("Failed to save journal entries");
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  // Function to fetch a Bible verse
-  const fetchBibleVerse = async (
-    reference: string
-  ): Promise<BibleVerse | null> => {
-    if (!reference) return null;
-
-    setIsFetchingBibleVerse(true);
-
-    try {
-      const response = await fetch(
-        `https://bible-api.com/${encodeURIComponent(
-          reference
-        )}?verse_numbers=true`
-      );
-
-      if (!response.ok) {
-        throw new Error(`Bible API error: ${response.statusText}`);
-      }
-
-      const data = await response.json();
-
-      if (!data.verses || data.verses.length === 0) {
-        console.error("No verses found for reference:", reference);
-        return null;
-      }
-
-      // Format the verses from the API response
-      const verses = data.verses.map((v: any) => ({
-        verse: v.verse,
-        text: v.text.trim(),
-      }));
-
-      return {
-        text: data.text,
-        reference: data.reference,
-        verses,
-      };
-    } catch (error) {
-      console.error("Error fetching Bible verse:", error);
-      return null;
-    } finally {
-      setIsFetchingBibleVerse(false);
-    }
-  };
-
-  // Handle opening the scripture modal
-  const handleOpenScriptureModal = async () => {
-    if (devotion?.bibleText && !bibleVerse) {
-      const verse = await fetchBibleVerse(devotion.bibleText);
-      if (verse) {
-        setBibleVerse(verse);
-      }
-    }
-    setShowScriptureModal(true);
-  };
-
-  // Function to handle scripture modal closing with animation
-  const closeScriptureModal = () => {
-    setIsScriptureModalClosing(true);
-    setTimeout(() => {
-      setShowScriptureModal(false);
-      setIsScriptureModalClosing(false);
-    }, 300); // Match animation duration
-  };
-
-  if (isLoading) {
+  if (loading || isLoading) {
     return (
-      <div className="min-h-screen bg-black flex items-center justify-center">
-        <div className="w-8 h-8 border-4 border-white border-t-transparent rounded-full animate-spin" />
+      <div className="min-h-screen bg-black text-white flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-white"></div>
       </div>
     );
   }
 
-  if (!devotion) {
+  if (!user) {
     return (
-      <div className="min-h-screen bg-black text-white flex flex-col items-center justify-center">
-        <p className="text-xl mb-4">Devotion not found</p>
-        <Link
-          href="/devotion"
-          className="px-4 py-2 bg-white/20 rounded-lg hover:bg-white/30 transition-colors"
-        >
-          Go Back
-        </Link>
+      <div className="min-h-screen bg-black text-white flex items-center justify-center p-4">
+        <div className="max-w-md text-center">
+          <p className="text-xl mb-4">Please sign in to view your journal</p>
+          <Link href={`/auth/login?from=${encodeURIComponent(`/devotion/${params.date}/journal`)}`} className="px-4 py-2 bg-zinc-800 rounded-lg hover:bg-zinc-700">
+            Sign In
+          </Link>
+        </div>
       </div>
     );
   }
+
+  const sections = getAllQuestionsAndSections();
 
   return (
-    <main className="min-h-screen bg-black text-white pb-20">
-      {/* Header */}
-      <div className="relative px-4 py-6 border-b border-white/10">
-        <div className="max-w-3xl mx-auto">
-          <Link
+    <div className="min-h-screen bg-black text-white pb-20 font-outfit">
+      <div className="container mx-auto px-4 py-8 max-w-3xl">
+        {/* Header */}
+        <div className="mb-6 flex items-center justify-between">
+          <Link 
             href={`/devotion/${params.date}/reflection`}
-            className="inline-flex items-center text-white/70 hover:text-white mb-2"
+            className="text-white/70 hover:text-white flex items-center"
           >
-            <ArrowLeftIcon className="w-4 h-4 mr-1" />
-            Back to Reflection
+            <ArrowLeftIcon className="w-5 h-5 mr-2" />
+            <span>Back to Reflection</span>
           </Link>
-          <h1 className="text-3xl font-bold">Journal</h1>
-          <p className="text-white/70">{formattedDate}</p>
+          
+          <div className="text-sm">
+            {saveStatus === "saving" && <span className="text-white/50">Saving...</span>}
+            {saveStatus === "saved" && <span className="text-green-400">Saved</span>}
+            {saveStatus === "error" && <span className="text-red-400">Error saving</span>}
+          </div>
         </div>
-      </div>
-
-      {/* Journal Content */}
-      <div className="max-w-3xl mx-auto px-4 py-8">
+        
+        {/* Journal Title */}
         <div className="mb-8">
-          <h2 className="text-2xl font-bold mb-2">Today's Scripture</h2>
-          <div
-            className="p-4 bg-zinc-900/60 rounded-xl mb-4 cursor-pointer hover:bg-zinc-800/60 transition-colors"
-            onClick={handleOpenScriptureModal}
-          >
-            <p className="text-lg">{devotion.bibleText}</p>
-          </div>
-        </div>
-
-        {/* Reflection Sections */}
-        <div className="space-y-12">
-          {devotion.reflectionSections.map((section, sectionIndex) => (
-            <div key={sectionIndex} className="space-y-6">
-              <div>
-                <h2 className="text-2xl font-bold">{section.passage}</h2>
-                <div className="w-20 h-1 bg-white/30 mt-2"></div>
-              </div>
-
-              {section.questions.map((question, questionIndex) => (
-                <div key={questionIndex} className="space-y-3">
-                  <h3 className="text-lg font-medium text-white/90">
-                    {questionIndex + 1}. {question}
-                  </h3>
-                  <textarea
-                    value={
-                      entries[sectionIndex.toString()]?.[
-                        questionIndex.toString()
-                      ] || ""
-                    }
-                    onChange={(e) =>
-                      updateEntry(sectionIndex, questionIndex, e.target.value)
-                    }
-                    className="w-full p-4 bg-zinc-800/60 rounded-xl text-white placeholder-white/40 min-h-[120px] resize-y focus:outline-none focus:ring-2 focus:ring-white/30"
-                    placeholder="Write your thoughts here..."
-                  />
-                </div>
-              ))}
-            </div>
-          ))}
-        </div>
-
-        {/* AI Reflections Section */}
-        <div className="mt-12 pt-8 border-t border-white/10">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-2xl font-bold">AI Reflections</h2>
-            <button
-              onClick={() => setIsAiDropdownOpen(!isAiDropdownOpen)}
-              className="p-2 rounded-full bg-zinc-800/60 hover:bg-zinc-700/60 transition-colors"
-            >
-              {isAiDropdownOpen ? (
-                <ChevronUpIcon className="w-5 h-5" />
-              ) : (
-                <ChevronDownIcon className="w-5 h-5" />
-              )}
-            </button>
-          </div>
-
-          {isAiDropdownOpen && (
-            <div className="space-y-4 mb-6">
-              {/* AI Reflections Accordion */}
-              {aiReflections.length > 0 ? (
-                <div className="space-y-3">
-                  {aiReflections.map((reflection, index) => (
-                    <div
-                      key={index}
-                      className="bg-zinc-900/60 rounded-xl overflow-hidden"
-                    >
-                      <div
-                        className="p-4 flex justify-between items-center cursor-pointer hover:bg-zinc-800/60 transition-colors"
-                        onClick={() => toggleReflection(index)}
-                      >
-                        <h3 className="text-lg font-medium text-white/90 truncate pr-4">
-                          {reflection.question}
-                        </h3>
-                        <div className="flex items-center">
-                          <button
-                            onClick={(e) => deleteReflection(index, e)}
-                            className="mr-2 p-1 text-white/60 hover:text-white/90 transition-colors"
-                            aria-label="Delete reflection"
-                          >
-                            <svg
-                              xmlns="http://www.w3.org/2000/svg"
-                              className="h-5 w-5"
-                              fill="none"
-                              viewBox="0 0 24 24"
-                              stroke="currentColor"
-                            >
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth={2}
-                                d="M6 18L18 6M6 6l12 12"
-                              />
-                            </svg>
-                          </button>
-                          {expandedReflection === index ? (
-                            <ChevronUpIcon className="w-5 h-5 flex-shrink-0" />
-                          ) : (
-                            <ChevronDownIcon className="w-5 h-5 flex-shrink-0" />
-                          )}
-                        </div>
-                      </div>
-
-                      {expandedReflection === index && (
-                        <div className="p-4 pt-0 border-t border-zinc-800">
-                          <p className="text-white/80 whitespace-pre-wrap">
-                            {reflection.answer}
-                          </p>
-                          <p className="text-xs text-white/40 mt-2">
-                            {new Date(reflection.timestamp).toLocaleString()}
-                          </p>
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-center py-6 bg-zinc-900/40 rounded-xl">
-                  <p className="text-white/60">No AI reflections yet</p>
-                </div>
-              )}
-            </div>
+          <h1 className="text-3xl font-bold mb-2">Journal</h1>
+          <p className="text-white/70">{formattedDate()}</p>
+          {devotionData?.bibleText && (
+            <p className="text-white/90 mt-2 text-xl">{devotionData.bibleText}</p>
           )}
         </div>
-
-        {/* Save Button */}
-        <div className="fixed bottom-6 right-6 z-10">
-          <button
-            onClick={saveEntries}
-            disabled={isSaving || !hasChanges}
-            className={`px-6 py-3 rounded-full font-medium flex items-center shadow-lg ${
-              hasChanges ? "bg-white text-black" : "bg-zinc-700 text-zinc-400"
-            }`}
-          >
-            {isSaving ? (
-              <>
-                <div className="w-5 h-5 border-2 border-black border-t-transparent rounded-full animate-spin mr-2" />
-                Saving...
-              </>
-            ) : (
-              <>
-                {hasChanges ? "Save Journal" : "Saved"}
-                {hasChanges && <ArrowRightIcon className="w-5 h-5 ml-2" />}
-              </>
-            )}
-          </button>
-        </div>
-      </div>
-
-      {/* Scripture Modal */}
-      {showScriptureModal && (
-        <div
-          className={`fixed inset-0 z-50 flex items-end justify-center bg-black/80 ${
-            isScriptureModalClosing ? "animate-fadeout" : "animate-fadein"
-          }`}
-          onClick={closeScriptureModal}
-        >
-          <div
-            className={`w-full max-w-lg bg-zinc-900 rounded-t-2xl p-6 max-h-[80vh] overflow-y-auto ${
-              isScriptureModalClosing ? "animate-slideout" : "animate-slidein"
-            }`}
-            onClick={(e) => e.stopPropagation()} // Prevent closing when clicking on the modal content
-          >
-            <div className="flex justify-between items-center mb-6">
-              <h2 className="text-xl font-bold">
-                {bibleVerse?.reference || devotion?.bibleText || "Scripture"}
-              </h2>
-              <button
-                onClick={closeScriptureModal}
-                className="p-2 text-white hover:text-gray-300"
-              >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  className="h-6 w-6"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M6 18L18 6M6 6l12 12"
-                  />
-                </svg>
-              </button>
-            </div>
-
-            <div className="mt-2">
-              {isFetchingBibleVerse ? (
-                <div className="flex justify-center py-8">
-                  <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-white"></div>
-                </div>
-              ) : bibleVerse ? (
-                <div className="space-y-4">
-                  {bibleVerse.verses.map((verse) => (
-                    <p
-                      key={verse.verse}
-                      className="text-lg leading-relaxed text-white/90"
-                    >
-                      <span className="text-white/50 text-sm align-super mr-2">
-                        {verse.verse}
-                      </span>
-                      {verse.text}
-                    </p>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-lg leading-relaxed text-white/90">
-                  {devotion.scriptureText || "Scripture text not available."}
-                </p>
-              )}
-            </div>
+        
+        {/* No sections message */}
+        {sections.length === 0 && (
+          <div className="bg-[#0F1211] rounded-2xl p-8 text-center">
+            <p className="text-white/70">No journal prompts available for this date.</p>
           </div>
-        </div>
-      )}
-    </main>
+        )}
+        
+        {/* Journal Sections */}
+        {sections.map((section, sectionIndex) => (
+          <div key={sectionIndex} className="mb-6 bg-[#0F1211] rounded-2xl overflow-hidden">
+            <button
+              onClick={() => toggleSection(sectionIndex)}
+              className="w-full p-6 flex items-center justify-between text-left"
+            >
+              <h2 className="text-xl font-medium">Section {sectionIndex + 1}</h2>
+              {expandedSections[sectionIndex] ? (
+                <ChevronUpIcon className="w-5 h-5 text-white/70" />
+              ) : (
+                <ChevronDownIcon className="w-5 h-5 text-white/70" />
+              )}
+            </button>
+            
+            {expandedSections[sectionIndex] && (
+              <div className="px-6 pb-6">
+                {/* Passage if available */}
+                {section.passage && (
+                  <div className="mb-6 p-4 bg-zinc-800 rounded-xl">
+                    <h3 className="text-lg font-medium text-white/90 mb-2">Passage:</h3>
+                    <p className="text-white/80">{section.passage}</p>
+                  </div>
+                )}
+                
+                {/* Questions and textareas */}
+                {section.questions && section.questions.map((question, qIndex) => {
+                  const questionId = `section_${sectionIndex}_q_${qIndex}`;
+                  return (
+                    <div key={questionId} className="mb-8">
+                      <h3 className="text-lg font-medium mb-3">{question}</h3>
+                      <textarea
+                        value={journalEntries[questionId] || ""}
+                        onChange={(e) => handleTextChange(questionId, e.target.value)}
+                        className="w-full bg-black/30 text-white rounded-xl p-4 min-h-[120px] outline-none border border-white/10 focus:border-white/30"
+                        placeholder="Write your reflection here..."
+                      />
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        ))}
+        
+        {/* Save Button */}
+        <button
+          onClick={saveJournalEntries}
+          className="mt-4 px-6 py-3 bg-white/10 hover:bg-white/20 rounded-full font-medium"
+        >
+          Save Journal Entries
+        </button>
+      </div>
+    </div>
   );
 }
