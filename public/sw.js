@@ -13,7 +13,10 @@ const STATIC_FILES = [
   '/images/logo192.png',
   '/images/logo512.png',
   '/hymn-bg.jpg',
-  '/resources-bg.jpg'
+  '/resources-bg.jpg',
+  '/history',
+  '/devotion',
+  '/auth/login'
 ];
 
 // Install event - cache static files
@@ -71,6 +74,12 @@ const isStaticAsset = (url) => {
          url.endsWith('.woff2');
 };
 
+// Helper to check if this is a history page navigation
+const isHistoryNavigation = (url) => {
+  return url.includes('/history') || 
+         (url.includes('/devotion/') && !url.includes('/api/'));
+};
+
 // Fetch event - network-first for API, cache-first for static assets
 self.addEventListener('fetch', event => {
   const url = new URL(event.request.url);
@@ -100,7 +109,56 @@ self.addEventListener('fetch', event => {
         })
         .catch(() => {
           // If network fails, try to serve from cache
-          return caches.match(event.request);
+          return caches.match(event.request)
+            .then(cachedResponse => {
+              if (cachedResponse) {
+                return cachedResponse;
+              }
+              
+              // Return a custom offline response for API requests
+              return new Response(JSON.stringify({
+                error: 'You are offline. Please check your connection and try again.',
+                offline: true
+              }), {
+                status: 503,
+                statusText: 'Service Unavailable',
+                headers: new Headers({
+                  'Content-Type': 'application/json'
+                })
+              });
+            });
+        })
+    );
+    return;
+  }
+  
+  // Special handling for history navigation (cache-first with network fallback)
+  if (isHistoryNavigation(url.href)) {
+    event.respondWith(
+      caches.match(event.request)
+        .then(cachedResponse => {
+          if (cachedResponse) {
+            return cachedResponse;
+          }
+          
+          // Try network if not in cache
+          return fetch(event.request)
+            .then(response => {
+              // Cache the response for future use
+              const responseToCache = response.clone();
+              if (response.status === 200) {
+                caches.open(STATIC_CACHE_NAME)
+                  .then(cache => {
+                    cache.put(event.request, responseToCache);
+                  });
+              }
+              return response;
+            })
+            .catch(() => {
+              // If network fails and we don't have a cache for this specific URL,
+              // return the index page as a fallback
+              return caches.match('/');
+            });
         })
     );
     return;

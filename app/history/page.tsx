@@ -5,7 +5,7 @@ import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
 import { format, parseISO } from "date-fns";
 import { useAuth } from "@/lib/context/AuthContext";
-import { ClockIcon, ChevronDownIcon, ChevronUpIcon } from "@heroicons/react/24/outline";
+import { ClockIcon, ChevronDownIcon, ChevronUpIcon, ExclamationCircleIcon } from "@heroicons/react/24/outline";
 
 // Interface for stored reflection
 interface StoredReflection {
@@ -27,6 +27,8 @@ export default function HistoryPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [expandedItems, setExpandedItems] = useState<{[key: number]: boolean}>({});
   const [currentDate, setCurrentDate] = useState<string>(new Date().toISOString().split('T')[0]);
+  const [error, setError] = useState<string | null>(null);
+  const [isOffline, setIsOffline] = useState<boolean>(false);
 
   // Function to toggle expansion of a reflection
   const toggleExpand = (index: number) => {
@@ -36,11 +38,32 @@ export default function HistoryPage() {
     }));
   };
 
+  // Check if the app is offline
+  useEffect(() => {
+    const handleOnlineStatus = () => {
+      setIsOffline(!navigator.onLine);
+    };
+
+    // Set initial status
+    setIsOffline(!navigator.onLine);
+
+    // Add event listeners
+    window.addEventListener('online', handleOnlineStatus);
+    window.addEventListener('offline', handleOnlineStatus);
+
+    // Cleanup
+    return () => {
+      window.removeEventListener('online', handleOnlineStatus);
+      window.removeEventListener('offline', handleOnlineStatus);
+    };
+  }, []);
+
   // Load all reflections from localStorage
   const loadAllReflections = () => {
     if (typeof window === "undefined") return;
 
     try {
+      setError(null);
       const allReflections: DatedReflection[] = [];
       
       // Iterate through all localStorage items
@@ -77,23 +100,32 @@ export default function HistoryPage() {
             }
           } catch (error) {
             console.error("Error processing reflection item:", error);
+            // Continue processing other items
           }
         }
       }
       
-      // Sort reflections by timestamp (newest first)
-      allReflections.sort((a, b) => 
-        new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
-      );
-      
-      setReflections(allReflections);
-      
-      // Set the current date to the most recent reflection date if available
-      if (allReflections.length > 0) {
-        setCurrentDate(allReflections[0].date);
+      if (allReflections.length === 0) {
+        // No reflections found in localStorage
+        console.log("No reflections found in localStorage");
+      } else {
+        // Sort reflections by timestamp (newest first)
+        allReflections.sort((a, b) => 
+          new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+        );
+        
+        setReflections(allReflections);
+        
+        // Set the current date to the most recent reflection date if available
+        if (allReflections.length > 0) {
+          setCurrentDate(allReflections[0].date);
+        }
       }
     } catch (error) {
       console.error("Error loading reflections:", error);
+      setError("Failed to load your reflection history. Please try again.");
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -102,7 +134,6 @@ export default function HistoryPage() {
     if (!loading && user) {
       setIsLoading(true);
       loadAllReflections();
-      setIsLoading(false);
     } else if (!loading && !user) {
       router.push("/auth/login?from=/history");
     }
@@ -125,6 +156,12 @@ export default function HistoryPage() {
           <p className="text-white/70">
             All your past AI-generated reflections
           </p>
+          {isOffline && (
+            <div className="mt-2 p-2 bg-yellow-800/30 rounded-lg flex items-center">
+              <ExclamationCircleIcon className="w-5 h-5 mr-2 text-yellow-500" />
+              <span className="text-yellow-300 text-sm">You're offline. Data shown is from your local storage.</span>
+            </div>
+          )}
         </div>
         
         {/* Navigation */}
@@ -136,6 +173,27 @@ export default function HistoryPage() {
             <span>← Back to Journal</span>
           </Link>
         </div>
+
+        {/* Error Message */}
+        {error && (
+          <div className="mb-6 p-4 bg-red-900/20 rounded-xl">
+            <div className="flex items-start">
+              <ExclamationCircleIcon className="w-6 h-6 text-red-500 mr-3 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="text-red-300">{error}</p>
+                <button 
+                  onClick={() => {
+                    setIsLoading(true);
+                    loadAllReflections();
+                  }} 
+                  className="mt-2 text-sm bg-white/10 hover:bg-white/20 px-3 py-1 rounded-md transition-colors"
+                >
+                  Try Again
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
         
         {/* Content */}
         <div className="space-y-6">
