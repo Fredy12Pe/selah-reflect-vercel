@@ -20,6 +20,8 @@ import {
   signInAnonymously,
   isSignInWithEmailLink,
   linkWithCredential,
+  setPersistence,
+  browserSessionPersistence,
 } from "firebase/auth";
 import { useRouter, usePathname } from "next/navigation";
 import { auth } from "../firebase/config";
@@ -244,6 +246,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         throw new Error("Auth is not initialized");
       }
 
+      // Switch to session persistence for anonymous users
+      // This ensures anonymous sessions are cleared when browser is closed
+      await setPersistence(auth, browserSessionPersistence);
+      
       const userCredential = await signInAnonymously(auth);
       await setSessionCookie(userCredential.user);
       setUser(userCredential.user);

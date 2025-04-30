@@ -32,8 +32,11 @@ import {
   ChevronLeftIcon,
   ChevronRightIcon,
   ArrowRightIcon,
+  ArrowLeftIcon,
   CalendarIcon,
   XMarkIcon,
+  ClockIcon,
+  ArrowRightOnRectangleIcon,
 } from "@heroicons/react/24/outline";
 import { getDevotionByDate } from "@/lib/services/devotionService";
 import { Devotion } from "@/lib/types/devotion";
@@ -267,7 +270,7 @@ export default function ReflectionPage({
   console.log('ReflectionPage: Component starting render for date:', params.date);
   
   const router = useRouter();
-  const { user, loading, isAnonymous } = useAuth();
+  const { user, loading, isAnonymous, logout } = useAuth();
   console.log('ReflectionPage: Auth state:', { userExists: !!user, loading });
   
   const [devotionData, setDevotionData] = useState<Devotion | PartialDevotion | null>(null);
@@ -1174,23 +1177,63 @@ export default function ReflectionPage({
   
   // Pull-to-close handler for modals
   const handleTouchStart = (e: React.TouchEvent) => {
+    // Store initial touch position
     setTouchStartY(e.touches[0].clientY);
   };
-  
+
   const handleTouchMove = (e: React.TouchEvent, closeModal: () => void) => {
     if (touchStartY === null) return;
     
+    // Determine which modal ref to use based on which modal is currently shown
+    let currentModalRef = null;
+    if (showHymnModal) currentModalRef = hymnModalRef;
+    else if (showScriptureModal) currentModalRef = scriptureModalRef;
+    else if (showResourcesModal) currentModalRef = resourcesModalRef;
+    
+    // Get modal element
+    const modalElement = currentModalRef?.current;
+    if (!modalElement) return;
+    
+    // Prevent default to avoid scrolling when dragging from the top area (header)
+    const headerHeight = 60; // Approximate header height
     const touchY = e.touches[0].clientY;
+    const rect = modalElement.getBoundingClientRect();
+    const touchWithinHeader = rect && (touchY - rect.top < headerHeight);
+    
+    if (touchWithinHeader) {
+      e.preventDefault();
+    }
+    
     const deltaY = touchY - touchStartY;
     
-    // Increased threshold from 50px to 100px to make it less sensitive
-    if (deltaY > 100) {
-      setTouchStartY(null);
-      closeModal();
+    // Only consider downward movement (positive deltaY)
+    if (deltaY > 0) {
+      // Apply transform to give visual feedback while dragging
+      modalElement.style.transform = `translateY(${deltaY * 0.5}px)`;
+      modalElement.style.transition = 'none';
+      
+      // Close only when dragged more than 200px (much higher threshold)
+      if (deltaY > 200) {
+        setTouchStartY(null);
+        closeModal();
+      }
     }
   };
   
   const handleTouchEnd = () => {
+    // Reset any applied transform with smooth animation
+    const resetTransform = (ref: React.RefObject<HTMLDivElement>) => {
+      if (ref.current) {
+        ref.current.style.transform = 'translateY(0)';
+        ref.current.style.transition = 'transform 0.3s ease-out';
+      }
+    };
+    
+    // Reset transform on all modal refs
+    resetTransform(hymnModalRef);
+    resetTransform(scriptureModalRef);
+    resetTransform(resourcesModalRef);
+    
     setTouchStartY(null);
   };
 
@@ -1223,18 +1266,37 @@ export default function ReflectionPage({
   );
 
   // Add an authentication prompt component for anonymous users
-  const AuthPrompt = ({ feature }: { feature: string }) => (
-    <div className="bg-[#0F1211] p-6 rounded-2xl text-center">
-      <p className="text-lg mb-4">Sign in to use {feature}</p>
-      <Link 
-        href={`/auth/login?from=${encodeURIComponent(`/devotion/${params.date}/reflection`)}`}
-        className="px-6 py-2 bg-white rounded-full hover:bg-white/90 inline-flex items-center text-black font-medium"
-      >
-        <span>Sign In</span>
-        <ChevronRightIcon className="w-5 h-5 ml-2" />
-      </Link>
-    </div>
-  );
+  const AuthPrompt = ({ feature }: { feature: string }) => {
+    const handleSignIn = () => {
+      // Ensure anonymous users are logged out before redirecting to login
+      if (isAnonymous && user) {
+        logout().then(() => {
+          // After logout, redirect to login page
+          router.push(`/auth/login?from=${encodeURIComponent(`/devotion/${params.date}`)}`);
+        }).catch(error => {
+          console.error("Error signing out anonymous user:", error);
+          // If logout fails, still try to redirect
+          router.push(`/auth/login?from=${encodeURIComponent(`/devotion/${params.date}`)}`);
+        });
+      } else {
+        // Regular redirect if not anonymous
+        router.push(`/auth/login?from=${encodeURIComponent(`/devotion/${params.date}`)}`);
+      }
+    };
+    
+    return (
+      <div className="bg-[#0F1211] p-6 rounded-2xl text-center">
+        <p className="text-lg mb-4">Sign in to use {feature}</p>
+        <button 
+          onClick={handleSignIn}
+          className="px-6 py-2 bg-white rounded-full hover:bg-white/90 inline-flex items-center text-black font-medium"
+        >
+          <span>Sign In</span>
+          <ChevronRightIcon className="w-5 h-5 ml-2" />
+        </button>
+      </div>
+    );
+  };
 
   // Function to handle auth gating for features
   const isFeatureAccessible = useCallback((featureName: string) => {
@@ -1251,6 +1313,21 @@ export default function ReflectionPage({
     // No user at all
     return false;
   }, [user, isAnonymous]);
+
+  // Update the handleLogout function to redirect to the main devotion page
+  const handleLogout = async () => {
+    try {
+      // Get the current date from the URL before logging out
+      const currentDateString = params.date;
+      await logout();
+      
+      // Redirect to login page with the main devotion page in the "from" parameter
+      router.push(`/auth/login?from=${encodeURIComponent(`/devotion/${currentDateString}`)}`);
+    } catch (error) {
+      console.error('Logout failed:', error);
+      toast.error('Failed to log out');
+    }
+  };
 
   if (!user) {
     return (
@@ -1432,16 +1509,16 @@ export default function ReflectionPage({
                     {isFeatureAccessible('ai') ? (
                       <>
                         <div className="flex items-center gap-4">
-                          <input
-                            type="text"
+                <input
+                  type="text"
                             value={aiQuestion}
                             onChange={(e) => setAiQuestion(e.target.value)}
-                            onKeyPress={handleReflectionKeyPress}
+                  onKeyPress={handleReflectionKeyPress}
                             placeholder="Ask questions about today's text..."
                             className="flex-1 bg-[#0F1211] border-none outline-none rounded-2xl px-6 py-5 text-white placeholder-white/50"
-                          />
-                          <button
-                            onClick={handleReflectionGeneration}
+                />
+                <button
+                  onClick={handleReflectionGeneration}
                             disabled={isAiLoading || !aiQuestion.trim()}
                             className={`w-16 h-16 rounded-2xl flex items-center justify-center ${
                               isAiLoading || !aiQuestion.trim()
@@ -1450,31 +1527,38 @@ export default function ReflectionPage({
                             }`}
                           >
                             <ArrowRightIcon className={`w-7 h-7 ${isAiLoading || !aiQuestion.trim() ? "text-white" : "text-black"}`} />
-                          </button>
-                        </div>
+                </button>
+              </div>
                         
                         {aiResponse && (
                           <div className="mt-6 p-4 bg-[#0F1211] rounded-xl">
                             <p className="text-white/90 whitespace-pre-line">{aiResponse}</p>
+                            <div className="mt-4 pt-3 border-t border-white/10 flex items-center">
+                              <Link href="/history" className="text-white/60 text-sm hover:text-white/80 flex items-center">
+                                <ClockIcon className="w-4 h-4 mr-1.5" />
+                                Your AI reflection has been saved to history
+                                <ChevronRightIcon className="w-4 h-4 ml-1" />
+                              </Link>
+                            </div>
                           </div>
                         )}
 
-                        {aiError && (
+              {aiError && (
                           <div className="mt-6 p-4 bg-red-900/20 rounded-xl">
                             <p className="text-red-400">{aiError}</p>
-                          </div>
-                        )}
+                </div>
+              )}
 
                         {isAiLoading && (
                           <div className="mt-6 flex justify-center">
                             <div className="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                          </div>
+                </div>
                         )}
                       </>
                     ) : (
                       <AuthPrompt feature="AI Reflection" />
-                    )}
-                  </div>
+              )}
+            </div>
 
             {/* Resources */}
                   <div className="mt-4">
@@ -1496,14 +1580,14 @@ export default function ReflectionPage({
                           <div className="absolute inset-0 p-6 flex flex-col justify-end">
                             <h2 className="text-2xl font-medium mb-1">Resources for today's text</h2>
                             <p className="text-white/80">Bible Commentaries, Videos, and Podcasts</p>
-                          </div>
+                </div>
                         </div>
                       </div>
                     ) : (
                       <AuthPrompt feature="Resources" />
                     )}
-                  </div>
-                </>
+            </div>
+          </>
               ) : (
                 !isFuture(currentDate) && showNoDevotionContent && (
                   <div className="text-center pt-10">
@@ -1738,6 +1822,19 @@ export default function ReflectionPage({
         </div>
       )}
       </div>
+      
+      {/* Logout button - only show for fully authenticated users */}
+      {user && !isAnonymous && (
+        <div className="pb-8 pt-2 flex justify-center">
+          <button
+            onClick={handleLogout}
+            className="flex items-center px-6 py-2 bg-zinc-800 hover:bg-zinc-700 rounded-full text-white/80 hover:text-white transition-colors"
+          >
+            <ArrowRightOnRectangleIcon className="w-5 h-5 mr-2" />
+            Log Out
+          </button>
+        </div>
+      )}
     </ClientOnly>
   );
 }

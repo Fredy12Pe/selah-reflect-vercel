@@ -106,7 +106,7 @@ const modalAnimations = `
 
 export default function JournalPage({ params }: { params: { date: string } }) {
   const router = useRouter();
-  const { user, loading, isAnonymous } = useAuth();
+  const { user, loading, isAnonymous, logout } = useAuth();
   const [devotionData, setDevotionData] = useState<PartialDevotion | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [journalEntries, setJournalEntries] = useState<{ [key: string]: string }>({});
@@ -125,23 +125,47 @@ export default function JournalPage({ params }: { params: { date: string } }) {
   
   // Pull-to-close handlers
   const handleTouchStart = (e: React.TouchEvent) => {
+    // Store initial touch position
     setTouchStartY(e.touches[0].clientY);
   };
   
   const handleTouchMove = (e: React.TouchEvent) => {
     if (touchStartY === null) return;
     
+    // Prevent default to avoid scrolling when dragging from the top area (header)
+    const headerHeight = 60; // Approximate header height
     const touchY = e.touches[0].clientY;
+    const rect = scriptureModalRef.current?.getBoundingClientRect();
+    const touchWithinHeader = rect && (touchY - rect.top < headerHeight);
+    
+    if (touchWithinHeader) {
+      e.preventDefault();
+    }
+    
     const deltaY = touchY - touchStartY;
     
-    // Increased threshold from 50px to 100px to make it less sensitive
-    if (deltaY > 100) {
-      setTouchStartY(null);
-      closeScriptureModal();
+    // Only consider downward movement (positive deltaY)
+    if (deltaY > 0) {
+      // Apply transform to give visual feedback while dragging
+      if (scriptureModalRef.current) {
+        scriptureModalRef.current.style.transform = `translateY(${deltaY * 0.5}px)`;
+        scriptureModalRef.current.style.transition = 'none';
+      }
+      
+      // Close only when dragged more than 200px (much higher threshold)
+      if (deltaY > 200) {
+        setTouchStartY(null);
+        closeScriptureModal();
+      }
     }
   };
   
   const handleTouchEnd = () => {
+    // Reset any applied transform with smooth animation
+    if (scriptureModalRef.current) {
+      scriptureModalRef.current.style.transform = 'translateY(0)';
+      scriptureModalRef.current.style.transition = 'transform 0.3s ease-out';
+    }
     setTouchStartY(null);
   };
 
@@ -338,7 +362,7 @@ export default function JournalPage({ params }: { params: { date: string } }) {
   // Redirect if not authenticated
   useEffect(() => {
     if (!loading && !user) {
-      router.push(`/auth/login?from=${encodeURIComponent(`/devotion/${params.date}/journal`)}`);
+      router.push(`/auth/login?from=${encodeURIComponent(`/devotion/${params.date}`)}`);
     }
   }, [user, loading, router, params.date]);
 
@@ -354,18 +378,37 @@ export default function JournalPage({ params }: { params: { date: string } }) {
   }, [journalEntries]);
 
   // Auth prompt component for anonymous users
-  const AuthPrompt = () => (
-    <div className="bg-[#0F1211] rounded-2xl p-8 text-center">
-      <p className="text-white/70 mb-4">Sign in to access your personal journal</p>
-      <Link 
-        href={`/auth/login?from=${encodeURIComponent(`/devotion/${params.date}/journal`)}`}
-        className="px-6 py-2 bg-white rounded-full hover:bg-white/90 inline-flex items-center text-black font-medium"
-      >
-        <span>Sign In</span>
-        <ChevronRightIcon className="w-5 h-5 ml-2" />
-      </Link>
-    </div>
-  );
+  const AuthPrompt = () => {
+    const handleSignIn = () => {
+      // Ensure anonymous users are logged out before redirecting to login
+      if (isAnonymous && user) {
+        logout().then(() => {
+          // After logout, redirect to login page
+          router.push(`/auth/login?from=${encodeURIComponent(`/devotion/${params.date}`)}`);
+        }).catch(error => {
+          console.error("Error signing out anonymous user:", error);
+          // If logout fails, still try to redirect
+          router.push(`/auth/login?from=${encodeURIComponent(`/devotion/${params.date}`)}`);
+        });
+      } else {
+        // Regular redirect if not anonymous
+        router.push(`/auth/login?from=${encodeURIComponent(`/devotion/${params.date}`)}`);
+      }
+    };
+    
+    return (
+      <div className="bg-[#0F1211] rounded-2xl p-8 text-center">
+        <p className="text-white/70 mb-4">Sign in to access your personal journal</p>
+        <button 
+          onClick={handleSignIn}
+          className="px-6 py-2 bg-white rounded-full hover:bg-white/90 inline-flex items-center text-black font-medium"
+        >
+          <span>Sign In</span>
+          <ChevronRightIcon className="w-5 h-5 ml-2" />
+        </button>
+      </div>
+    );
+  };
 
   if (loading || isLoading) {
     return (
@@ -376,13 +419,20 @@ export default function JournalPage({ params }: { params: { date: string } }) {
   }
 
   if (!user) {
+    const handleSignIn = () => {
+      router.push(`/auth/login?from=${encodeURIComponent(`/devotion/${params.date}`)}`);
+    };
+    
     return (
       <div className="min-h-screen bg-black text-white flex items-center justify-center p-4">
         <div className="max-w-md text-center">
           <p className="text-xl mb-4">Please sign in to view your journal</p>
-          <Link href={`/auth/login?from=${encodeURIComponent(`/devotion/${params.date}/journal`)}`} className="px-4 py-2 bg-zinc-800 rounded-lg hover:bg-zinc-700">
+          <button 
+            onClick={handleSignIn}
+            className="px-4 py-2 bg-zinc-800 rounded-lg hover:bg-zinc-700"
+          >
             Sign In
-          </Link>
+          </button>
         </div>
       </div>
     );

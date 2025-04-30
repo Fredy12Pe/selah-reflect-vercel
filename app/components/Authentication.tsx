@@ -165,6 +165,29 @@ export default function Authentication() {
     }
   }, [router, from]);
 
+  // Handle anonymous sign-in (defined before handleSignIn to avoid circular dependency)
+  const handleAnonymousSignIn = useCallback(async () => {
+    if (!isBrowser) return;
+    
+    try {
+      setIsAnonymousLoading(true);
+      setError("");
+      
+      await loginAnonymously();
+      console.log("Successfully signed in anonymously");
+      
+      // Don't show a toast for anonymous sign-in
+      redirectAfterLogin();
+    } catch (error) {
+      console.error("Anonymous sign-in error:", error);
+      let errorMessage = error instanceof Error ? error.message : "Failed to sign in anonymously";
+      setError(errorMessage);
+      toast.error(errorMessage);
+    } finally {
+      setIsAnonymousLoading(false);
+    }
+  }, [loginAnonymously, redirectAfterLogin]);
+
   const handleSignIn = useCallback(async () => {
     // Ensure we're in browser environment
     if (!isBrowser) {
@@ -216,7 +239,41 @@ export default function Authentication() {
           return;
         }
         
-        throw new Error("Failed to establish your session");
+        // Custom handling for session establishment error
+        const sessionErrorMsg = "Failed to establish your session";
+        setError(sessionErrorMsg);
+        
+        // Show a special toast for this specific error
+        toast.error(
+          <div>
+            <p className="font-medium">Session error</p>
+            <p className="text-sm">Unable to establish your session</p>
+          </div>
+        );
+        
+        // Show guest mode suggestion immediately for this error
+        toast(
+          (t) => (
+            <div className="flex items-start">
+              <div className="flex-1">
+                <p className="font-bold">Try guest mode!</p>
+                <p className="text-sm opacity-90">Continue as a guest while we fix this issue</p>
+              </div>
+              <button 
+                onClick={() => {
+                  toast.dismiss(t.id);
+                  handleAnonymousSignIn();
+                }}
+                className="ml-3 px-3 py-1 bg-white text-black text-sm font-medium rounded-full"
+              >
+                Guest Mode
+              </button>
+            </div>
+          ),
+          { duration: 15000 }
+        );
+        
+        return; // Return early to prevent showing the success message
       }
 
       console.log("Successfully signed in");
@@ -237,33 +294,34 @@ export default function Authentication() {
       
       setError(errorMessage);
       toast.error(errorMessage);
+      
+      // Show a suggestion to try guest login as a fallback
+      setTimeout(() => {
+        toast(
+          (t) => (
+            <div className="flex items-start">
+              <div className="flex-1">
+                <p className="font-medium">Having trouble signing in?</p>
+                <p className="text-sm opacity-90">Try continuing as a guest for now and login later, thanks!</p>
+              </div>
+              <button 
+                onClick={() => {
+                  toast.dismiss(t.id);
+                  handleAnonymousSignIn();
+                }}
+                className="ml-3 px-3 py-1 bg-white text-black text-sm font-medium rounded-full"
+              >
+                Try it
+              </button>
+            </div>
+          ),
+          { duration: 8000 }
+        );
+      }, 1000); // Show after a short delay so it appears after the error message
     } finally {
       setLoading(false);
     }
-  }, [redirectAfterLogin, setSessionCookie]);
-
-  // Handle anonymous sign-in
-  const handleAnonymousSignIn = useCallback(async () => {
-    if (!isBrowser) return;
-    
-    try {
-      setIsAnonymousLoading(true);
-      setError("");
-      
-      await loginAnonymously();
-      console.log("Successfully signed in anonymously");
-      
-      // Don't show a toast for anonymous sign-in
-      redirectAfterLogin();
-    } catch (error) {
-      console.error("Anonymous sign-in error:", error);
-      let errorMessage = error instanceof Error ? error.message : "Failed to sign in anonymously";
-      setError(errorMessage);
-      toast.error(errorMessage);
-    } finally {
-      setIsAnonymousLoading(false);
-    }
-  }, [loginAnonymously, redirectAfterLogin]);
+  }, [redirectAfterLogin, setSessionCookie, handleAnonymousSignIn]);
 
   return (
     <div className="min-h-screen">

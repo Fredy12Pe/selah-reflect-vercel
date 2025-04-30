@@ -8,6 +8,7 @@ import {
   getAuth, 
   setPersistence, 
   browserLocalPersistence, 
+  browserSessionPersistence, 
   Auth, 
   connectAuthEmulator, 
   signInAnonymously 
@@ -60,6 +61,10 @@ export const signInAnonymousUser = async () => {
   if (typeof window === 'undefined' || !auth) return null;
   
   try {
+    // For anonymous users, we don't want persistence between sessions
+    // We'll use session persistence which is cleared when the browser is closed
+    await setPersistence(auth, browserSessionPersistence);
+    
     const userCredential = await signInAnonymously(auth);
     console.log('[Firebase] Anonymous sign-in successful');
     return userCredential.user;
