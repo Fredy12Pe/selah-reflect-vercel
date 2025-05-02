@@ -271,28 +271,238 @@ export async function createOrUpdateDevotion(devotionInput: DevotionInput): Prom
 
 export async function getHymnByMonth(month: string): Promise<Hymn | null> {
   try {
+    console.log('DevotionService: Getting hymn for month:', month);
     const db = getFirebaseDb();
     if (!db) {
-      console.log('Database not initialized');
-      return null;
+      console.error('DevotionService: Database not initialized');
+      return getFallbackHymnForMonth(month);
     }
     
-    // Use the full month name directly for fetching hymn data
-    console.log('Getting hymn for month:', month);
+    // Handle both formats - full month name (like "April") or normalized format (YYYY-MM)
+    let monthName = month;
     
-    const hymnRef = doc(db, 'hymns', month);
+    // If we received a normalized month (YYYY-MM format), extract just the month
+    if (month.includes('-') && month.length >= 7) {
+      try {
+        // Convert from YYYY-MM format to month name
+        const date = new Date(month + '-01');
+        if (!isNaN(date.getTime())) {
+          monthName = date.toLocaleString('default', { month: 'long' });
+          console.log('DevotionService: Converted normalized month to name:', monthName);
+        }
+      } catch (dateError) {
+        console.error('DevotionService: Error converting month format:', dateError);
+      }
+    }
+    
+    // Try to use the lowercase month name as the document ID
+    const docId = monthName.toLowerCase();
+    console.log('DevotionService: Using lowercase document ID:', docId);
+    
+    // Debug: List all documents in the hymns collection
+    try {
+      const hymnsCollection = collection(db, 'hymns');
+      const hymnsSnapshot = await getDocs(hymnsCollection);
+      console.log('DevotionService: All hymn documents in collection:');
+      hymnsSnapshot.forEach(doc => {
+        console.log(`Document ID: ${doc.id}, Data:`, doc.data());
+      });
+    } catch (listError) {
+      console.error('DevotionService: Error listing hymn documents:', listError);
+    }
+    
+    const hymnRef = doc(db, 'hymns', docId);
     const hymnSnap = await getDoc(hymnRef);
     
     if (!hymnSnap.exists()) {
-      console.log('No hymn found for month:', month);
-      return null;
+      console.log('DevotionService: No hymn found for month:', docId);
+      return getFallbackHymnForMonth(monthName);
     }
     
-    return hymnSnap.data() as Hymn;
+    const hymnData = hymnSnap.data() as Hymn;
+    console.log('DevotionService: Successfully fetched hymn data for month:', docId, hymnData);
+    return hymnData;
   } catch (error) {
-    console.error('Error fetching hymn:', error);
-    throw new Error('Failed to fetch hymn');
+    console.error('DevotionService: Error fetching hymn:', error);
+    return getFallbackHymnForMonth(month);
   }
+}
+
+// Fallback hymns in case Firebase access fails
+function getFallbackHymnForMonth(month: string): Hymn {
+  console.log('DevotionService: Using fallback hymn for month:', month);
+  
+  // Normalize month name for lookup
+  let monthName = month.toLowerCase();
+  
+  // If we have a date format (YYYY-MM), extract the month
+  if (monthName.includes('-') && monthName.length >= 7) {
+    try {
+      const date = new Date(month + '-01');
+      if (!isNaN(date.getTime())) {
+        monthName = date.toLocaleString('default', { month: 'long' }).toLowerCase();
+      }
+    } catch (e) {
+      console.error('Error parsing month format:', e);
+    }
+  }
+  
+  // Default hymn in case the month doesn't match
+  const defaultHymn: Hymn = {
+    title: "Amazing Grace",
+    author: "John Newton",
+    lyrics: [
+      { lineNumber: 1, text: "Amazing grace! how sweet the sound," },
+      { lineNumber: 2, text: "That saved a wretch like me!" },
+      { lineNumber: 3, text: "I once was lost, but now am found," },
+      { lineNumber: 4, text: "Was blind, but now I see." },
+      { lineNumber: 5, text: "" },
+      { lineNumber: 6, text: "'Twas grace that taught my heart to fear," },
+      { lineNumber: 7, text: "And grace my fears relieved;" },
+      { lineNumber: 8, text: "How precious did that grace appear" },
+      { lineNumber: 9, text: "The hour I first believed!" }
+    ],
+    month: "Default"
+  };
+  
+  // Map of fallback hymns for each month
+  const fallbackHymns: Record<string, Hymn> = {
+    january: {
+      title: "Amazing Grace",
+      author: "John Newton",
+      lyrics: [
+        { lineNumber: 1, text: "Amazing grace! how sweet the sound," },
+        { lineNumber: 2, text: "That saved a wretch like me!" },
+        { lineNumber: 3, text: "I once was lost, but now am found," },
+        { lineNumber: 4, text: "Was blind, but now I see." }
+      ],
+      month: "January"
+    },
+    february: {
+      title: "Holy, Holy, Holy",
+      author: "Reginald Heber",
+      lyrics: [
+        { lineNumber: 1, text: "Holy, holy, holy! Lord God Almighty!" },
+        { lineNumber: 2, text: "Early in the morning our song shall rise to thee;" },
+        { lineNumber: 3, text: "Holy, holy, holy! merciful and mighty," },
+        { lineNumber: 4, text: "God in three persons, blessed Trinity!" }
+      ],
+      month: "February"
+    },
+    march: {
+      title: "Be Thou My Vision",
+      author: "Ancient Irish Poem",
+      lyrics: [
+        { lineNumber: 1, text: "Be Thou my Vision, O Lord of my heart;" },
+        { lineNumber: 2, text: "Naught be all else to me, save that Thou art;" },
+        { lineNumber: 3, text: "Thou my best Thought, by day or by night," },
+        { lineNumber: 4, text: "Waking or sleeping, Thy presence my light." }
+      ],
+      month: "March"
+    },
+    april: {
+      title: "When I Survey the Wondrous Cross",
+      author: "Isaac Watts",
+      lyrics: [
+        { lineNumber: 1, text: "When I survey the wondrous cross" },
+        { lineNumber: 2, text: "On which the Prince of glory died," },
+        { lineNumber: 3, text: "My richest gain I count but loss," },
+        { lineNumber: 4, text: "And pour contempt on all my pride." }
+      ],
+      month: "April"
+    },
+    may: {
+      title: "O Master, Let Me Walk With Thee",
+      author: "Washington Gladden",
+      lyrics: [
+        { lineNumber: 1, text: "O Master, let me walk with Thee" },
+        { lineNumber: 2, text: "In lowly paths of service free;" },
+        { lineNumber: 3, text: "Tell me Thy secret; help me bear" },
+        { lineNumber: 4, text: "The strain of toil, the fret of care." }
+      ],
+      month: "May"
+    },
+    june: {
+      title: "Great Is Thy Faithfulness",
+      author: "Thomas O. Chisholm",
+      lyrics: [
+        { lineNumber: 1, text: "Great is Thy faithfulness, O God my Father," },
+        { lineNumber: 2, text: "There is no shadow of turning with Thee;" },
+        { lineNumber: 3, text: "Thou changest not, Thy compassions, they fail not" },
+        { lineNumber: 4, text: "As Thou hast been Thou forever wilt be." }
+      ],
+      month: "June"
+    },
+    july: {
+      title: "Blessed Assurance",
+      author: "Fanny Crosby",
+      lyrics: [
+        { lineNumber: 1, text: "Blessed assurance, Jesus is mine!" },
+        { lineNumber: 2, text: "Oh, what a foretaste of glory divine!" },
+        { lineNumber: 3, text: "Heir of salvation, purchase of God," },
+        { lineNumber: 4, text: "Born of His Spirit, washed in His blood." }
+      ],
+      month: "July"
+    },
+    august: {
+      title: "It Is Well With My Soul",
+      author: "Horatio G. Spafford",
+      lyrics: [
+        { lineNumber: 1, text: "When peace like a river attendeth my way," },
+        { lineNumber: 2, text: "When sorrows like sea billows roll;" },
+        { lineNumber: 3, text: "Whatever my lot, Thou hast taught me to say," },
+        { lineNumber: 4, text: "It is well, it is well with my soul." }
+      ],
+      month: "August"
+    },
+    september: {
+      title: "Come, Thou Fount of Every Blessing",
+      author: "Robert Robinson",
+      lyrics: [
+        { lineNumber: 1, text: "Come, Thou Fount of every blessing," },
+        { lineNumber: 2, text: "Tune my heart to sing Thy grace;" },
+        { lineNumber: 3, text: "Streams of mercy, never ceasing," },
+        { lineNumber: 4, text: "Call for songs of loudest praise." }
+      ],
+      month: "September"
+    },
+    october: {
+      title: "A Mighty Fortress Is Our God",
+      author: "Martin Luther",
+      lyrics: [
+        { lineNumber: 1, text: "A mighty fortress is our God," },
+        { lineNumber: 2, text: "A bulwark never failing;" },
+        { lineNumber: 3, text: "Our helper He, amid the flood" },
+        { lineNumber: 4, text: "Of mortal ills prevailing." }
+      ],
+      month: "October"
+    },
+    november: {
+      title: "How Great Thou Art",
+      author: "Carl Boberg",
+      lyrics: [
+        { lineNumber: 1, text: "O Lord my God, when I in awesome wonder" },
+        { lineNumber: 2, text: "Consider all the worlds Thy hands have made," },
+        { lineNumber: 3, text: "I see the stars, I hear the rolling thunder," },
+        { lineNumber: 4, text: "Thy pow'r throughout the universe displayed," }
+      ],
+      month: "November"
+    },
+    december: {
+      title: "Joy to the World",
+      author: "Isaac Watts",
+      lyrics: [
+        { lineNumber: 1, text: "Joy to the world! the Lord is come;" },
+        { lineNumber: 2, text: "Let earth receive her King;" },
+        { lineNumber: 3, text: "Let ev'ry heart prepare Him room," },
+        { lineNumber: 4, text: "And heav'n and nature sing," }
+      ],
+      month: "December"
+    }
+  };
+  
+  // Return the appropriate hymn or default if not found
+  return fallbackHymns[monthName] || defaultHymn;
 }
 
 export async function createOrUpdateMeta(meta: Meta): Promise<void> {
@@ -431,4 +641,29 @@ export async function getAvailableDates(): Promise<string[]> {
     console.log('Using fallback dates due to error');
     return fallbackDates;
   }
-} 
+}
+
+// Function to convert hymn lyrics from Firebase format to verses format for display
+const convertHymnLyricsToVerses = (hymnData: Hymn | null): Array<{verse: number, lines: string[]}> => {
+  if (!hymnData || !hymnData.lyrics || hymnData.lyrics.length === 0) {
+    return [];
+  }
+
+  // Group lyrics by verse (assuming 4 lines per verse)
+  const linesPerVerse = 4;
+  const verses = [];
+  
+  // Sort lyrics by lineNumber to ensure correct order
+  const sortedLyrics = [...hymnData.lyrics].sort((a, b) => a.lineNumber - b.lineNumber);
+  
+  // Group into verses of 4 lines each
+  for (let i = 0; i < sortedLyrics.length; i += linesPerVerse) {
+    const verseLines = sortedLyrics.slice(i, i + linesPerVerse).map(line => line.text);
+    verses.push({
+      verse: Math.floor(i / linesPerVerse) + 1,
+      lines: verseLines
+    });
+  }
+  
+  return verses;
+}; 

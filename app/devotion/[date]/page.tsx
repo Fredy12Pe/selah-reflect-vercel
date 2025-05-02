@@ -12,6 +12,8 @@ import {
 } from "@/lib/services/unsplashService";
 import DynamicBackground from "@/app/components/DynamicBackground";
 import { format, parseISO } from "date-fns";
+import { getVerse, createScriptureVerse } from "@/lib/bibleApi";
+import Link from "next/link";
 
 interface DevotionData {
   date: string;
@@ -33,8 +35,22 @@ interface BibleVerse {
   }[];
 }
 
-// Get the ESV API key from environment variables
-const ESV_API_KEY = process.env.NEXT_PUBLIC_ESV_API_KEY;
+// Bible verse fetching function
+const fetchBibleVerse = async (reference: string, scriptureText?: string) => {
+  if (!reference) {
+    console.log("No reference provided to fetchBibleVerse");
+    return null;
+  }
+  
+  try {
+    console.log("Fetching Bible verse for reference:", reference);
+    const verse = await getVerse(reference, scriptureText);
+    return verse;
+  } catch (error) {
+    console.error("Error in fetchBibleVerse:", error);
+    return null;
+  }
+};
 
 export default function DevotionPage({ params }: { params: { date: string } }) {
   const router = useRouter();
@@ -42,6 +58,7 @@ export default function DevotionPage({ params }: { params: { date: string } }) {
   const [devotion, setDevotion] = useState<DevotionData | null>(null);
   const [bibleVerse, setBibleVerse] = useState<BibleVerse | null>(null);
   const [pageLoading, setPageLoading] = useState(true);
+  const [apiKeyStatus, setApiKeyStatus] = useState<'unknown' | 'valid' | 'invalid' | 'testing'>('unknown');
 
   const currentDate = parseISO(params.date);
 
@@ -53,6 +70,42 @@ export default function DevotionPage({ params }: { params: { date: string } }) {
     const day = String(today.getDate()).padStart(2, "0");
     return `${year}-${month}-${day}`;
   };
+
+  // Check ESV API key validity
+  useEffect(() => {
+    const checkApiKey = async () => {
+      try {
+        // Check if the API key exists and is not the default
+        const apiKey = process.env.NEXT_PUBLIC_ESV_BIBLE_API_KEY;
+        if (!apiKey || apiKey === 'YOUR_ESV_API_KEY') {
+          console.log('API key is invalid or missing');
+          setApiKeyStatus('invalid');
+          return;
+        }
+
+        // Test with a simple verse
+        setApiKeyStatus('testing');
+        console.log('Testing ESV API key...');
+        const testReference = 'John 3:16';
+        const verse = await fetchBibleVerse(testReference);
+        
+        if (verse && verse.text && !verse.text.includes('Could not load verse')) {
+          console.log('ESV API key is valid');
+          setApiKeyStatus('valid');
+        } else {
+          console.log('ESV API key test failed');
+          setApiKeyStatus('invalid');
+        }
+      } catch (error) {
+        console.error('Error testing API key:', error);
+        setApiKeyStatus('invalid');
+      }
+    };
+
+    if (!loading && user) {
+      checkApiKey();
+    }
+  }, [loading, user]);
 
   useEffect(() => {
     // If no date is provided or it's invalid, redirect to today's date
@@ -68,47 +121,14 @@ export default function DevotionPage({ params }: { params: { date: string } }) {
       return;
     }
 
-    const fetchBibleVerse = async (reference: string) => {
-      try {
-        console.log("Fetching Bible verse for reference:", reference);
-        
-        // Import utility for getting cached verses
-        const { getVerse, getCachedVerse } = await import('@/lib/bibleApi');
-        
-        // Try to get from cache first
-        try {
-          // Check if we have this verse in localStorage
-          const cachedESV = getCachedVerse(reference, 'esv');
-          if (cachedESV) {
-            console.log('Found Bible verse in cache:', reference);
-            return cachedESV;
-          }
-          
-          const cachedBibleApi = getCachedVerse(reference, 'bible-api');
-          if (cachedBibleApi) {
-            console.log('Found Bible verse in cache (bible-api):', reference);
-            return cachedBibleApi;
-          }
-        } catch (cacheError) {
-          console.warn('Cache retrieval error:', cacheError);
-          // Continue to fetch from API
-        }
-        
-        console.log('Fetching Bible verse from API:', reference);
-        return await getVerse(reference);
-      } catch (error) {
-        console.error("Error fetching Bible verse:", error);
-        // Create a simple verse object as fallback
-        return {
-          text: reference,
-          reference: "Scripture",
-          verses: [{ verse: 1, text: reference }]
-        };
-      }
-    };
-
     const fetchData = async () => {
       try {
+        // Check for connectivity issues
+        if (typeof navigator !== 'undefined' && !navigator.onLine) {
+          console.warn("Device appears to be offline. Firestore operations may fail.");
+          toast.error("You appear to be offline. Some features may not work properly.");
+        }
+        
         // Create a document reference using our safe helper
         const devotionRef = safeDoc("devotions", params.date);
         
@@ -140,20 +160,75 @@ export default function DevotionPage({ params }: { params: { date: string } }) {
         // Fall back to scriptureReference for backward compatibility
         const reference =
           devotionData.bibleText || devotionData.scriptureReference;
+        
         if (reference) {
           console.log("Using reference for Bible API:", reference);
-          const verse = await fetchBibleVerse(reference);
-          if (verse) {
-            setBibleVerse(verse);
-            console.log("Successfully loaded Bible verse:", verse.reference);
-          } else {
-            console.error(
-              "Failed to fetch Bible verse for reference:",
-              reference
-            );
+            
+          // Create a simple fallback in case Bible APIs fail
+          const fallbackVerse = {
+            text: devotionData.scriptureText || reference,
+            reference: reference,
+            verses: devotionData.scriptureText 
+              ? [{ verse: 1, text: devotionData.scriptureText }]
+              : [{ verse: 1, text: reference }]
+          };
+            
+          // If we have scriptureText, set it as an immediate temporary value 
+          // while API request is being made
+          if (devotionData.scriptureText) {
+            console.log("Setting temporary Bible verse from scriptureText");
+            setBibleVerse(fallbackVerse);
           }
+          
+          // Function to fetch with retries
+          const fetchWithRetry = async (maxRetries = 2) => {
+            for (let attempt = 0; attempt <= maxRetries; attempt++) {
+              try {
+                console.log(`Attempt ${attempt + 1} to fetch Bible verse`);
+                
+                // Add exponential backoff between retries
+                if (attempt > 0) {
+                  const delay = 1000 * Math.pow(2, attempt);
+                  console.log(`Waiting ${delay}ms before retry...`);
+                  await new Promise(r => setTimeout(r, delay));
+                }
+                
+                const verse = await fetchBibleVerse(reference, devotionData.scriptureText);
+                
+                if (verse) {
+                  console.log("Successfully loaded Bible verse:", verse.reference);
+                  setBibleVerse(verse);
+                  return true;
+                }
+              } catch (error) {
+                console.error(`Error on attempt ${attempt + 1}:`, error);
+                if (attempt === maxRetries) {
+                  console.error("All retry attempts failed");
+                  return false;
+                }
+              }
+            }
+            return false;
+          };
+          
+          // Start the fetch attempt
+          fetchWithRetry().then(success => {
+            if (!success && devotionData.scriptureText) {
+              console.log("All fetch attempts failed, using scriptureText as fallback");
+              setBibleVerse(fallbackVerse);
+            }
+          });
         } else {
           console.warn("No Bible reference found in devotion data");
+          // If we have scriptureText but no reference, we can still create a verse object
+          if (devotionData.scriptureText) {
+            console.log("Using scriptureText with no reference");
+            setBibleVerse({
+              text: devotionData.scriptureText,
+              reference: "Scripture",
+              verses: [{ verse: 1, text: devotionData.scriptureText }]
+            });
+          }
         }
       } catch (error) {
         console.error("Error fetching data:", error);
@@ -167,6 +242,48 @@ export default function DevotionPage({ params }: { params: { date: string } }) {
       fetchData();
     }
   }, [params.date, user, loading, router]);
+
+  // Add a second useEffect to retry Bible verse loading if it fails initially
+  useEffect(() => {
+    const retryBibleVerseFetch = async () => {
+      // Only retry if we have devotion data but no Bible verse
+      if (devotion && !bibleVerse) {
+        console.log("Retrying Bible verse fetch...");
+        const reference = devotion.bibleText || devotion.scriptureReference;
+        
+        if (reference) {
+          try {
+            const verse = await fetchBibleVerse(reference, devotion.scriptureText);
+            if (verse) {
+              console.log("Successfully loaded Bible verse on retry:", verse.reference);
+              setBibleVerse(verse);
+            } else if (devotion.scriptureText) {
+              console.log("Using scriptureText as fallback after retry");
+              setBibleVerse({
+                text: devotion.scriptureText,
+                reference: reference || "Scripture",
+                verses: [{ verse: 1, text: devotion.scriptureText }]
+              });
+            }
+          } catch (error) {
+            console.error("Failed to fetch Bible verse on retry:", error);
+            // On retry failure, use scriptureText as fallback if available
+            if (devotion.scriptureText) {
+              setBibleVerse({
+                text: devotion.scriptureText,
+                reference: reference || "Scripture",
+                verses: [{ verse: 1, text: devotion.scriptureText }]
+              });
+            }
+          }
+        }
+      }
+    };
+    
+    if (!pageLoading && devotion && !bibleVerse) {
+      retryBibleVerseFetch();
+    }
+  }, [devotion, bibleVerse, pageLoading]);
 
   if (loading || pageLoading) {
     return (
@@ -221,6 +338,17 @@ export default function DevotionPage({ params }: { params: { date: string } }) {
 
   // For debugging
   console.log("Bible verse state:", bibleVerse);
+  console.log("Devotion data:", devotion);
+  
+  // Log what text sources are available for debugging
+  const availableTextSources = {
+    hasBibleVerseText: !!bibleVerse?.text,
+    hasBibleVerseVerses: !!bibleVerse?.verses?.length,
+    hasScriptureText: !!devotion?.scriptureText,
+    hasScriptureReference: !!devotion?.scriptureReference,
+    hasBibleText: !!devotion?.bibleText,
+  };
+  console.log("Available text sources:", availableTextSources);
 
   return (
     <DynamicBackground
@@ -245,6 +373,16 @@ export default function DevotionPage({ params }: { params: { date: string } }) {
             <p className="text-xl text-white/90">
               Have a blessed day, {firstName}!
             </p>
+            
+            {/* API Key Status - Only shown when there's an issue */}
+            {apiKeyStatus === 'invalid' && (
+              <div className="mt-2 px-3 py-2 bg-red-900/50 rounded-lg text-sm">
+                <p className="mb-1">⚠️ Bible API configuration issue detected</p>
+                <Link href="/debug/esv-api-setup" className="text-blue-300 underline text-xs">
+                  Click here to fix
+                </Link>
+              </div>
+            )}
           </div>
         </div>
 
@@ -256,7 +394,8 @@ export default function DevotionPage({ params }: { params: { date: string } }) {
             <h2 className="text-2xl font-bold text-white flex-none mb-6">
               {bibleVerse?.reference ||
                 devotion?.bibleText ||
-                devotion?.scriptureReference}
+                devotion?.scriptureReference ||
+                "Today's Scripture"}
             </h2>
 
             {/* Scripture Text - Scrollable */}
@@ -265,7 +404,8 @@ export default function DevotionPage({ params }: { params: { date: string } }) {
               scrollbar-thin scrollbar-thumb-white/20 scrollbar-track-transparent"
             >
               <div className="space-y-4">
-                {bibleVerse?.verses ? (
+                {bibleVerse?.verses && bibleVerse.verses.length > 0 ? (
+                  // Case 1: We have properly formatted Bible verses with verse numbers
                   bibleVerse.verses.map((verse) => (
                     <p
                       key={verse.verse}
@@ -277,13 +417,71 @@ export default function DevotionPage({ params }: { params: { date: string } }) {
                       {verse.text}
                     </p>
                   ))
-                ) : (
+                ) : bibleVerse?.text ? (
+                  // Case 2: We have Bible text but not formatted with verse numbers
                   <p className="text-lg leading-relaxed text-white/95">
-                    {devotion?.scriptureText || "Loading scripture text..."}
+                    {bibleVerse.text}
                   </p>
+                ) : devotion?.scriptureText ? (
+                  // Case 3: Fallback to scriptureText field from devotion
+                  <p className="text-lg leading-relaxed text-white/95">
+                    {devotion.scriptureText}
+                  </p>
+                ) : (
+                  // Case 4: Last resort fallback - just show the reference with error
+                  <div className="text-center py-4">
+                    <p className="text-lg leading-relaxed text-white/70 italic mb-4">
+                      {devotion?.bibleText || devotion?.scriptureReference || "Loading scripture..."}
+                    </p>
+                    {(devotion?.bibleText || devotion?.scriptureReference) && (
+                      <div className="py-2">
+                        <p className="text-red-400 mb-4">Could not load scripture text</p>
+                        <div className="space-y-2">
+                          <button 
+                            onClick={() => {
+                              // Try fetching again
+                              if (devotion.bibleText || devotion.scriptureReference) {
+                                const reference = devotion.bibleText || devotion.scriptureReference;
+                                fetchBibleVerse(reference, devotion.scriptureText).then(verse => {
+                                  if (verse) setBibleVerse(verse);
+                                });
+                              }
+                            }}
+                            className="px-4 py-2 bg-white/10 rounded-lg hover:bg-white/20 text-white"
+                          >
+                            Retry
+                          </button>
+                          
+                          {apiKeyStatus === 'invalid' && (
+                            <div className="mt-2">
+                              <p className="text-sm text-white/70 mb-2">Bible API key issue detected</p>
+                              <Link href="/debug/esv-api-setup">
+                                <button className="px-4 py-2 bg-blue-600/60 rounded-lg hover:bg-blue-700/60 text-white text-sm">
+                                  Configure API Key
+                                </button>
+                              </Link>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 )}
               </div>
             </div>
+            
+            {/* API Configuration Note - Only shown when there's a loading issue */}
+            {apiKeyStatus === 'invalid' && !bibleVerse?.verses && !bibleVerse?.text && (
+              <div className="mb-4 px-4 py-3 bg-blue-900/30 rounded-lg text-sm">
+                <p className="mb-1">💡 Bible verses require API configuration</p>
+                <p className="text-white/80 mb-2">Set up your ESV Bible API key to unlock all features</p>
+                <Link href="/debug/esv-api-setup">
+                  <button className="px-3 py-1.5 bg-blue-600/60 rounded-lg hover:bg-blue-700/60 text-white text-sm">
+                    Configure API Key
+                  </button>
+                </Link>
+              </div>
+            )}
 
             {/* Reflection Button - Fixed */}
             <button

@@ -108,12 +108,12 @@ if (isBrowser() && !shouldSkipFirebaseInit) {
     } else {
       console.log('[Firebase] Using existing Firebase app instance');
       app = getApps()[0];
-      
+    
       // Initialize services from existing app
       try {
         firestore = getFirestore(app);
-        auth = getAuth(app);
-        storage = getStorage(app);
+    auth = getAuth(app);
+    storage = getStorage(app);
         console.log('[Firebase] Services initialized from existing app');
       } catch (error) {
         console.error('[Firebase] Error initializing services from existing app:', error);
@@ -147,7 +147,7 @@ export const getFirebaseAuth = (): Auth | null => {
       // Check if we have an app
       if (!app || Object.keys(app).length === 0) {
         console.log('[Firebase] Initializing app for Auth');
-        app = getApps().length > 0 ? getApps()[0] : initializeApp(firebaseConfig);
+      app = getApps().length > 0 ? getApps()[0] : initializeApp(firebaseConfig);
       }
       
       // Get auth from the app
@@ -197,7 +197,7 @@ export const getFirebaseDb = (): Firestore | null => {
   // Try to initialize Firestore with basic error handling
   try {
     console.log('[Firebase] Initializing Firestore on demand');
-    firestore = getFirestore(app);
+      firestore = getFirestore(app);
     
     // Apply more aggressive settings to avoid CORS issues
     if (firestore && typeof (firestore as any).settings === 'function') {

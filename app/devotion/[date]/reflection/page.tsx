@@ -619,6 +619,14 @@ export default function ReflectionPage({
   useEffect(() => {
     const loadImages = async () => {
       try {
+        // Default local fallback images
+        const defaultHymnImage = "/hymn-bg.jpg"; 
+        const defaultResourcesImage = "/resources-bg.jpg";
+
+        // Initialize with default images to ensure we always have something
+        setHymnImage(defaultHymnImage);
+        setResourcesImage(defaultResourcesImage);
+
         // Create cache keys for the images
         const hymnCacheKey = `hymnImage_${params.date}`;
         const resourcesCacheKey = `resourcesImage_${params.date}`;
@@ -639,17 +647,17 @@ export default function ReflectionPage({
           setHymnImage(cachedHymnImage);
         } else {
           try {
-          const hymn = await getDailyDevotionImage(
-            params.date,
-            "landscape,mountains,sunrise,peaceful"
-          );
-          if (hymn) {
+            const hymn = await getDailyDevotionImage(
+              params.date,
+              "landscape,mountains,sunrise,peaceful"
+            );
+            if (hymn) {
               setHymnImage(hymn);
-            try {
-              sessionStorage.setItem(hymnCacheKey, hymn);
-            } catch (error) {
+              try {
+                sessionStorage.setItem(hymnCacheKey, hymn);
+              } catch (error) {
                 console.warn("Unable to store hymn image in sessionStorage", error);
-            }
+              }
             }
           } catch (error) {
             console.error("Error loading hymn image:", error);
@@ -662,17 +670,17 @@ export default function ReflectionPage({
           setResourcesImage(cachedResourcesImage);
         } else {
           try {
-          const resources = await getDailyDevotionImage(
-            params.date,
-            "landscape,forest,lake,sunset"
-          );
-          if (resources) {
+            const resources = await getDailyDevotionImage(
+              params.date,
+              "landscape,forest,lake,sunset"
+            );
+            if (resources) {
               setResourcesImage(resources);
-            try {
-              sessionStorage.setItem(resourcesCacheKey, resources);
-            } catch (error) {
+              try {
+                sessionStorage.setItem(resourcesCacheKey, resources);
+              } catch (error) {
                 console.warn("Unable to store resources image in sessionStorage", error);
-            }
+              }
             }
           } catch (error) {
             console.error("Error loading resources image:", error);
@@ -1410,7 +1418,7 @@ export default function ReflectionPage({
                   <div className="absolute inset-0 bg-gradient-to-b from-black/30 to-black/70" />
                   <div className="absolute inset-0 p-6 flex flex-col justify-end">
                     <p className="text-lg font-medium text-white/80 mb-1">Hymn of the Month:</p>
-                    <h2 className="text-3xl font-medium">{hymn?.title}</h2>
+                    <h2 className="text-3xl font-medium">{hymn?.title || "Hymn of the Month"}</h2>
                     <p className="text-white/50 text-sm mt-1">Tap to view full hymn</p>
                   </div>
                 </div>
@@ -1597,7 +1605,8 @@ export default function ReflectionPage({
                 <div className="absolute inset-0 bg-gradient-to-b from-black/40 to-black/90" />
                 <div className="absolute inset-0 p-6 flex flex-col justify-end">
                   <p className="text-sm font-medium text-white/80 mb-1">Hymn of the Month</p>
-                  <h2 className="text-xl font-medium">{hymn?.title}</h2>
+                  <h2 className="text-xl font-medium">{hymn?.title || "Hymn of the Month"}</h2>
+                  {hymn?.author && <p className="text-sm text-white/60 mt-1">by {hymn.author}</p>}
                 </div>
               <button
                 onClick={closeHymnModal}
@@ -1607,7 +1616,7 @@ export default function ReflectionPage({
               </button>
             </div>
               <div className="p-6 space-y-6 overflow-y-auto flex-grow">
-                {hymn ? (
+                {hymn && hymn.lyrics && hymn.lyrics.length > 0 ? (
                   convertHymnLyricsToVerses(hymn).map((verse, index) => (
                     <div key={index} className="space-y-2">
                       <p className="text-sm font-medium text-white/60">Verse {verse.verse}</p>
@@ -1617,7 +1626,10 @@ export default function ReflectionPage({
                     </div>
                   ))
                 ) : (
-                  <p className="text-white/60">No hymn available for this month</p>
+                  <div className="space-y-4">
+                    <p className="text-white/80 text-center">The hymn for this month will appear here.</p>
+                    <p className="text-white/60 text-center">Please check back later or view a different month.</p>
+                  </div>
                 )}
               </div>
           </div>

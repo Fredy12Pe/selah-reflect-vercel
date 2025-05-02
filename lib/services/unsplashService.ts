@@ -33,11 +33,11 @@ export interface UnsplashImage {
  * Gets a random background image from Unsplash based on a search query
  * 
  * @param query - The search query (e.g. "bible", "nature", "prayer")
- * @param options - Additional options like date parameter for cache busting
+ * @param options - Additional options like date parameter for cache busting and signal for AbortController
  */
 export async function getRandomBackgroundImage(
   query: string = 'landscape,mountains,nature',
-  options: { dateParam?: string } = {}
+  options: { dateParam?: string, signal?: AbortSignal } = {}
 ): Promise<UnsplashImage | null> {
   if (!ACCESS_KEY) {
     console.warn('Unsplash Access Key not set in environment variables');
@@ -53,6 +53,7 @@ export async function getRandomBackgroundImage(
           Authorization: `Client-ID ${ACCESS_KEY}`,
           'Content-Type': 'application/json',
         },
+        signal: options.signal
       }
     );
 
@@ -80,21 +81,59 @@ export async function getDailyDevotionImage(
   query: string = 'landscape,mountains,forest,sunset,nature'
 ): Promise<string> {
   try {
-    // Use the date as a parameter for cache busting
-    const dateParam = date.replace(/-/g, '');
-    const image = await getRandomBackgroundImage(query, { dateParam });
+    // Local fallback images
+    const fallbackImages = {
+      default: '/images/background.jpg',
+      hymn: '/hymn-bg.jpg',
+      resources: '/resources-bg.jpg',
+      scripture: '/scripture-bg.jpg',
+    };
     
-    if (image?.urls?.regular) {
-      // Return direct Unsplash URL without going through Next.js image optimization
-      return image.urls.regular;
+    // Determine which fallback to use based on the query
+    let fallbackImage = fallbackImages.default;
+    if (query.includes('mountains') || query.includes('sunrise')) {
+      fallbackImage = fallbackImages.hymn;
+    } else if (query.includes('forest') || query.includes('lake')) {
+      fallbackImage = fallbackImages.resources;
+    } else if (query.includes('bible') || query.includes('scripture')) {
+      fallbackImage = fallbackImages.scripture;
     }
     
-    // If API call fails, use Unsplash Source (which doesn't require API key)
-    const formattedQuery = query.replace(/,/g, '+');
-    return `https://source.unsplash.com/1600x900/?${formattedQuery}&sig=${dateParam}`;
+    // If ACCESS_KEY is not available, don't even try the API call
+    if (!ACCESS_KEY) {
+      console.warn('UnsplashService: Access Key not set, using local image');
+      return fallbackImage;
+    }
+    
+    // Use the date as a parameter for cache busting
+    const dateParam = date.replace(/-/g, '');
+    
+    // Add a timeout to the fetch call to prevent hanging
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 3000); // 3 second timeout
+    
+    try {
+      const image = await getRandomBackgroundImage(query, { 
+        dateParam,
+        signal: controller.signal  
+      });
+      
+      clearTimeout(timeoutId);
+      
+      if (image?.urls?.regular) {
+        // Return direct Unsplash URL
+        return image.urls.regular;
+      } else {
+        console.warn('UnsplashService: No image URL returned, using local image');
+        return fallbackImage;
+      }
+    } catch (fetchError) {
+      console.error('UnsplashService: API fetch error:', fetchError);
+      return fallbackImage;
+    }
   } catch (error) {
-    console.error('Error in getDailyDevotionImage:', error);
-    return '/images/background.jpg'; // Fallback to local image
+    console.error('UnsplashService: Error in getDailyDevotionImage:', error);
+    return '/hymn-bg.jpg'; // Ultimate fallback
   }
 }
 
