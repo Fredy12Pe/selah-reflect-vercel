@@ -1,7 +1,7 @@
 // Service Worker for Selah Devotion PWA
-const CACHE_NAME = 'selah-devotion-cache-v1';
-const STATIC_CACHE_NAME = 'selah-devotion-static-v1';
-const API_CACHE_NAME = 'selah-devotion-api-v1';
+const CACHE_NAME = 'selah-devotion-cache-v2';
+const STATIC_CACHE_NAME = 'selah-devotion-static-v2';
+const API_CACHE_NAME = 'selah-devotion-api-v2';
 
 // Static files to cache immediately
 const STATIC_FILES = [
@@ -10,12 +10,9 @@ const STATIC_FILES = [
   '/favicon.ico',
   '/manifest.json',
   '/images/logo.png',
-  '/images/logo192.png',
-  '/images/logo512.png',
   '/hymn-bg.jpg',
   '/resources-bg.jpg',
-  '/history',
-  '/devotion',
+  '/fallback.html',
   '/auth/login'
 ];
 
@@ -74,13 +71,13 @@ const isStaticAsset = (url) => {
          url.endsWith('.woff2');
 };
 
-// Helper to check if this is a history page navigation
-const isHistoryNavigation = (url) => {
+// Helper to check if this is a history or devotion page navigation
+const isAppNavigation = (url) => {
   return url.includes('/history') || 
-         (url.includes('/devotion/') && !url.includes('/api/'));
+         url.includes('/devotion/');
 };
 
-// Fetch event - network-first for API, cache-first for static assets
+// Fetch event - improved handling for PWA installed version
 self.addEventListener('fetch', event => {
   const url = new URL(event.request.url);
   
@@ -89,7 +86,28 @@ self.addEventListener('fetch', event => {
     return;
   }
   
-  // Handle API requests (network-first strategy)
+  // For navigation requests in PWA mode, always go to index.html first
+  if (event.request.mode === 'navigate' && isAppNavigation(url.href)) {
+    event.respondWith(
+      caches.match('/')
+        .then(cachedResponse => {
+          if (cachedResponse) {
+            // Return cached index page for client-side routing
+            return cachedResponse;
+          }
+          // Fall back to network if not cached
+          return fetch(event.request);
+        })
+        .catch(() => {
+          // If both cache and network fail, return cached fallback page
+          return caches.match('/fallback.html') || 
+                 new Response('Network error', { status: 503 });
+        })
+    );
+    return;
+  }
+  
+  // Handle API requests (network-first with improved error handling)
   if (isAPIRequest(url.href)) {
     event.respondWith(
       fetch(event.request)
@@ -97,7 +115,7 @@ self.addEventListener('fetch', event => {
           // Clone the response to save it in cache and return it
           const responseToCache = response.clone();
           
-          // Only cache successful responses
+          // Cache successful responses
           if (response.status === 200) {
             caches.open(API_CACHE_NAME)
               .then(cache => {
@@ -107,7 +125,8 @@ self.addEventListener('fetch', event => {
           
           return response;
         })
-        .catch(() => {
+        .catch(error => {
+          console.log('API fetch failed, trying cache:', error);
           // If network fails, try to serve from cache
           return caches.match(event.request)
             .then(cachedResponse => {
@@ -118,7 +137,8 @@ self.addEventListener('fetch', event => {
               // Return a custom offline response for API requests
               return new Response(JSON.stringify({
                 error: 'You are offline. Please check your connection and try again.',
-                offline: true
+                offline: true,
+                errorMessage: error.message
               }), {
                 status: 503,
                 statusText: 'Service Unavailable',
@@ -132,59 +152,13 @@ self.addEventListener('fetch', event => {
     return;
   }
   
-  // Special handling for history navigation (cache-first with network fallback)
-  if (isHistoryNavigation(url.href)) {
-    event.respondWith(
-      caches.match(event.request)
-        .then(cachedResponse => {
-          if (cachedResponse) {
-            return cachedResponse;
-          }
-          
-          // Try network if not in cache
-          return fetch(event.request)
-            .then(response => {
-              // Cache the response for future use
-              const responseToCache = response.clone();
-              if (response.status === 200) {
-                caches.open(STATIC_CACHE_NAME)
-                  .then(cache => {
-                    cache.put(event.request, responseToCache);
-                  });
-              }
-              return response;
-            })
-            .catch(() => {
-              // If network fails and we don't have a cache for this specific URL,
-              // return the index page as a fallback
-              return caches.match('/');
-            });
-        })
-    );
-    return;
-  }
-  
   // Handle static assets (cache-first strategy)
   if (isStaticAsset(url.href)) {
     event.respondWith(
       caches.match(event.request)
         .then(cachedResponse => {
           if (cachedResponse) {
-            // Return cache but update in background
-            const fetchPromise = fetch(event.request).then(response => {
-              // Only cache valid responses
-              if (response.status === 200) {
-                const responseToCache = response.clone();
-                caches.open(STATIC_CACHE_NAME).then(cache => {
-                  cache.put(event.request, responseToCache);
-                });
-              }
-              return response;
-            }).catch(() => {
-              // Swallow network errors when refreshing cache
-            });
-            
-            // Return the cached response immediately
+            // Return cache immediately
             return cachedResponse;
           }
           
@@ -202,6 +176,24 @@ self.addEventListener('fetch', event => {
               }
               
               return response;
+            })
+            .catch(error => {
+              console.error('Failed to fetch static asset:', error);
+              // For image failures, return a transparent pixel
+              if (event.request.url.match(/\.(jpg|jpeg|png|gif|webp|svg)$/)) {
+                return new Response(
+                  'R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7',
+                  {
+                    status: 200,
+                    statusText: 'OK',
+                    headers: new Headers({
+                      'Content-Type': 'image/gif',
+                      'Content-Length': '42',
+                    })
+                  }
+                );
+              }
+              throw error;
             });
         })
     );
@@ -212,8 +204,8 @@ self.addEventListener('fetch', event => {
   event.respondWith(
     fetch(event.request)
       .then(response => {
-        // Cache successful responses from navigation requests
-        if (response.status === 200 && event.request.mode === 'navigate') {
+        // Only cache successful responses
+        if (response.status === 200) {
           const responseToCache = response.clone();
           caches.open(STATIC_CACHE_NAME)
             .then(cache => {
@@ -223,19 +215,19 @@ self.addEventListener('fetch', event => {
         return response;
       })
       .catch(() => {
-        // Try to serve from cache, and if that fails, show offline page
+        // Try to serve from cache
         return caches.match(event.request)
           .then(cachedResponse => {
             if (cachedResponse) {
               return cachedResponse;
             }
             
-            // For navigation requests, show a generic offline page
+            // For navigation requests, show a fallback page
             if (event.request.mode === 'navigate') {
-              return caches.match('/');
+              return caches.match('/fallback.html') || caches.match('/');
             }
             
-            // Otherwise just fail
+            // Otherwise return an error response
             return new Response('Network error', {
               status: 503,
               statusText: 'Service Unavailable',

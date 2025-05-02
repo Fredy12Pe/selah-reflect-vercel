@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Selah - Offline</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      margin: 0;
+      padding: 0;
+      background-color: #000;
+      color: white;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      text-align: center;
+    }
+    .container {
+      max-width: 600px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+    h1 {
+      font-size: 2rem;
+      margin-bottom: 1rem;
+    }
+    p {
+      margin-bottom: 1.5rem;
+      font-size: 1.1rem;
+      line-height: 1.5;
+      opacity: 0.8;
+    }
+    button {
+      background-color: white;
+      color: black;
+      border: none;
+      padding: 12px 24px;
+      font-size: 1rem;
+      border-radius: 24px;
+      cursor: pointer;
+      font-weight: 500;
+    }
+    button:hover {
+      background-color: rgba(255,255,255,0.9);
+    }
+    .card {
+      background-color: rgba(255,255,255,0.1);
+      padding: 20px;
+      border-radius: 16px;
+      margin: 20px 0;
+      backdrop-filter: blur(10px);
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Selah</h1>
+    
+    <div class="card">
+      <p>You're currently offline.</p>
+      <p>To access past devotions and reflections, you'll need to reconnect to the internet.</p>
+      
+      <button onclick="attemptReconnect()">Try Again</button>
+    </div>
+    
+    <div class="card">
+      <p>If you've previously visited devotions while connected, you may be able to access some content from your cache.</p>
+      <button onclick="window.location.href = '/'">Go to Home</button>
+    </div>
+  </div>
+  
+  <script>
+    function attemptReconnect() {
+      window.location.reload();
+    }
+    
+    // Listen for online status changes
+    window.addEventListener('online', function() {
+      window.location.reload();
+    });
+  </script>
+</body>
+</html> 
