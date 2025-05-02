@@ -43,9 +43,9 @@ export function getFallbackImageUrl(imageType: string): string {
     case 'devotion':
       return '/images/background.jpg';
     case 'hymn':
-      return '/hymn-bg.jpg';
+      return '/images/hymn-bg.jpg';
     case 'resources':
-      return '/resources-bg.jpg';
+      return '/images/resources-bg.jpg';
     default:
       return '/images/background.jpg';
   }
@@ -63,4 +63,24 @@ export function getImageQuality(imageType: string): number {
     default:
       return 85;
   }
+}
+
+// Function to get appropriate background image URL based on content category
+export function getBackgroundImageForCategory(category: string): string {
+  // Default background image
+  const defaultImage = '/images/devotion-bg.jpg';
+  
+  // Map of categories to image URLs
+  const categoryImageMap: Record<string, string> = {
+    devotion: '/images/devotion-bg.jpg',
+    scripture: '/images/scripture-bg.jpg',
+    prayer: '/images/devotion-bg.jpg',
+    hymn: '/images/hymn-bg.jpg',
+    music: '/images/hymn-bg.jpg',
+    resources: '/images/resources-bg.jpg',
+    commentary: '/images/resources-bg.jpg',
+  };
+  
+  // Return the appropriate image URL or default if not found
+  return categoryImageMap[category.toLowerCase()] || defaultImage;
 } 

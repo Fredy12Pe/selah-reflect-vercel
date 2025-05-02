@@ -10,8 +10,8 @@ const STATIC_FILES = [
   '/favicon.ico',
   '/manifest.json',
   '/images/logo.png',
-  '/hymn-bg.jpg',
-  '/resources-bg.jpg',
+  '/images/hymn-bg.jpg',
+  '/images/resources-bg.jpg',
   '/fallback.html',
   '/auth/login'
 ];

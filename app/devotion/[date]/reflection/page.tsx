@@ -43,11 +43,13 @@ import { Devotion } from "@/lib/types/devotion";
 import { toast } from "react-hot-toast";
 import { getDailyDevotionImage } from "@/lib/services/unsplashService";
 import DynamicBackground from "@/app/components/DynamicBackground";
+import ReliableBackground from "@/app/components/ReliableBackground";
 import BackgroundCard from "@/app/components/BackgroundCard";
 import { doc, getDoc } from "firebase/firestore";
 import { getFirebaseDb } from "@/lib/firebase/firebase";
 import dynamic from 'next/dynamic';
 import { safeDoc, safeGetDocWithFallback } from "@/lib/utils/firebase-helpers";
+import BackgroundImage from "@/app/components/BackgroundImage";
 
 // CSS animations
 const modalAnimations = `
@@ -306,7 +308,7 @@ export default function ReflectionPage({
   const [devotionData, setDevotionData] = useState<Devotion | PartialDevotion | null>(null);
   const [hymn, setHymn] = useState<Hymn | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [hymnImage, setHymnImage] = useState<string>("/hymn-bg.jpg");
+  const [hymnImage, setHymnImage] = useState<string>("/images/hymn-bg.jpg");
   const [showCalendar, setShowCalendar] = useState(false);
   
   // Add a key based on the date to force re-mount on date change
@@ -361,7 +363,7 @@ export default function ReflectionPage({
   const dateButtonRef = useRef<HTMLButtonElement>(null);
 
   // Image states
-  const [resourcesImage, setResourcesImage] = useState("/resources-bg.jpg");
+  const [resourcesImage, setResourcesImage] = useState("/images/resources-bg.jpg");
 
   // AI reflection states
   const [aiQuestion, setAiQuestion] = useState("");
@@ -620,8 +622,8 @@ export default function ReflectionPage({
     const loadImages = async () => {
       try {
         // Default local fallback images
-        const defaultHymnImage = "/hymn-bg.jpg"; 
-        const defaultResourcesImage = "/resources-bg.jpg";
+        const defaultHymnImage = "/images/hymn-bg.jpg"; 
+        const defaultResourcesImage = "/images/resources-bg.jpg";
 
         // Initialize with default images to ensure we always have something
         setHymnImage(defaultHymnImage);
