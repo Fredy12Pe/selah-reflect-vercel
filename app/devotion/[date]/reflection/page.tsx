@@ -192,6 +192,36 @@ interface Hymn {
   author?: string;
 }
 
+// Function to convert hymn lyrics from Firebase format to verses format for display
+const convertHymnLyricsToVerses = (hymnData: Hymn | null): Array<{verse: number, lines: string[]}> => {
+  console.log('Converting hymn lyrics to verses format, hymn data:', hymnData);
+  
+  if (!hymnData || !hymnData.lyrics || hymnData.lyrics.length === 0) {
+    console.log('No hymn data or lyrics to convert');
+    return [];
+  }
+
+  // Group lyrics by verse (assuming 4 lines per verse)
+  const linesPerVerse = 4;
+  const verses = [];
+  
+  // Sort lyrics by lineNumber to ensure correct order
+  const sortedLyrics = [...hymnData.lyrics].sort((a, b) => a.lineNumber - b.lineNumber);
+  console.log('Sorted lyrics:', sortedLyrics);
+  
+  // Group into verses of 4 lines each
+  for (let i = 0; i < sortedLyrics.length; i += linesPerVerse) {
+    const verseLines = sortedLyrics.slice(i, i + linesPerVerse).map(line => line.text);
+    verses.push({
+      verse: Math.floor(i / linesPerVerse) + 1,
+      lines: verseLines
+    });
+  }
+  
+  console.log('Converted verses:', verses);
+  return verses;
+};
+
 // Define ReflectionSection interface to match the expected structure
 interface ReflectionSection {
   questions: string[];
@@ -368,46 +398,6 @@ export default function ReflectionPage({
   const hymnParam = getDateBasedParam(params.date, "hymn");
   const resourceParam = getDateBasedParam(params.date, "resource");
 
-  // Lyrics for "When I Survey the Wondrous Cross"
-  const hymnLyrics = [
-    {
-      verse: 1,
-      lines: [
-        "When I survey the wondrous cross",
-        "On which the Prince of glory died,",
-        "My richest gain I count but loss,",
-        "And pour contempt on all my pride.",
-      ],
-    },
-    {
-      verse: 2,
-      lines: [
-        "Forbid it, Lord, that I should boast,",
-        "Save in the death of Christ my God!",
-        "All the vain things that charm me most,",
-        "I sacrifice them to His blood.",
-      ],
-    },
-    {
-      verse: 3,
-      lines: [
-        "See from His head, His hands, His feet,",
-        "Sorrow and love flow mingled down!",
-        "Did e'er such love and sorrow meet,",
-        "Or thorns compose so rich a crown?",
-      ],
-    },
-    {
-      verse: 4,
-      lines: [
-        "Were the whole realm of nature mine,",
-        "That were a present far too small;",
-        "Love so amazing, so divine,",
-        "Demands my soul, my life, my all.",
-      ],
-    },
-  ];
-
   // Update useEffect to better handle errors
   useEffect(() => {
     console.log('ReflectionPage: Data fetch effect running, user:', !!user, 'loading:', loading, 'isLoading:', isLoading);
@@ -476,48 +466,29 @@ export default function ReflectionPage({
         console.log('Reflection page: Getting hymn for month:', monthStr);
         
         // Set default hymn first as a fallback
-        setHymn({
-          title: "When I Survey the Wondrous Cross",
-          author: "Isaac Watts",
-          lyrics: hymnLyrics.flatMap((verse, verseIndex) => 
-            verse.lines.map((line, lineIndex) => ({
-              lineNumber: verseIndex * verse.lines.length + lineIndex + 1,
-              text: line
-            }))
-          )
-        });
+        setHymn(null);
+        console.log('Reflection page: Initial hymn set to null');
         
-        // Try to fetch hymn from Firestore
+        // Try to fetch hymn using the devotionService
         try {
-          const db = getFirebaseDb();
+          // Import the getHymnByMonth function
+          const { getHymnByMonth } = await import('@/lib/services/devotionService');
           
-          if (db) {
-            console.log('Reflection page: Got Firestore instance, fetching hymn');
-            
-            // Use a more resilient approach for getting document
-            try {
-              const hymnRef = doc(db, 'hymns', monthStr);
-              const hymnSnap = await getDoc(hymnRef);
-              
-              // Check if document exists by directly checking data
-              const data = hymnSnap.data();
-              if (data) {
-                console.log('Reflection page: Found hymn data for month:', monthStr);
-                setHymn(data as Hymn);
-              } else {
-                console.log('Reflection page: No hymn found for month:', monthStr);
-                // We've already set the default hymn above
-              }
-            } catch (docError) {
-              console.error('Error fetching hymn doc:', docError);
-              // We'll keep the default hymn set above
-            }
+          console.log('Reflection page: Fetching hymn for month:', monthStr);
+          const hymnData = await getHymnByMonth(monthStr);
+          
+          if (hymnData) {
+            console.log('Reflection page: Found hymn data for month:', monthStr, 'Hymn title:', hymnData.title);
+            console.log('Reflection page: Hymn lyrics sample:', hymnData.lyrics.slice(0, 2));
+            setHymn(hymnData);
+            console.log('Reflection page: Hymn state set with new data');
           } else {
-            console.warn('Reflection page: No Firestore instance available, using default hymn');
+            console.log('Reflection page: No hymn found for month:', monthStr);
+            // We've already set hymn to null above
           }
-        } catch (firestoreError) {
-          console.error('Reflection page: Firestore error fetching hymn:', firestoreError);
-          // Keep using the default hymn set above
+        } catch (hymnError) {
+          console.error('Reflection page: Error fetching hymn:', hymnError);
+          // Keep using null hymn set above
         }
 
         // Fetch devotion data
@@ -1119,6 +1090,7 @@ export default function ReflectionPage({
 
   // Handle opening the hymn modal
   const handleOpenHymnModal = () => {
+    console.log('Opening hymn modal with hymn data:', hymn);
     setShowHymnModal(true);
   };
 
@@ -1439,7 +1411,8 @@ export default function ReflectionPage({
                   <div className="absolute inset-0 p-6 flex flex-col justify-end">
                     <p className="text-lg font-medium text-white/80 mb-1">Hymn of the Month:</p>
                     <h2 className="text-3xl font-medium">{hymn?.title}</h2>
-              </div>
+                    <p className="text-white/50 text-sm mt-1">Tap to view full hymn</p>
+                  </div>
                 </div>
               </div>
 
@@ -1460,10 +1433,11 @@ export default function ReflectionPage({
             <div>
                     <p className="text-white/70 text-lg mb-2">Today's Scripture</p>
               <div
-                      className="bg-[#0F1211] p-6 rounded-2xl cursor-pointer relative min-h-[100px] flex items-center justify-center"
+                      className="bg-[#0F1211] p-6 rounded-2xl cursor-pointer relative min-h-[100px] flex flex-col justify-center"
                 onClick={handleOpenScriptureModal}
               >
-                      <h2 className="text-2xl font-medium text-center">{devotionData.bibleText}</h2>
+                      <h2 className="text-2xl font-medium">{devotionData.bibleText}</h2>
+                      <p className="text-white/50 text-sm mt-2">Tap to view full scripture</p>
               </div>
             </div>
 
@@ -1569,7 +1543,8 @@ export default function ReflectionPage({
                           <div className="absolute inset-0 p-6 flex flex-col justify-end">
                             <h2 className="text-2xl font-medium mb-1">Resources for today's text</h2>
                             <p className="text-white/80">Bible Commentaries, Videos, and Podcasts</p>
-                </div>
+                            <p className="text-white/50 text-sm mt-1">Tap to explore resources</p>
+                          </div>
                         </div>
                       </div>
                     ) : (
@@ -1632,15 +1607,19 @@ export default function ReflectionPage({
               </button>
             </div>
               <div className="p-6 space-y-6 overflow-y-auto flex-grow">
-                {hymnLyrics.map((verse, index) => (
-                  <div key={index} className="space-y-2">
-                    <p className="text-sm font-medium text-white/60">Verse {verse.verse}</p>
-                    {verse.lines.map((line, lineIndex) => (
-                      <p key={lineIndex} className="text-lg">{line}</p>
-                  ))}
-                </div>
-              ))}
-            </div>
+                {hymn ? (
+                  convertHymnLyricsToVerses(hymn).map((verse, index) => (
+                    <div key={index} className="space-y-2">
+                      <p className="text-sm font-medium text-white/60">Verse {verse.verse}</p>
+                      {verse.lines.map((line, lineIndex) => (
+                        <p key={lineIndex} className="text-lg">{line}</p>
+                      ))}
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-white/60">No hymn available for this month</p>
+                )}
+              </div>
           </div>
         </div>
       )}
@@ -1806,11 +1785,11 @@ export default function ReflectionPage({
                 ) : (
                   <p className="text-white/60">No resources available</p>
             )}
+                        </div>
+                    </div>
+                  </div>
+                )}
               </div>
-          </div>
-        </div>
-      )}
-      </div>
       
       {/* Logout button - only show for fully authenticated users */}
       {user && !isAnonymous && (

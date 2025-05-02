@@ -27,6 +27,7 @@ export default function HistoryPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [expandedItems, setExpandedItems] = useState<{[key: number]: boolean}>({});
   const [currentDate, setCurrentDate] = useState<string>(new Date().toISOString().split('T')[0]);
+  const [originatingDate, setOriginatingDate] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isOffline, setIsOffline] = useState<boolean>(false);
 
@@ -37,6 +38,33 @@ export default function HistoryPage() {
       [index]: !prev[index]
     }));
   };
+
+  // Capture the originating date on component mount
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      // Try to get the date from URL search params
+      const urlParams = new URLSearchParams(window.location.search);
+      const fromDate = urlParams.get('from');
+      
+      if (fromDate && /^\d{4}-\d{2}-\d{2}$/.test(fromDate)) {
+        // URL parameter has valid date format
+        console.log('Using date from URL parameter:', fromDate);
+        setOriginatingDate(fromDate);
+      } else {
+        // Try to get from sessionStorage (may have been set by another page)
+        const storedDate = sessionStorage.getItem('journal_originating_date');
+        if (storedDate) {
+          console.log('Using date from session storage:', storedDate);
+          setOriginatingDate(storedDate);
+        } else {
+          // Default to today if no other source is available
+          const today = new Date().toISOString().split('T')[0];
+          console.log('No originating date found, using today:', today);
+          setOriginatingDate(today);
+        }
+      }
+    }
+  }, []);
 
   // Check if the app is offline
   useEffect(() => {
@@ -108,6 +136,8 @@ export default function HistoryPage() {
       if (allReflections.length === 0) {
         // No reflections found in localStorage
         console.log("No reflections found in localStorage");
+        // Set current date to today if no reflections
+        setCurrentDate(new Date().toISOString().split('T')[0]);
       } else {
         // Sort reflections by timestamp (newest first)
         allReflections.sort((a, b) => 
@@ -119,6 +149,7 @@ export default function HistoryPage() {
         // Set the current date to the most recent reflection date if available
         if (allReflections.length > 0) {
           setCurrentDate(allReflections[0].date);
+          console.log("Setting current date to most recent reflection:", allReflections[0].date);
         }
       }
     } catch (error) {
@@ -138,6 +169,20 @@ export default function HistoryPage() {
       router.push("/auth/login?from=/history");
     }
   }, [user, loading, router]);
+
+  // This effect runs when the component mounts to capture the current date from query parameter
+  useEffect(() => {
+    if (typeof window !== "undefined" && !originatingDate) {
+      // Try to parse current date from URL
+      const params = new URLSearchParams(window.location.search);
+      const dateParam = params.get('from');
+      
+      if (dateParam && /^\d{4}-\d{2}-\d{2}$/.test(dateParam)) {
+        console.log('Setting date from URL query param:', dateParam);
+        setOriginatingDate(dateParam);
+      }
+    }
+  }, [originatingDate]);
 
   if (loading || isLoading) {
     return (
@@ -167,10 +212,18 @@ export default function HistoryPage() {
         {/* Navigation */}
         <div className="mb-8">
           <Link 
-            href={`/devotion/${currentDate}/journal`}
+            href={`/devotion/${originatingDate || currentDate}/journal`}
             className="text-white/70 hover:text-white flex items-center space-x-1"
+            onClick={() => {
+              // Store the current date in session storage for the journal page
+              if (typeof window !== "undefined") {
+                // Clear the originating date from session storage since we're navigating back
+                sessionStorage.removeItem('journal_originating_date');
+              }
+            }}
           >
             <span>← Back to Journal</span>
+            <span className="text-xs text-white/50 ml-2">({originatingDate || currentDate})</span>
           </Link>
         </div>
 

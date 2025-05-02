@@ -24,6 +24,7 @@ import {
 } from "@/lib/utils/firebase-helpers";
 import { toast } from "react-hot-toast";
 import { Devotion, ReflectionSection } from "@/lib/types/devotion";
+import { getFirebaseDb } from "@/lib/firebase/firebase";
 
 // Add generateStaticParams in a separate file to make it compatible with static export
 // This file should be placed in the same directory
@@ -118,7 +119,7 @@ export default function JournalPage({ params }: { params: { date: string } }) {
   const [isScriptureModalClosing, setIsScriptureModalClosing] = useState(false);
   const [bibleVerse, setBibleVerse] = useState<BibleVerse | null>(null);
   const [isFetchingBibleVerse, setIsFetchingBibleVerse] = useState(false);
-  
+
   // Add ref for modal and touch state
   const scriptureModalRef = useRef<HTMLDivElement>(null);
   const [touchStartY, setTouchStartY] = useState<number | null>(null);
@@ -293,26 +294,84 @@ export default function JournalPage({ params }: { params: { date: string } }) {
     }
   };
 
-  // Load journal entries from localStorage
-  const loadJournalEntries = () => {
+  // Load journal entries from Firebase with localStorage fallback
+  const loadJournalEntries = async () => {
+    if (!user) return;
+    
     try {
+      // First try to load from Firebase
+      const db = getFirebaseDb();
+      if (db) {
+        console.log('Loading journal entries from Firebase for date:', params.date);
+        // Create a reference to the user's journal entry for this date
+        const docRef = safeDoc('users', user.uid, 'journalEntries', params.date);
+        const docSnap = await safeGetDoc(docRef);
+        
+        if (docSnap && docSnap.exists()) {
+          console.log('Found journal entry in Firebase');
+          const data = docSnap.data();
+          if (data && data.entries) {
+            setJournalEntries(data.entries);
+            return; // Successfully loaded from Firebase, return early
+          }
+        } else {
+          console.log('No journal entry found in Firebase, checking localStorage');
+        }
+      }
+      
+      // Fallback to localStorage if Firebase failed or entry doesn't exist
       const key = `journal_${params.date}`;
       const saved = localStorage.getItem(key);
       if (saved) {
-        setJournalEntries(JSON.parse(saved));
+        console.log('Found journal entry in localStorage');
+        const parsedEntries = JSON.parse(saved);
+        setJournalEntries(parsedEntries);
+        
+        // If we have localStorage entries but not Firebase entries, sync to Firebase
+        if (db && user) {
+          console.log('Syncing localStorage entries to Firebase');
+          const docRef = safeDoc('users', user.uid, 'journalEntries', params.date);
+          await safeSetDoc(docRef, {
+            entries: parsedEntries,
+            date: params.date,
+            updatedAt: new Date().toISOString()
+          });
+        }
       }
     } catch (error) {
       console.error("Error loading journal entries:", error);
     }
   };
 
-  // Save journal entries to localStorage
-  const saveJournalEntries = () => {
+  // Save journal entries to Firebase with localStorage fallback
+  const saveJournalEntries = async (isManualSave = false) => {
+    if (!user) return;
+    
     try {
       setSaveStatus("saving");
+      
+      // Always save to localStorage as fallback
       const key = `journal_${params.date}`;
       localStorage.setItem(key, JSON.stringify(journalEntries));
+      
+      // Try to save to Firebase
+      const db = getFirebaseDb();
+      if (db) {
+        console.log('Saving journal entries to Firebase for date:', params.date);
+        const docRef = safeDoc('users', user.uid, 'journalEntries', params.date);
+        await safeSetDoc(docRef, {
+          entries: journalEntries,
+          date: params.date,
+          updatedAt: new Date().toISOString()
+        });
+      }
+      
       setSaveStatus("saved");
+      
+      // Show success toast notification only for manual saves
+      if (isManualSave) {
+        toast.success("Journal entries saved");
+      }
       
       // Reset save status after 2 seconds
       setTimeout(() => {
@@ -361,17 +420,20 @@ export default function JournalPage({ params }: { params: { date: string } }) {
             setExpandedSections(initialExpandedState);
           }
         }
-      } catch (error) {
+    } catch (error) {
         console.error("Error fetching devotion:", error);
         toast.error("Failed to load devotion data");
-      } finally {
+    } finally {
         setIsLoading(false);
       }
     };
 
     if (user && !loading) {
       fetchData();
-      loadJournalEntries();
+      // Call the async function from within the effect
+      loadJournalEntries().catch(error => {
+        console.error("Error in loadJournalEntries:", error);
+      });
     }
   }, [params.date, user, loading]);
 
@@ -386,12 +448,74 @@ export default function JournalPage({ params }: { params: { date: string } }) {
   useEffect(() => {
     const autoSaveTimer = setTimeout(() => {
       if (Object.keys(journalEntries).length > 0) {
-        saveJournalEntries();
+        saveJournalEntries().catch(error => {
+          console.error("Error in auto-save:", error);
+        });
       }
     }, 2000);
     
     return () => clearTimeout(autoSaveTimer);
   }, [journalEntries]);
+
+  // Sync all localStorage journal entries to Firebase
+  const syncLocalStorageToFirebase = async () => {
+    if (!user) return;
+    
+    try {
+      console.log('Checking for localStorage entries to sync to Firebase');
+      const db = getFirebaseDb();
+      if (!db) return;
+      
+      // Look for all localStorage keys matching the journal pattern
+      const journalKeyPrefix = 'journal_';
+      const entriesMap: Record<string, any> = {};
+      let syncCount = 0;
+      
+      // Find all keys in localStorage
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && key.startsWith(journalKeyPrefix)) {
+          const date = key.substring(journalKeyPrefix.length);
+          const savedEntry = localStorage.getItem(key);
+          
+          if (savedEntry) {
+            try {
+              const parsedEntry = JSON.parse(savedEntry);
+              entriesMap[date] = parsedEntry;
+              
+              // Save to Firebase
+              const docRef = safeDoc('users', user.uid, 'journalEntries', date);
+              await safeSetDoc(docRef, {
+                entries: parsedEntry,
+                date: date,
+                updatedAt: new Date().toISOString()
+              });
+              syncCount++;
+            } catch (parseError) {
+              console.error(`Error parsing localStorage entry for ${date}:`, parseError);
+            }
+          }
+        }
+      }
+      
+      console.log(`Synced ${syncCount} journal entries from localStorage to Firebase`);
+      
+      if (syncCount > 0) {
+        toast.success(`Synced ${syncCount} journal entries to your account`);
+      }
+    } catch (error) {
+      console.error('Error syncing localStorage to Firebase:', error);
+    }
+  };
+
+  // When user first logs in, sync localStorage entries to Firebase
+  useEffect(() => {
+    if (user && !loading && !isLoading) {
+      syncLocalStorageToFirebase().catch(error => {
+        console.error("Error in syncLocalStorageToFirebase:", error);
+      });
+    }
+  }, [user, loading]);
 
   // Auth prompt component for anonymous users
   const AuthPrompt = () => {
@@ -461,13 +585,33 @@ export default function JournalPage({ params }: { params: { date: string } }) {
         <div className="container mx-auto px-4 py-8 max-w-3xl">
           {/* Header */}
           <div className="mb-6 flex items-center justify-between">
-            <Link 
+            <Link
               href={`/devotion/${params.date}/reflection`}
               className="text-white/70 hover:text-white flex items-center"
             >
               <ArrowLeftIcon className="w-5 h-5 mr-2" />
               <span>Back to Reflection</span>
             </Link>
+            
+            <div className="flex items-center space-x-6">
+              <Link
+                href="/history"
+                className="text-white/70 hover:text-white"
+                onClick={() => {
+                  // Store current journal date in session storage
+                  if (typeof window !== "undefined") {
+                    sessionStorage.setItem("journal_originating_date", params.date);
+                  }
+                }}
+              >
+                View AI History
+              </Link>
+              <div className="text-sm">
+                {saveStatus === "saving" && <span className="text-white/50">Saving...</span>}
+                {saveStatus === "saved" && <span className="text-green-400">Saved</span>}
+                {saveStatus === "error" && <span className="text-red-400">Error saving</span>}
+              </div>
+            </div>
           </div>
           
           {/* Journal Title */}
@@ -547,7 +691,7 @@ export default function JournalPage({ params }: { params: { date: string } }) {
       <div className="container mx-auto px-4 py-8 max-w-3xl">
         {/* Header */}
         <div className="mb-6 flex items-center justify-between">
-          <Link 
+          <Link
             href={`/devotion/${params.date}/reflection`}
             className="text-white/70 hover:text-white flex items-center"
           >
@@ -556,9 +700,15 @@ export default function JournalPage({ params }: { params: { date: string } }) {
           </Link>
           
           <div className="flex items-center space-x-6">
-            <Link 
+            <Link
               href="/history"
               className="text-white/70 hover:text-white"
+              onClick={() => {
+                // Store current journal date in session storage
+                if (typeof window !== "undefined") {
+                  sessionStorage.setItem("journal_originating_date", params.date);
+                }
+              }}
             >
               View AI History
             </Link>
@@ -569,7 +719,7 @@ export default function JournalPage({ params }: { params: { date: string } }) {
             </div>
           </div>
         </div>
-        
+
         {/* Journal Title */}
         <div className="mb-8">
           <h1 className="text-3xl font-bold mb-2">Journal</h1>
@@ -584,7 +734,7 @@ export default function JournalPage({ params }: { params: { date: string } }) {
             </div>
           )}
         </div>
-        
+
         {/* No sections message */}
         {sections.length === 0 && (
           <div className="bg-[#0F1211] rounded-2xl p-8 text-center">
@@ -614,8 +764,8 @@ export default function JournalPage({ params }: { params: { date: string } }) {
                   <div className="mb-6 p-4 bg-zinc-800 rounded-xl">
                     <h3 className="text-lg font-medium text-white/90 mb-2">Passage:</h3>
                     <p className="text-white/80">{section.passage}</p>
-                  </div>
-                )}
+                        </div>
+                      )}
                 
                 {/* Questions and textareas */}
                 {section.questions && section.questions.map((question, qIndex) => {
@@ -632,18 +782,18 @@ export default function JournalPage({ params }: { params: { date: string } }) {
                     </div>
                   );
                 })}
-              </div>
-            )}
-          </div>
+                </div>
+              )}
+            </div>
         ))}
-        
+
         {/* Save Button */}
-        <button
-          onClick={saveJournalEntries}
+          <button
+          onClick={() => saveJournalEntries(true)}
           className="mt-4 px-6 py-3 bg-white/10 hover:bg-white/20 rounded-full font-medium"
         >
           Save Journal Entries
-        </button>
+          </button>
       </div>
 
       {/* Scripture Modal */}
