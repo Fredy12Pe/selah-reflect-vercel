@@ -118,6 +118,25 @@ async function uploadMonthData() {
         try {
           console.log(`Processing hymn: ${monthData.hymn.title}`);
           
+          // Extract the month name from the month data or parse it from the key
+          let monthName = '';
+          if (monthData.month && typeof monthData.month === 'string') {
+            // Try to extract just the month name (e.g., "January" from "January 2023")
+            const parts = monthData.month.split(' ');
+            if (parts.length > 0) {
+              monthName = parts[0]; // Take the first part which should be the month name
+            }
+          }
+          
+          // If no month name was found, try to derive it from the normalized key
+          if (!monthName) {
+            // Extract the month from YYYY-MM format
+            const date = new Date(normalizedMonthKey + '-01');
+            monthName = date.toLocaleString('default', { month: 'long' });
+          }
+          
+          console.log(`Using month name "${monthName}" for hymn document ID`);
+          
           // Create hymn document with proper structure
           const hymnData: Hymn = {
             title: monthData.hymn.title,
@@ -132,13 +151,11 @@ async function uploadMonthData() {
             updatedBy: 'script',
           };
           
-          // Save hymn to meta collection
-          const metaRef = db.collection('meta').doc('hymns');
-          await metaRef.set({ 
-            [normalizedMonthKey]: hymnData 
-          }, { merge: true });
+          // Save hymn directly to hymns collection using month name as ID
+          const hymnRef = db.collection('hymns').doc(monthName);
+          await hymnRef.set(hymnData);
           
-          console.log(`Successfully saved hymn for ${normalizedMonthKey}`);
+          console.log(`Successfully saved hymn for ${monthName}`);
         } catch (error) {
           console.error(`Error saving hymn for ${normalizedMonthKey}:`, error);
         }

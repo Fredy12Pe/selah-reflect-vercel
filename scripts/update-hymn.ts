@@ -74,6 +74,10 @@ async function updateHymn() {
   const args = await parseArgs();
   const lyrics = await readLyrics(args.lyricsPath);
   
+  // Get the month name from the YYYY-MM format
+  const monthName = new Date(args.month + '-01').toLocaleString('default', { month: 'long' });
+  console.log(`Storing hymn for month: ${monthName}`);
+  
   const hymnData: Hymn = {
     title: args.title,
     author: args.author || 'Unknown',
@@ -88,13 +92,11 @@ async function updateHymn() {
   };
 
   try {
-    // Update in meta collection
-    const metaRef = db.collection('meta').doc('hymns');
-    await metaRef.set({ 
-      [args.month]: hymnData 
-    }, { merge: true });
+    // Store directly in 'hymns' collection using month name as document ID
+    const hymnRef = db.collection('hymns').doc(monthName);
+    await hymnRef.set(hymnData);
     
-    console.log(`Successfully updated hymn "${args.title}" for ${args.month}`);
+    console.log(`Successfully updated hymn "${args.title}" for ${monthName} (${args.month})`);
   } catch (error) {
     console.error('Error updating hymn:', error);
     process.exit(1);

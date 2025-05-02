@@ -472,7 +472,7 @@ export default function ReflectionPage({
         }
 
         // Fetch hymn data - Use default hymn if there are issues
-        const monthStr = format(currentDate, 'MMMM').toLowerCase();
+        const monthStr = format(currentDate, 'MMMM');
         console.log('Reflection page: Getting hymn for month:', monthStr);
         
         // Set default hymn first as a fallback
