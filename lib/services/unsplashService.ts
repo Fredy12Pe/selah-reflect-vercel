@@ -8,6 +8,9 @@
 const UNSPLASH_API_URL = 'https://api.unsplash.com';
 const ACCESS_KEY = process.env.NEXT_PUBLIC_UNSPLASH_ACCESS_KEY;
 
+// Flag to disable API calls after consistent failures
+let API_DISABLED = false;
+
 /**
  * Types for Unsplash API responses
  */
@@ -39,6 +42,12 @@ export async function getRandomBackgroundImage(
   query: string = 'landscape,mountains,nature',
   options: { dateParam?: string, signal?: AbortSignal } = {}
 ): Promise<UnsplashImage | null> {
+  // If API has been consistently failing, don't even try
+  if (API_DISABLED) {
+    console.warn('UnsplashService: API calls are currently disabled due to previous failures');
+    return null;
+  }
+  
   if (!ACCESS_KEY) {
     console.warn('Unsplash Access Key not set in environment variables');
     return null;
@@ -58,7 +67,15 @@ export async function getRandomBackgroundImage(
     );
 
     if (!response.ok) {
-      console.error('Unsplash API error:', response.statusText);
+      const errorText = await response.text();
+      console.error(`Unsplash API error: ${response.status} - "${errorText}"`);
+      
+      // If we get a 403 (Forbidden) or 429 (Too Many Requests), disable API calls for this session
+      if (response.status === 403 || response.status === 429) {
+        console.warn('UnsplashService: API key issue or rate limit exceeded, disabling API calls for this session');
+        API_DISABLED = true;
+      }
+      
       return null;
     }
 
@@ -84,9 +101,9 @@ export async function getDailyDevotionImage(
     // Local fallback images
     const fallbackImages = {
       default: '/images/background.jpg',
-      hymn: '/hymn-bg.jpg',
-      resources: '/resources-bg.jpg',
-      scripture: '/scripture-bg.jpg',
+      hymn: '/images/hymn-bg.jpg',
+      resources: '/images/resources-bg.jpg',
+      scripture: '/images/scripture-bg.jpg',
     };
     
     // Determine which fallback to use based on the query
@@ -99,22 +116,29 @@ export async function getDailyDevotionImage(
       fallbackImage = fallbackImages.scripture;
     }
     
-    // If ACCESS_KEY is not available, don't even try the API call
-    if (!ACCESS_KEY) {
-      console.warn('UnsplashService: Access Key not set, using local image');
+    // If API is disabled or ACCESS_KEY is not available, don't even try the API call
+    if (API_DISABLED || !ACCESS_KEY) {
+      console.warn('UnsplashService: API disabled or Access Key not set, using local image');
       return fallbackImage;
     }
     
     // Use the date as a parameter for cache busting
     const dateParam = date.replace(/-/g, '');
     
+    // Log information about the request to help debug
+    console.log(`UnsplashService: Getting image for date=${date}, query=${query}`);
+    
     // Add a timeout to the fetch call to prevent hanging
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 3000); // 3 second timeout
     
     try {
+      // For today's date, force a unique request to bypass caching
+      const isToday = new Date(date).toDateString() === new Date().toDateString();
+      const cacheBuster = isToday ? `_${new Date().getHours()}` : '';
+      
       const image = await getRandomBackgroundImage(query, { 
-        dateParam,
+        dateParam: dateParam + cacheBuster,
         signal: controller.signal  
       });
       
@@ -133,7 +157,7 @@ export async function getDailyDevotionImage(
     }
   } catch (error) {
     console.error('UnsplashService: Error in getDailyDevotionImage:', error);
-    return '/hymn-bg.jpg'; // Ultimate fallback
+    return '/images/hymn-bg.jpg'; // Ultimate fallback
   }
 }
 

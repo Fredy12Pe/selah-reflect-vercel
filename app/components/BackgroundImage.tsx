@@ -1,84 +1,63 @@
+"use client";
+
 import { useState, useEffect } from 'react';
 import Image from 'next/image';
-import type { ImageProps } from 'next/dist/client/image';
 
-interface BackgroundImageProps extends Omit<ImageProps, 'src' | 'alt'> {
-  src?: string;
+interface BackgroundImageProps {
+  type?: "devotion" | "hymn" | "resources" | "scripture";
+  className?: string;
+  priority?: boolean;
+  fill?: boolean;
+  height?: string;
+  width?: string;
   alt?: string;
-  fallbackSrc: string;
-  type?: 'hymn' | 'resources' | 'scripture' | 'devotion';
 }
 
 /**
- * A component that renders an image with a fallback
- * It first renders the fallback image, then tries to load the src image
- * If the src image fails to load, it keeps showing the fallback
+ * BackgroundImage component
+ * 
+ * A reliable component for displaying background images
+ * that always works even when Unsplash API fails
  */
 export default function BackgroundImage({
-  src,
-  alt = 'Background image',
-  fallbackSrc,
-  type = 'devotion',
-  ...props
+  type = "devotion",
+  className = "",
+  priority = true,
+  fill = true,
+  height,
+  width,
+  alt = "Background",
 }: BackgroundImageProps) {
-  // Default images based on type
-  const defaultImages = {
-    hymn: '/images/hymn-bg.jpg',
-    resources: '/images/resources-bg.jpg',
-    scripture: '/images/devotion-bg.jpg',
-    devotion: '/images/devotion-bg.jpg',
+  // Get image path based on type
+  const getImagePath = () => {
+    switch (type) {
+      case "hymn":
+        return "/images/hymn-bg.jpg";
+      case "resources":
+        return "/images/resources-bg.jpg";
+      case "scripture":
+        return "/images/scripture-bg.jpg";
+      default:
+        return "/images/devotion-bg.jpg";
+    }
   };
 
-  // Use the fallback or default image
-  const defaultSrc = fallbackSrc || defaultImages[type];
-  
-  // State to track which image to display
-  const [imageSrc, setImageSrc] = useState<string>(defaultSrc);
-  const [isLoading, setIsLoading] = useState(!!src); // Only show loading if we're trying to load a src
-
-  // Try to load the src image after component mounts
-  useEffect(() => {
-    if (!src) return;
-
-    const img = document.createElement('img');
-    let mounted = true;
-
-    img.onload = () => {
-      // Only update state if component is still mounted
-      if (mounted) {
-        setImageSrc(src);
-        setIsLoading(false);
-      }
-    };
-
-    img.onerror = () => {
-      if (mounted) {
-        console.warn(`Failed to load image: ${src}, using fallback`);
-        setImageSrc(defaultSrc);
-        setIsLoading(false);
-      }
-    };
-
-    img.src = src;
-
-    // Cleanup function to prevent memory leaks and state updates on unmounted component
-    return () => {
-      mounted = false;
-    };
-  }, [src, defaultSrc]);
+  // Store the image path
+  const [imagePath] = useState<string>(getImagePath());
 
   return (
-    <>
+    <div className={`relative ${fill ? "w-full h-full" : ""} ${className}`}>
       <Image
-        src={imageSrc}
+        src={imagePath}
         alt={alt}
-        {...props}
+        fill={fill}
+        width={!fill ? width || 800 : undefined}
+        height={!fill ? height || 500 : undefined}
+        className={`object-cover ${className}`}
+        priority={priority}
+        sizes="100vw"
+        quality={90}
       />
-      {isLoading && (
-        <div className="absolute inset-0 flex items-center justify-center bg-black/20">
-          <div className="w-8 h-8 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-        </div>
-      )}
-    </>
+    </div>
   );
 } 

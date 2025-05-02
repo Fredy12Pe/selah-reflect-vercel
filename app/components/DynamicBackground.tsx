@@ -18,6 +18,9 @@ interface DynamicBackgroundProps {
   className?: string;
 }
 
+// Flag to determine if we should skip Unsplash API due to persistent failures
+let SKIP_UNSPLASH = false;
+
 /**
  * DynamicBackground component
  *
@@ -55,16 +58,28 @@ export default function DynamicBackground({
   const [attribution, setAttribution] = useState<string>("");
   const [isUnsplashImage, setIsUnsplashImage] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [useLocalOnly, setUseLocalOnly] = useState<boolean>(SKIP_UNSPLASH);
 
   // Fetch image from Unsplash when component mounts
   useEffect(() => {
+    // If we're skipping Unsplash, just use local images
+    if (useLocalOnly) {
+      return;
+    }
+    
     // Create a cache key to prevent unnecessary fetches
     const cacheKey = `background_${date}_${query}_${imageType}`;
     let cachedImage = null;
 
+    // Check if this is for today's date
+    const isToday = new Date(date).toDateString() === new Date().toDateString();
+    
     // Try to access sessionStorage (might fail in private browsing)
     try {
-      cachedImage = sessionStorage.getItem(cacheKey);
+      // Only use cached image if it's not today's date
+      if (!isToday) {
+        cachedImage = sessionStorage.getItem(cacheKey);
+      }
     } catch (error) {
       console.warn("Unable to access sessionStorage", error);
     }
@@ -72,8 +87,8 @@ export default function DynamicBackground({
     // If we have a cached image, use it immediately
     if (cachedImage) {
       setBackgroundImage(cachedImage);
-      setIsUnsplashImage(true);
-      if (showAttribution) {
+      setIsUnsplashImage(cachedImage.startsWith('http'));
+      if (showAttribution && cachedImage.startsWith('http')) {
         setAttribution(getUnsplashAttribution(cachedImage));
       }
       return;
@@ -85,6 +100,15 @@ export default function DynamicBackground({
         setIsLoading(true);
         try {
           const image = await getDailyDevotionImage(date, query);
+          
+          // If the image doesn't start with http, it's a local fallback
+          const isRemoteImage = image.startsWith('http');
+          if (!isRemoteImage) {
+            // This indicates the API is failing, so set the flag to skip future requests
+            SKIP_UNSPLASH = true;
+            setUseLocalOnly(true);
+          }
+          
           if (image && image !== backgroundImage) {
             // Cache the image for this session
             try {
@@ -94,16 +118,18 @@ export default function DynamicBackground({
             }
 
             setBackgroundImage(image);
-            setIsUnsplashImage(true);
+            setIsUnsplashImage(isRemoteImage);
 
             // Set basic attribution for Unsplash
-            if (showAttribution) {
+            if (showAttribution && isRemoteImage) {
               setAttribution(getUnsplashAttribution(image));
             }
           }
         } catch (error) {
           console.error("Error fetching background image:", error);
           // Keep using the local image if there's an error
+          SKIP_UNSPLASH = true;
+          setUseLocalOnly(true);
         } finally {
           setIsLoading(false);
         }
@@ -111,7 +137,7 @@ export default function DynamicBackground({
 
       fetchImage();
     }
-  }, [date, query, showAttribution, imageType, isLoading]);
+  }, [date, query, showAttribution, imageType, isLoading, useLocalOnly]);
 
   const overlayStyle = {
     backgroundColor: `rgba(0, 0, 0, ${overlayOpacity})`,
@@ -126,6 +152,17 @@ export default function DynamicBackground({
             src={backgroundImage}
             alt="Background"
             className="absolute inset-0 w-full h-full object-cover"
+            onError={() => {
+              // If loading the remote image fails, fall back to local
+              console.warn("Failed to load Unsplash image, using local fallback");
+              const localImage = getLocalImage();
+              setBackgroundImage(localImage);
+              setIsUnsplashImage(false);
+              setAttribution("");
+              // Mark to skip Unsplash for future components
+              SKIP_UNSPLASH = true;
+              setUseLocalOnly(true);
+            }}
           />
         ) : (
           <Image

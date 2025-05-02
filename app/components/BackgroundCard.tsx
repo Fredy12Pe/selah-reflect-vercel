@@ -14,6 +14,9 @@ interface BackgroundCardProps {
   imageType?: "devotion" | "hymn" | "resources";
 }
 
+// Flag to determine if we should skip Unsplash API due to persistent failures
+let SKIP_UNSPLASH = false;
+
 /**
  * BackgroundCard component
  *
@@ -45,16 +48,28 @@ export default function BackgroundCard({
     getLocalImage()
   );
   const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [useLocalOnly, setUseLocalOnly] = useState<boolean>(SKIP_UNSPLASH);
 
   // Fetch image from Unsplash when component mounts
   useEffect(() => {
+    // If we're skipping Unsplash, just use local images
+    if (useLocalOnly) {
+      return;
+    }
+
     // Create a cache key to prevent unnecessary fetches
     const cacheKey = `bgcard_${date}_${query}_${imageType}`;
     let cachedImage = null;
 
+    // Check if this is for today's date
+    const isToday = new Date(date).toDateString() === new Date().toDateString();
+    
     // Try to access sessionStorage (might fail in private browsing)
     try {
-      cachedImage = sessionStorage.getItem(cacheKey);
+      // Only use cached image if it's not today's date
+      if (!isToday) {
+        cachedImage = sessionStorage.getItem(cacheKey);
+      }
     } catch (error) {
       console.warn("Unable to access sessionStorage", error);
     }
@@ -71,6 +86,14 @@ export default function BackgroundCard({
         setIsLoading(true);
         try {
           const image = await getDailyDevotionImage(date, query);
+          
+          // If the image doesn't start with http, it's a local fallback
+          if (!image.startsWith('http')) {
+            // This indicates the API is failing, so set the flag to skip future requests
+            SKIP_UNSPLASH = true;
+            setUseLocalOnly(true);
+          }
+          
           if (image) {
             // Cache the image for this session
             try {
@@ -83,6 +106,8 @@ export default function BackgroundCard({
         } catch (error) {
           console.error("Error fetching background image:", error);
           // Keep using the local image if there's an error
+          SKIP_UNSPLASH = true;
+          setUseLocalOnly(true);
         } finally {
           setIsLoading(false);
         }
@@ -90,7 +115,7 @@ export default function BackgroundCard({
 
       fetchImage();
     }
-  }, [date, query, imageType, isLoading]);
+  }, [date, query, imageType, isLoading, useLocalOnly]);
 
   return (
     <div
@@ -105,6 +130,14 @@ export default function BackgroundCard({
             src={backgroundImage}
             alt="Background"
             className="w-full h-full object-cover"
+            onError={() => {
+              // If loading the remote image fails, fall back to local
+              console.warn("Failed to load Unsplash image, using local fallback");
+              setBackgroundImage(getLocalImage());
+              // Mark to skip Unsplash for future components
+              SKIP_UNSPLASH = true;
+              setUseLocalOnly(true);
+            }}
           />
         ) : (
           <Image
