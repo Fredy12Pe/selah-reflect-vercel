@@ -49,7 +49,7 @@ export default function OnboardingPage() {
     <OnboardingScreen3 key="homescreen-screen" onComplete={handleComplete} />
   ];
   
-  // Handle authentication and onboarding state
+  // Function to handle authentication and onboarding state
   useEffect(() => {
     console.log("Onboarding page: UseEffect running", {
       hasUser: !!user,
@@ -63,6 +63,15 @@ export default function OnboardingPage() {
       if (!user) {
         console.log("Onboarding page: No user, redirecting to login");
         router.push('/auth/login');
+        return;
+      }
+
+      // Anonymous users should bypass onboarding
+      if (user.isAnonymous) {
+        console.log("Onboarding page: Anonymous user detected, skipping onboarding");
+        // Get today's date in YYYY-MM-DD format
+        const todayFormatted = format(new Date(), "yyyy-MM-dd");
+        router.push(`/devotion/${todayFormatted}`);
         return;
       }
       

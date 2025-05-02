@@ -155,6 +155,20 @@ export default function Authentication() {
   }, []);
 
   const redirectAfterLogin = useCallback(() => {
+    // For anonymous/guest users, bypass onboarding completely
+    if (user?.isAnonymous) {
+      console.log("Authentication: Anonymous user detected, bypassing onboarding");
+      // If 'from' is a valid URL path, redirect there
+      if (from && from !== "/auth/login") {
+        router.push(from);
+      } else {
+        // Otherwise, redirect to today's devotion with specific date format
+        const today = format(new Date(), "yyyy-MM-dd");
+        router.push(`/devotion/${today}`);
+      }
+      return;
+    }
+
     // Check if this is a first-time user who needs onboarding
     try {
       const userId = user?.uid || '';
@@ -452,7 +466,7 @@ export default function Authentication() {
             ) : (
               <>
                 <Image
-                  src="/images/google-logo.svg"
+                  src="/google.svg"
                   alt="Google"
                   width={20}
                   height={20}
@@ -462,7 +476,7 @@ export default function Authentication() {
               </>
             )}
           </button>
-          
+
           <div className="relative">
             <div className="absolute inset-0 flex items-center">
               <div className="w-full border-t border-white/20"></div>
@@ -471,7 +485,7 @@ export default function Authentication() {
               <span className="px-2 bg-black/30 text-white/70">Or</span>
             </div>
           </div>
-          
+
           <button
             onClick={handleAnonymousSignIn}
             disabled={isAnonymousLoading}
@@ -486,7 +500,7 @@ export default function Authentication() {
             )}
           </button>
         </div>
-        
+
         <div className="mt-8 text-white/60 text-sm text-center">
           <p>
             By continuing, you agree to our <a href="/terms" className="underline hover:text-white">Terms of Service</a> and{" "}

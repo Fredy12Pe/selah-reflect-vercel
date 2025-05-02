@@ -16,6 +16,14 @@ export const useOnboarding = (user: User | null) => {
       return;
     }
 
+    // Skip onboarding for anonymous/guest users
+    if (user.isAnonymous) {
+      console.log("useOnboarding: Anonymous user detected, skipping onboarding");
+      setHasCompletedOnboarding(true);
+      setLoading(false);
+      return;
+    }
+
     // Get the userId for storing user-specific onboarding state
     const userId = user.uid;
     
