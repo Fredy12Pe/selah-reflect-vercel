@@ -177,6 +177,24 @@ export default function DebugPage() {
             RESET ONBOARDING & GO TO ONBOARDING FLOW
           </a>
           <a 
+            href="/debug/firebase-status" 
+            className="bg-orange-500 text-white px-4 py-2 rounded text-center hover:bg-orange-600 col-span-full"
+          >
+            Firebase Status & Configuration Checker
+          </a>
+          <a 
+            href="/debug/data-availability" 
+            className="bg-yellow-500 text-white px-4 py-2 rounded text-center hover:bg-yellow-600"
+          >
+            Date Data Availability
+          </a>
+          <a 
+            href="/debug/hymn-availability" 
+            className="bg-yellow-500 text-white px-4 py-2 rounded text-center hover:bg-yellow-600"
+          >
+            Hymn Data Availability
+          </a>
+          <a 
             href="/debug/onboarding-status" 
             className="bg-indigo-500 text-white px-4 py-2 rounded text-center hover:bg-indigo-600"
           >
@@ -205,7 +223,7 @@ export default function DebugPage() {
       
       <div className="mb-6 p-4 bg-gray-100 rounded">
         <h2 className="text-xl font-semibold mb-2">Environment Variables</h2>
-        <pre className="bg-black text-green-400 p-4 rounded overflow-auto">
+        <pre className="bg-white text-black border border-gray-300 p-4 rounded overflow-auto">
           {JSON.stringify(envVars, null, 2)}
         </pre>
       </div>
@@ -242,7 +260,7 @@ export default function DebugPage() {
       
       <div className="p-4 bg-gray-100 rounded">
         <h2 className="text-xl font-semibold mb-2">Test Results</h2>
-        <pre className="bg-black text-green-400 p-4 rounded overflow-auto">
+        <pre className="bg-white text-black border border-gray-300 p-4 rounded overflow-auto">
           {JSON.stringify(testResults, null, 2)}
         </pre>
       </div>
