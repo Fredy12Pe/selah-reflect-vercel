@@ -33,7 +33,16 @@ const checkDataAvailability = (data: any): Record<string, boolean> => {
 
 export default function DataAvailabilityPage() {
   const [availableDates, setAvailableDates] = useState<string[]>([]);
-  const [dateStatus, setDateStatus] = useState<{[key: string]: {available: boolean, loading?: boolean, error?: string, data?: any, components?: Record<string, boolean>}}>({}); 
+  const [dateStatus, setDateStatus] = useState<{
+    [key: string]: {
+      available: boolean, 
+      loading?: boolean, 
+      error?: string, 
+      data?: any, 
+      components?: Record<string, boolean>,
+      isWeekend?: boolean
+    }
+  }>({}); 
   const [rangeStart, setRangeStart] = useState<string>(
     format(subDays(new Date(), 30), 'yyyy-MM-dd')
   );
@@ -122,6 +131,11 @@ export default function DataAvailabilityPage() {
       
       const components = checkDataAvailability(devotion);
       
+      // Handle weekend dates specially - they should show as "Unknown" instead of "Not available"
+      const dateObj = parseISO(date);
+      const dayOfWeek = format(dateObj, 'EEEE');
+      const isWeekend = dayOfWeek === 'Saturday' || dayOfWeek === 'Sunday';
+      
       // Update status based on the API response
       setDateStatus(prev => ({
         ...prev,
@@ -129,7 +143,8 @@ export default function DataAvailabilityPage() {
           available: !!devotion && !devotion.notFound,
           loading: false,
           data: devotion,
-          components
+          components,
+          isWeekend // Add this flag to identify weekends
         }
       }));
     } catch (err) {
@@ -203,7 +218,42 @@ export default function DataAvailabilityPage() {
         </div>
       ) : (
         <div className="mb-6">
-          <h2 className="text-xl font-semibold mb-4">Available Dates</h2>
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-xl font-semibold">Available Dates</h2>
+            <button
+              onClick={async () => {
+                setLoading(true);
+                try {
+                  // Refresh available dates
+                  const dates = await getAvailableDates();
+                  setAvailableDates(dates);
+                  
+                  // Initialize the status object for all dates
+                  const initialStatus: {[key: string]: {available: boolean}} = {};
+                  dates.forEach(date => {
+                    initialStatus[date] = { available: true };
+                  });
+                  setDateStatus(initialStatus);
+                  
+                  // Check data for each date in our range
+                  const datesToCheck = datesInRange.filter(date => 
+                    dates.includes(date)).slice(0, 20);
+                  
+                  for (const date of datesToCheck) {
+                    await checkDateData(date);
+                  }
+                } catch (err) {
+                  setError(err instanceof Error ? err.message : 'Failed to refresh dates');
+                } finally {
+                  setLoading(false);
+                }
+              }}
+              className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600"
+            >
+              Refresh All Dates
+            </button>
+          </div>
+          
           <p className="mb-4">
             Found {availableDates.length} dates with data in the database.
           </p>
@@ -222,12 +272,18 @@ export default function DataAvailabilityPage() {
               <tbody>
                 {datesInRange.map(date => {
                   const isCurrentDate = date === today;
+                  const dateObj = parseISO(date);
+                  const dayOfWeek = format(dateObj, 'EEEE');
+                  const isWeekend = dayOfWeek === 'Saturday' || dayOfWeek === 'Sunday';
+                  
                   return (
                     <tr 
                       key={date} 
                       className={
                         isCurrentDate
                           ? "bg-blue-100 text-black font-medium border-l-4 border-l-blue-500"
+                          : dateStatus[date]?.isWeekend || isWeekend
+                            ? "bg-gray-50 text-black"
                           : dateStatus[date]?.available 
                             ? "bg-green-50 text-black" 
                             : dateStatus[date] 
@@ -244,6 +300,8 @@ export default function DataAvailabilityPage() {
                           <span className="text-gray-700">Checking...</span>
                         ) : dateStatus[date]?.available ? (
                           <span className="text-green-700 font-medium">✓ Available</span>
+                        ) : dateStatus[date]?.isWeekend || isWeekend ? (
+                          <span className="text-gray-700 font-medium">Unknown</span>
                         ) : dateStatus[date] ? (
                           <span className="text-red-700 font-medium">✗ Not available</span>
                         ) : (

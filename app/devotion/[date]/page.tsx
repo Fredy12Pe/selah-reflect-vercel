@@ -329,6 +329,18 @@ export default function DevotionPage({ params }: { params: { date: string } }) {
               <p className="text-xl">
                 New devotions are posted Monday through Friday</p>
               <p className="text-xl">check back soon!"</p>
+              
+              <div className="mt-8">
+                <Link
+                  href={`/devotion/${params.date}/reflection`}
+                  className="px-6 py-3 bg-white rounded-full hover:bg-white/90 inline-flex items-center text-black font-medium"
+                >
+                  <span>Go to Reflection</span>
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 ml-2">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
+                  </svg>
+                </Link>
+              </div>
             </div>
           </div>
         </div>
