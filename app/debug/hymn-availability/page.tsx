@@ -5,6 +5,11 @@ import { getHymnByMonth } from '@/lib/services/devotionService';
 import { Hymn } from '@/lib/types/devotion';
 import { format, addMonths, subMonths } from 'date-fns';
 
+// Extended hymn type with source tracking
+interface EnhancedHymn extends Hymn {
+  _source?: 'FIREBASE' | 'FALLBACK';
+}
+
 // Helper function to check hymn data components
 const checkHymnComponents = (hymn: Hymn | null): Record<string, boolean> => {
   if (!hymn) return {};
@@ -19,7 +24,7 @@ const checkHymnComponents = (hymn: Hymn | null): Record<string, boolean> => {
 };
 
 export default function HymnAvailabilityPage() {
-  const [hymnData, setHymnData] = useState<{[month: string]: Hymn | null}>({});
+  const [hymnData, setHymnData] = useState<{[month: string]: EnhancedHymn | null}>({});
   const [hymnComponents, setHymnComponents] = useState<{[month: string]: Record<string, boolean>}>({});
   const [loading, setLoading] = useState<{[month: string]: boolean}>({});
   const [error, setError] = useState<{[month: string]: string | null}>({});
@@ -44,13 +49,30 @@ export default function HymnAvailabilityPage() {
     setError(prev => ({ ...prev, [month]: null }));
     
     try {
-      const hymn = await getHymnByMonth(month);
-      setHymnData(prev => ({ ...prev, [month]: hymn }));
+      console.log(`Fetching hymn data for ${month} (${displayName})`);
+      
+      // Extract just the month name from the formatted display name
+      // This ensures we're using the same month format as the main app
+      const monthName = displayName.split(' ')[0]; // Gets "May" from "May 2024"
+      console.log(`Using month name: ${monthName} for fetching hymn`);
+      
+      const hymn = await getHymnByMonth(monthName);
+      console.log(`Received hymn data for ${monthName}:`, hymn);
+      
+      // Add a property to track if data is from fallback
+      const isFallback = hymn && (!hymn.updatedAt || hymn.updatedBy === 'fallback');
+      const enhancedHymn = hymn ? { 
+        ...hymn, 
+        _source: isFallback ? 'FALLBACK' : 'FIREBASE' 
+      } as EnhancedHymn : null;
+      
+      setHymnData(prev => ({ ...prev, [month]: enhancedHymn }));
       
       // Check which components are available
       const components = checkHymnComponents(hymn);
       setHymnComponents(prev => ({ ...prev, [month]: components }));
     } catch (err) {
+      console.error(`Error fetching hymn for ${month}:`, err);
       setError(prev => ({
         ...prev,
         [month]: err instanceof Error ? err.message : 'Failed to fetch hymn'
@@ -119,7 +141,26 @@ export default function HymnAvailabilityPage() {
         <div className="text-center p-4">Loading hymn data...</div>
       ) : (
         <div className="mb-6">
-          <h2 className="text-xl font-semibold mb-4">Available Hymns by Month</h2>
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-xl font-semibold">Available Hymns by Month</h2>
+            <button
+              onClick={async () => {
+                setPageLoading(true);
+                try {
+                  await Promise.all(
+                    months.map(month => fetchHymnForMonth(month.formattedMonth, month.displayName))
+                  );
+                } catch (err) {
+                  console.error('Error refreshing hymns:', err);
+                } finally {
+                  setPageLoading(false);
+                }
+              }}
+              className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600"
+            >
+              Refresh All Hymns
+            </button>
+          </div>
           
           <div className="overflow-auto">
             <table className="w-full border-collapse">
@@ -164,6 +205,15 @@ export default function HymnAvailabilityPage() {
                       </td>
                       <td className="border px-4 py-2 font-medium">
                         {hymnData[formattedMonth]?.title || '-'}
+                        {hymnData[formattedMonth]?._source && (
+                          <span className={`ml-2 text-xs px-1 py-0.5 rounded ${
+                            hymnData[formattedMonth]?._source === 'FIREBASE' 
+                              ? 'bg-green-100 text-green-800' 
+                              : 'bg-yellow-100 text-yellow-800'
+                          }`}>
+                            {hymnData[formattedMonth]?._source}
+                          </span>
+                        )}
                       </td>
                       <td className="border px-4 py-2">
                         {hymnComponents[formattedMonth] ? (

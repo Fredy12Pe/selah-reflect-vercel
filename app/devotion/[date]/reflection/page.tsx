@@ -476,6 +476,8 @@ export default function ReflectionPage({
           // Import the getHymnByMonth function
           const { getHymnByMonth } = await import('@/lib/services/devotionService');
           
+          // Use the current month for hymn lookup
+          // The old month offset code is removed since we now have correct hymn data for each month
           console.log('Reflection page: Fetching hymn for month:', monthStr);
           const hymnData = await getHymnByMonth(monthStr);
           
