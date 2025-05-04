@@ -795,8 +795,30 @@ export default function ReflectionPage({
     };
   }, []);
 
-  // Disable next button if current date is today
-  const isNextDisabled = isToday(currentDate) || isFuture(currentDate);
+  // Disable next button if current date is too far in the future
+  const oneWeekFromNow = addDays(new Date(), 7);
+  const isNextDisabled = isFuture(currentDate) && currentDate > oneWeekFromNow;
+
+  // Function to check if a date is a weekend
+  const isWeekend = (date: Date): boolean => {
+    return ['Saturday', 'Sunday'].includes(format(date, 'EEEE'));
+  };
+
+  // Function to check if a date is a weekday and within the preview window
+  const isPreviewableWeekday = (date: Date): boolean => {
+    const isWeekday = !isWeekend(date);
+    return isFuture(date) && date <= oneWeekFromNow && isWeekday;
+  };
+
+  // Function to determine if we should show placeholder content for preview dates
+  const showPlaceholderContent = isPreviewableWeekday(currentDate);
+
+  // Adapt the showNoDevotionContent to handle preview dates
+  // Weekend dates should always show "No devotion available" message
+  const showNoDevotionContent = ((!devotionData || 
+    (devotionData && 'notFound' in devotionData && devotionData.notFound)) && 
+    !isPreviewableWeekday(currentDate)) || 
+    isWeekend(currentDate);
 
   // Get all questions from all sections
   const getAllQuestions = () => {
@@ -817,9 +839,7 @@ export default function ReflectionPage({
     return allQuestions.slice(0, 2);
   };
 
-  // Adapt the showNoDevotionContent to handle PartialDevotion
-  const showNoDevotionContent = !devotionData || 
-    (devotionData && 'notFound' in devotionData && devotionData.notFound);
+  // Reflection questions for the current date
   const reflectionQuestions = showNoDevotionContent ? [] : getFirstTwoQuestions();
 
   // Function to handle AI reflection generation
@@ -1381,16 +1401,21 @@ export default function ReflectionPage({
 
         <button
           onClick={() => handleDateChange(addDays(currentDate, 1))}
-                  disabled={isNextDisabled}
-                  className={`p-3 rounded-full absolute right-0 top-1/2 -translate-y-1/2 ${
-                    isNextDisabled
-                      ? "text-white/30 cursor-not-allowed"
-                      : "hover:bg-zinc-800"
-                  }`}
-          aria-label="Next day"
-        >
-          <ChevronRightIcon className="w-6 h-6" />
-        </button>
+            disabled={isNextDisabled}
+            className={`p-3 rounded-full absolute right-0 top-1/2 -translate-y-1/2 group ${
+              isNextDisabled
+                ? "text-white/30 cursor-not-allowed"
+                : "hover:bg-zinc-800"
+            }`}
+            aria-label="Next day"
+          >
+            <ChevronRightIcon className="w-6 h-6" />
+            {!isNextDisabled && isFuture(addDays(currentDate, 1)) && (
+              <span className="absolute hidden group-hover:block right-0 top-full mt-2 bg-black/80 text-white text-xs rounded px-2 py-1 whitespace-nowrap">
+                Preview up to 7 days ahead
+              </span>
+            )}
+          </button>
       </div>
           </div>
 
@@ -1430,31 +1455,37 @@ export default function ReflectionPage({
 
               {/* If we have future date, show it clearly */}
               {isFuture(currentDate) && (
-                <div className="bg-zinc-900 rounded-xl p-6 mt-4 text-center">
-                  <h2 className="text-xl font-semibold mb-2">Future Date</h2>
+                <div className="bg-zinc-900 rounded-xl p-6 text-center mb-6">
+                  <div className="flex items-center justify-center mb-3">
+                    <span className="text-2xl mr-2">📆</span>
+                    <h2 className="text-xl font-semibold">Future Date</h2>
+                  </div>
                   <p className="text-white/80">
-                    This devotion is not yet available. Content will be released on {format(currentDate, "MMMM d, yyyy")}.
+                    {currentDate <= oneWeekFromNow ? 
+                      "You're viewing content for a future date." :
+                      `This devotion is not yet available. Content will be released on ${format(currentDate, "MMMM d, yyyy")}.`
+                    }
                   </p>
                 </div>
               )}
               
               {/* Display devotion content if we have it */}
-              {!isFuture(currentDate) && devotionData && !('notFound' in devotionData) ? (
+              {devotionData && !('notFound' in devotionData) ? (
                 <>
                   {/* Scripture Reference */}
-            <div>
+                  <div>
                     <p className="text-white/70 text-lg mb-2">Today's Scripture</p>
-              <div
+                    <div
                       className="bg-[#0F1211] p-6 rounded-2xl cursor-pointer relative min-h-[100px] flex flex-col justify-center"
-                onClick={handleOpenScriptureModal}
-              >
+                      onClick={handleOpenScriptureModal}
+                    >
                       <h2 className="text-2xl font-medium">{devotionData.bibleText}</h2>
                       <p className="text-white/50 text-sm mt-2">Tap to view full scripture</p>
-              </div>
-            </div>
+                    </div>
+                  </div>
 
-            {/* Reflection Questions */}
-            <div>
+                  {/* Reflection Questions */}
+                  <div>
                     <p className="text-white/70 text-lg mb-2">Reflection Questions</p>
                     <div className="bg-[#0F1211] p-6 rounded-2xl">
                       <ol className="list-decimal ml-5 space-y-6">
@@ -1465,17 +1496,20 @@ export default function ReflectionPage({
                         ))}
                       </ol>
                       
-                      <div className="mt-10 flex justify-start">
-                <Link
-                  href={`/devotion/${params.date}/journal`}
-                          className="px-6 py-2 bg-white rounded-full hover:bg-white/90 flex items-center space-x-2 text-black"
-                >
-                          <span className="font-medium">Journal Entry</span>
-                          <ChevronRightIcon className="w-5 h-5 ml-2" />
-                </Link>
-                      </div>
-              </div>
-            </div>
+                      {/* Only show Journal Entry button on weekdays */}
+                      {!isWeekend(currentDate) && (
+                        <div className="mt-10 flex justify-start">
+                          <Link
+                            href={`/devotion/${params.date}/journal`}
+                            className="px-6 py-2 bg-white rounded-full hover:bg-white/90 flex items-center space-x-2 text-black"
+                          >
+                            <span className="font-medium">Journal Entry</span>
+                            <ChevronRightIcon className="w-5 h-5 ml-2" />
+                          </Link>
+                        </div>
+                      )}
+                    </div>
+                  </div>
 
                   {/* AI Reflection */}
                   <div className="mt-6 mb-2">
@@ -1564,22 +1598,68 @@ export default function ReflectionPage({
                     )}
             </div>
           </>
+              ) : showPlaceholderContent ? (
+                <>
+                  {/* Placeholder content for future preview dates */}
+                  <div>
+                    <p className="text-white/70 text-lg mb-2">Scripture</p>
+                    <div className="bg-[#0F1211] p-6 rounded-2xl relative min-h-[100px] flex flex-col justify-center">
+                      <div className="mb-4">
+                        <div className="bg-zinc-800/50 animate-pulse h-8 rounded mb-3 w-3/4"></div>
+                        <div className="bg-zinc-800/50 animate-pulse h-6 rounded w-1/2"></div>
+                      </div>
+                      <p className="text-white/50 text-sm mt-2">Content preview for {format(currentDate, "MMMM d, yyyy")}</p>
+                    </div>
+                  </div>
+                  
+                  {/* Questions Placeholder */}
+                  <div className="mt-6">
+                    <p className="text-white/70 text-lg mb-2">Reflection Questions</p>
+                    <div className="bg-[#0F1211] p-6 rounded-2xl">
+                      <div className="space-y-6">
+                        <div className="bg-zinc-800/50 animate-pulse h-16 rounded"></div>
+                        <div className="bg-zinc-800/50 animate-pulse h-16 rounded"></div>
+                      </div>
+                      
+                      <div className="mt-6 text-center">
+                        <p className="text-white/50 mb-4">This preview shows what content will look like on {format(currentDate, "EEEE, MMMM d")}</p>
+                        <div className="mt-3 px-6 py-2 bg-zinc-800/50 animate-pulse rounded-full w-32 h-10 mx-auto"></div>
+                      </div>
+                    </div>
+                  </div>
+                </>
               ) : (
-                !isFuture(currentDate) && showNoDevotionContent && (
-                  <div className="text-center pt-10">
-                    <h2 className="text-2xl font-medium mb-8">"No devotion is available for today.</h2>
+                <div className="text-center pt-10">
+                  <div className="inline-block bg-zinc-900 rounded-xl p-8 max-w-lg mx-auto">
+                    <div className="text-5xl mb-6">📖</div>
+                    <h2 className="text-2xl font-medium mb-4">No devotion is available for today</h2>
                     
-                    <p className="text-xl text-white/80 mb-6">
+                    <p className="text-lg text-white/80 mb-4">
                       New devotions are posted Monday through Friday
                     </p>
                     
-                    <p className="text-xl text-white/80 mb-6">
-                      check back soon!"
+                    <p className="text-lg text-white/80 mb-6">
+                      Check back soon!
                     </p>
+                    
+                    {/* Only show Journal button on weekdays */}
+                    {!isWeekend(currentDate) && (
+                      <div className="mt-8">
+                        <Link
+                          href="/journal"
+                          className="px-6 py-3 bg-white rounded-full hover:bg-white/90 inline-flex items-center text-black font-medium"
+                        >
+                          <span>Go to Journal</span>
+                          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 ml-2">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
+                          </svg>
+                        </Link>
+                      </div>
+                    )}
                   </div>
-                )
-        )}
-      </div>
+                </div>
+              )}
+            </div>
           </>
         )}
 

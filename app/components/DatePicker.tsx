@@ -13,6 +13,7 @@ import {
   isToday,
   isFuture,
   parseISO,
+  addDays,
 } from "date-fns";
 import { ChevronLeftIcon, ChevronRightIcon } from "@heroicons/react/24/outline";
 import Link from "next/link";
@@ -115,9 +116,25 @@ export default function DatePicker({
       return !isFuture(date);
     }
     
+    // Allow weekdays within 7 days in the future
+    const isWithinPreviewPeriod = isFuture(date) && 
+      date <= addDays(new Date(), 7);
+    
+    const isWeekday = !['Saturday', 'Sunday'].includes(format(date, 'EEEE'));
+      
+    if (isWithinPreviewPeriod && isWeekday) {
+      return true;
+    }
+    
     // Otherwise, check if the date is in our list of available dates
     const dateString = format(date, "yyyy-MM-dd");
     return availableDates.includes(dateString);
+  };
+
+  // Add helper to check if a date is in the 7-day preview period
+  const isInPreviewPeriod = (date: Date): boolean => {
+    const isWeekday = !['Saturday', 'Sunday'].includes(format(date, 'EEEE'));
+    return isFuture(date) && date <= addDays(new Date(), 7) && isWeekday;
   };
 
   const handleDateClick = (date: Date) => {
@@ -202,13 +219,15 @@ export default function DatePicker({
                   ${
                     isSelected
                       ? "bg-white text-black font-medium"
+                      : isInPreviewPeriod(day)
+                      ? "bg-blue-600/30 hover:bg-blue-600/50 text-white"
                       : isFutureDate && !hasDevotional
                       ? "text-white/30 cursor-not-allowed"
                       : "text-white hover:bg-zinc-800"
                   }
                   ${isTodayDate && !isSelected ? "border border-white" : ""}
                   ${
-                    hasDevotional && !isSelected
+                    hasDevotional && !isSelected && !isInPreviewPeriod(day)
                       ? "border border-green-500"
                       : ""
                   }
@@ -220,7 +239,7 @@ export default function DatePicker({
           })}
         </div>
         
-        <div className="mt-4 flex items-center justify-between">
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-y-2">
           <div className="flex items-center space-x-2">
             <div className="w-3 h-3 border border-green-500 rounded-full"></div>
             <span className="text-xs text-white/60">Devotional available</span>
@@ -228,6 +247,10 @@ export default function DatePicker({
           <div className="flex items-center space-x-2">
             <div className="w-3 h-3 border border-white rounded-full"></div>
             <span className="text-xs text-white/60">Today</span>
+          </div>
+          <div className="flex items-center space-x-2">
+            <div className="w-3 h-3 bg-blue-600/30 rounded-full"></div>
+            <span className="text-xs text-white/60">Preview (next 7 days)</span>
           </div>
         </div>
       </div>
