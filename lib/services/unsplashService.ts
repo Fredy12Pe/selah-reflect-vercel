@@ -143,10 +143,10 @@ export async function getDailyDevotionImage(
       });
       
       clearTimeout(timeoutId);
-      
-      if (image?.urls?.regular) {
+    
+    if (image?.urls?.regular) {
         // Return direct Unsplash URL
-        return image.urls.regular;
+      return image.urls.regular;
       } else {
         console.warn('UnsplashService: No image URL returned, using local image');
         return fallbackImage;

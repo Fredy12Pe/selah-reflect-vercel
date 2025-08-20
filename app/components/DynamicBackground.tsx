@@ -73,12 +73,12 @@ export default function DynamicBackground({
 
     // Check if this is for today's date
     const isToday = new Date(date).toDateString() === new Date().toDateString();
-    
+
     // Try to access sessionStorage (might fail in private browsing)
     try {
       // Only use cached image if it's not today's date
       if (!isToday) {
-        cachedImage = sessionStorage.getItem(cacheKey);
+      cachedImage = sessionStorage.getItem(cacheKey);
       }
     } catch (error) {
       console.warn("Unable to access sessionStorage", error);

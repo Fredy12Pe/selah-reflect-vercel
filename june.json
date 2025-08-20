@@ -1,0 +1,400 @@
+{
+    "months": {
+      "june": {
+        "id": "june",
+        "name": "June 2025",
+        "order": 6,
+        "hymn": {
+          "title": "Rock of Ages",
+          "lyrics": [
+            "Rock of Ages, cleft for me,",
+            "Let me hide myself in Thee;",
+            "Let the water and the blood,",
+            "From Thy wounded side which flowed,",
+            "Be of sin the double cure –",
+            "Save from wrath and make me pure.",
+            "",
+            "Not the labor of my hands",
+            "Can fulfill Thy law's demands;",
+            "Could my zeal no respite know,",
+            "Could my tears forever flow,",
+            "All for sin could not atone;",
+            "Thou must save, and Thou alone.",
+            "",
+            "Nothing in my hand I bring,",
+            "Simply to the cross I cling;",
+            "Naked, come to Thee for dress;",
+            "Helpless, look to Thee for grace;",
+            "Foul, I to the fountain fly;",
+            "Wash me, Savior, or I die.",
+            "",
+            "While I draw this fleeting breath,",
+            "When mine eyes shall close in death,",
+            "When I soar to worlds unknown,",
+            "And behold Thee on Thy throne,",
+            "Rock of Ages, cleft for me,",
+            "Let me hide myself in Thee."
+          ]
+        }
+      }
+    },
+    "devotions": {
+      "june2": {
+        "id": "june2",
+        "monthId": "june",
+        "date": "2025-06-02",
+        "displayDate": "Monday, June 2",
+        "bibleText": "1 Corinthians 9:19-23 (ESV)",
+        "reflectionSections": [
+          {
+            "id": "june2_1",
+            "passage": "General",
+            "questions": [
+              "Apostle Paul re-emphasizes the fact that he is free, but he also talks about his efforts to make himself a servant. How did these two seemingly mutually exclusive ideas co-exist in Apostle Paul's life?",
+              "What does it mean to \"make myself a servant to all\" or \"become all things to all people\" without compromising my Christian values?",
+              "Consider the difficulties of adjusting to others. Why did Apostle Paul do so? What would it look like for me to adjust to others for the sake of advancing the gospel in my current context?"
+            ]
+          }
+        ]
+      },
+      "june3": {
+        "id": "june3",
+        "monthId": "june",
+        "date": "2025-06-03",
+        "displayDate": "Tuesday, June 3",
+        "bibleText": "1 Corinthians 9:24-27 (ESV)",
+        "reflectionSections": [
+          {
+            "id": "june3_1",
+            "passage": "General",
+            "questions": [
+              "In what ways is Christian life similar to a race? Why is it necessary to \"discipline my body and keep it under control\" in Christian life? How does this challenge a common yet faulty view of \"grace\" and Christian life?",
+              "In what ways is Christian life different from the \"races\" of this world? In what ways do the people of this world run aimlessly?",
+              "What lessons can I learn from the fact that even Apostle Paul \"disciplined his body and kept it under control\" so that he would not be disqualified for the prize? What is my attitude toward struggle (cf. Heb 12:3-4)?"
+            ]
+          }
+        ]
+      },
+      "june4": {
+        "id": "june4",
+        "monthId": "june",
+        "date": "2025-06-04",
+        "displayDate": "Wednesday, June 4",
+        "bibleText": "1 Corinthians 10:1-13 (ESV)",
+        "reflectionSections": [
+          {
+            "id": "june4_1",
+            "passage": "1 Corinthians 10:1-5",
+            "questions": [
+              "In this passage, Apostle Paul draws from the history of the Exodus to warn the Corinthians. What lessons regarding faith and experiences can I learn from the fact that, despite all they experienced, the \"fathers\" died in the desert and never made it into the Promised Land?"
+            ]
+          },
+          {
+            "id": "june4_2",
+            "passage": "1 Corinthians 10:6-11",
+            "questions": [
+              "Are there examples from Scripture that I need to heed in my current situation or season of life?"
+            ]
+          },
+          {
+            "id": "june4_3",
+            "passage": "1 Corinthians 10:12",
+            "questions": [
+              "\"Self-testing can give an occasion for realignment, for reorientation, in which one can make certain to steer clear of sexual immorality, idolatry, and a testing of God. By altering one's course on the basis of self-examination, one can choose to stand with the exodus forebears who were faithful rather than fall like those who tested God.\"",
+              "What concrete steps can I take to allow for this kind of self-examination and taking heed, so that I don't fall?"
+            ]
+          },
+          {
+            "id": "june4_4",
+            "passage": "1 Corinthians 10:13",
+            "questions": [
+              "How does this verse give me perspective and help me in my struggle against temptation? What truth about God do I need to cling onto when I face temptations?"
+            ]
+          }
+        ]
+      },
+      "june5": {
+        "id": "june5",
+        "monthId": "june",
+        "date": "2025-06-05",
+        "displayDate": "Thursday, June 5",
+        "bibleText": "1 Corinthians 10:14-17 (ESV)",
+        "reflectionSections": [
+          {
+            "id": "june5_1",
+            "passage": "General",
+            "questions": [
+              "What can I learn about idolatry from the fact that Apostle Paul advises us to flee from it?",
+              "\"This is the positive counter reality set over against the danger of idolatry: authentic Christian worship draws us together around the table of the Lord in such a way that we become a covenant people, receiving the blessings of fellowship with God and sharing our lives with one another. In order to flee from idolatry we must order our lives so that this koinonia becomes the focal point of our existence.\"",
+              "Why is it that \"partaking of the one bread\" (the Lord's Supper) creates such a close relationship among those who participate in it that they become \"one body\"?",
+              "Reflect on the gift of 'koinonia' that is the church. How is the church crucial in my fight to flee from idolatry? What are the ways I can help others flee idolatry, as well?"
+            ]
+          }
+        ]
+      },
+      "june6": {
+        "id": "june6",
+        "monthId": "june",
+        "date": "2025-06-06",
+        "displayDate": "Friday, June 6",
+        "bibleText": "1 Corinthians 10:18-22 (ESV)",
+        "reflectionSections": [
+          {
+            "id": "june6_1",
+            "passage": "General",
+            "questions": [
+              "What might have been the Corinthian Christians' justification regarding their involvement in idol feasts? What would have been Apostle Paul's response?",
+              "What are some examples of modern-day Christians partaking in both \"the table of the Lord and the table of demons\"? How can I guard against such compromises in my life?"
+            ]
+          }
+        ]
+      },
+      "june9": {
+        "id": "june9",
+        "monthId": "june",
+        "date": "2025-06-09",
+        "displayDate": "Monday, June 9",
+        "bibleText": "1 Corinthians 10:23-33 (ESV)",
+        "reflectionSections": [
+          {
+            "id": "june9_1",
+            "passage": "1 Corinthians 10:23-24",
+            "questions": [
+              "According to Apostle Paul, what else should we consider when people say \"all things are lawful\"? What is the proper basis for decision-making in Christian life, and what are the implications of this in my life?"
+            ]
+          },
+          {
+            "id": "june9_2",
+            "passage": "1 Corinthians 10:25-30",
+            "questions": [
+              "What reason does Apostle Paul give for why it is OK to eat anything sold in the meat market?",
+              "What reason does Apostle Paul give for why a Christian should not eat meat if someone tells him the meat was offered in sacrifice?"
+            ]
+          },
+          {
+            "id": "june9_3",
+            "passage": "1 Corinthians 10:31-33",
+            "questions": [
+              "What would Apostle Paul's life have looked like as he tried to \"please everyone in everything I do\" – Jews, Greeks, and the church of God?",
+              "How can I also seek the good of many, rather than my own advantage, so that people may be saved?"
+            ]
+          }
+        ]
+      },
+      "june10": {
+        "id": "june10",
+        "monthId": "june",
+        "date": "2025-06-10",
+        "displayDate": "Tuesday, June 10",
+        "bibleText": "1 Corinthians 11:1-16 (ESV)",
+        "reflectionSections": [
+          {
+            "id": "june10_1",
+            "passage": "General",
+            "questions": [
+              "What example of Christ is Apostle Paul referring to when he says he imitates Christ?"
+            ]
+          },
+          {
+            "id": "june10_2",
+            "passage": "1 Corinthians 11:2",
+            "questions": [
+              "What is the relationship between \"remembering\" Paul and maintaining the \"traditions\"? What are the traditions that I need to remember and hold to in order that the gospel may be passed down to the next generation without dilution?"
+            ]
+          },
+          {
+            "id": "june10_3",
+            "passage": "1 Corinthians 11:4-5",
+            "questions": [
+              "\"The covering or uncovering of the head is not merely a sign of individual freedom, Paul insists; rather, it signifies either respect or disrespect for one's superior in the hierarchy. Consequently, to display the literal head inappropriately attired in worship is to bring shame upon one's figurative 'head'.\"",
+              "As Jesus is the head of the church (cf. Col. 1:17-18), how is his name honored or dishonored through my conduct and the conduct of others within the church?"
+            ]
+          },
+          {
+            "id": "june10_4",
+            "passage": "1 Corinthians 11:11-12",
+            "questions": [
+              "\"Even though social decorum requires women and men to maintain symbolic distinctions, and even though Paul contends that such distinctions have a basis in creation itself, nevertheless 'in the Lord' things are different. Men and women live in mutual interdependence. This does not mean that the differences between the sexes are abolished; it does mean, however, that they are both radically dependent on God and that they are called to live as complementary partners in Christ.\"",
+              "How do these verses challenge my view on the roles of men and women and how we are to relate to one another?"
+            ]
+          },
+          {
+            "id": "june10_5",
+            "passage": "1 Corinthians 11:15",
+            "questions": [
+              "The passage reveals Paul's heart for why he desired women to veil their heads—to provide honor and dignity to women according to the customs of his time. What are some restrictions God has placed in our lives to bring honor and dignity to our lives? What has been my attitude to such restrictions?"
+            ]
+          }
+        ]
+      },
+      "june11": {
+        "id": "june11",
+        "monthId": "june",
+        "date": "2025-06-11",
+        "displayDate": "Wednesday, June 11",
+        "bibleText": "1 Corinthians 11:17-26 (ESV)",
+        "reflectionSections": [
+          {
+            "id": "june11_1",
+            "passage": "General",
+            "questions": [
+              "\"A second abuse of worship existed in the Corinthian church regarding how to celebrate the Lord's Supper. Apparently, there was a division between the rich and the poor during the celebration of Communion itself. This lack of unity caused the believers to lose the real meaning behind what they were remembering – the sacrifice of Jesus' body on the cross.\"",
+              "What are some examples of Christian practices where lack of unity can potentially lead to loss of meaning?",
+              "Why did Apostle Paul say that when the Corinthian church comes together for the Lord's Supper, \"it is not for the better but for the worse\" and what they are doing is \"not the Lord's supper\"? How were the Corinthians despising the church of God?",
+              "The Lord's Supper was supposed to be done in remembrance of Jesus, specifically his death on the cross. Why was the division based on social distinctions inappropriate in light of this? How can I more properly reflect what Jesus did on the cross through how I treat others within the body of Christ?"
+            ]
+          }
+        ]
+      },
+      "june12": {
+        "id": "june12",
+        "monthId": "june",
+        "date": "2025-06-12",
+        "displayDate": "Thursday, June 12",
+        "bibleText": "1 Corinthians 11:27-34 (ESV)",
+        "reflectionSections": [
+          {
+            "id": "june12_1",
+            "passage": "General",
+            "questions": [
+              "What constitutes \"an unworthy manner\" in approaching the Lord's Supper, and what is the consequence?",
+              "What steps can I take to guard myself against this kind of irreverence toward Jesus' death?",
+              "Is there any unconfessed sin or offensive attitude I need to repent of today?"
+            ]
+          }
+        ]
+      },
+      "june13": {
+        "id": "june13",
+        "monthId": "june",
+        "date": "2025-06-13",
+        "displayDate": "Friday, June 13",
+        "bibleText": "1 Corinthians 12:1-11 (ESV)",
+        "reflectionSections": [
+          {
+            "id": "june13_1",
+            "passage": "1 Corinthians 12:4-6",
+            "questions": [
+              "Why would Apostle Paul emphasize that the different kinds of gifts, service and working are all from the \"same Spirit,\" the \"same Lord,\" and the \"same God\"? How should I relate to my fellow brothers and sisters in light of this truth? How does this change the way I view myself?",
+              "List different kinds of gifts, service, and working within the church. How do these differences fit together to build up the body of Christ?"
+            ]
+          },
+          {
+            "id": "june13_2",
+            "passage": "1 Corinthians 12:7-11",
+            "questions": [
+              "\"Paul elucidates spiritual gifts from three different angles: They are bestowed freely by the Spirit's grace (v. 4), are intended to be used in a Christ-like attitude of servanthood (v. 5), and are the result of God's powerful working in a person's life (v. 6).\"",
+              "What is the purpose of the Spirit's manifestation in each person?",
+              "What are the spiritual gifts that God has given me? How can I fully use them \"for the common good\"?"
+            ]
+          }
+        ]
+      },
+      "june16": {
+        "id": "june16",
+        "monthId": "june",
+        "date": "2025-06-16",
+        "displayDate": "Monday, June 16",
+        "bibleText": "1 Corinthians 12:12-20 (ESV)",
+        "reflectionSections": [
+          {
+            "id": "june16_1",
+            "passage": "1 Corinthians 12:12-13",
+            "questions": [
+              "How is it possible that Jews and Greeks and slave and free can all become part of one body?",
+              "What are the ways that I need to let go of my differences with others so that I can become one with them in the body of Christ? For what purpose do we need to become one body (cf. Philippians 1:27)?"
+            ]
+          },
+          {
+            "id": "june16_2",
+            "passage": "1 Corinthians 12:14-20",
+            "questions": [
+              "How would you characterize the attitude of someone who says, \"Because I am not _______, I do not belong to the body\"? What would you tell that person?",
+              "How does v. 18 nullify the sentiment that \"I do not belong\"?"
+            ]
+          }
+        ]
+      },
+      "june17": {
+        "id": "june17",
+        "monthId": "june",
+        "date": "2025-06-17",
+        "displayDate": "Tuesday, June 17",
+        "bibleText": "1 Corinthians 12:21-31 (ESV)",
+        "reflectionSections": [
+          {
+            "id": "june17_1",
+            "passage": "1 Corinthians 12:21-26",
+            "questions": [
+              "What roles or services in the church do I consider \"more important\" than others?",
+              "How does God view each part of the body? Ultimately, why has God \"so composed the body\"?",
+              "Who are the people in my life I can suffer or rejoice with today, and what are ways I can share in their suffering or joy?"
+            ]
+          },
+          {
+            "id": "june17_2",
+            "passage": "1 Corinthians 12:27-28",
+            "questions": [
+              "Among the gifts listed in v. 28, what is the one gift that everyone possesses? How can I actively exercise this gift?"
+            ]
+          }
+        ]
+      },
+      "june18": {
+        "id": "june18",
+        "monthId": "june",
+        "date": "2025-06-18",
+        "displayDate": "Wednesday, June 18",
+        "bibleText": "1 Corinthians 13:1-3 (ESV)",
+        "reflectionSections": [
+          {
+            "id": "june18_1",
+            "passage": "General",
+            "questions": [
+              "Why is someone who \"speak[s] in the tongues of men and of angels,\" but does not have love, like a \"noisy gong or a clanging cymbal\"?",
+              "What is the tragedy of possessing gifts but not having any love? Why is such a person referred to as \"nothing\"?",
+              "What kind of person would give away all they have to the poor and even deliver up his body to be burned without love? What would such a person be like at the end of his life? Why does Apostle Paul say that such a person gains nothing?",
+              "Reflect on today's passage and write a prayer of response and commitment."
+            ]
+          }
+        ]
+      },
+      "june19": {
+        "id": "june19",
+        "monthId": "june",
+        "date": "2025-06-19",
+        "displayDate": "Thursday, June 19",
+        "bibleText": "1 Corinthians 13:4-7 (ESV)",
+        "reflectionSections": [
+          {
+            "id": "june19_1",
+            "passage": "General",
+            "questions": [
+              "What is the description of love according to the world?",
+              "Reflect on the life of Jesus, and how he perfectly embodied the description of true love.",
+              "How have I been loved by God and his people as described in this passage? How is it possible for me to love others in this way (cf. Galatians 5:22-25)?",
+              "Reflect on today's passage and write a prayer of response and commitment."
+            ]
+          }
+        ]
+      },
+      "june20": {
+        "id": "june20",
+        "monthId": "june",
+        "date": "2025-06-20",
+        "displayDate": "Friday, June 20",
+        "bibleText": "1 Corinthians 13:8-13 (ESV)",
+        "reflectionSections": [
+          {
+            "id": "june20_1",
+            "passage": "General",
+            "questions": [
+              "Consider the context and placement of this chapter on love. How does this passage provide the right perspective on the purpose of spiritual gifts and the issue of whether or not I have certain spiritual gifts?",
+              "Given Apostle Paul's description about the \"now\" and \"then,\" why is love greater than even \"faith\" and \"hope\"?",
+              "As I examine my life and relationships, are there \"childish ways\" I need to give up so that I can love more fully?"
+            ]
+          }
+        ]
+      }
+    }
+  }

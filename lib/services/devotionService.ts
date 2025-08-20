@@ -362,7 +362,8 @@ function getFallbackHymnForMonth(month: string): Hymn {
       { lineNumber: 8, text: "How precious did that grace appear" },
       { lineNumber: 9, text: "The hour I first believed!" }
     ],
-    month: "Default"
+    month: "Default",
+    updatedBy: "fallback"  // Add this marker to identify fallback data
   };
   
   // Map of fallback hymns for each month
@@ -376,7 +377,8 @@ function getFallbackHymnForMonth(month: string): Hymn {
         { lineNumber: 3, text: "I once was lost, but now am found," },
         { lineNumber: 4, text: "Was blind, but now I see." }
       ],
-      month: "January"
+      month: "January",
+      updatedBy: "fallback"
     },
     february: {
       title: "Holy, Holy, Holy",
@@ -387,7 +389,8 @@ function getFallbackHymnForMonth(month: string): Hymn {
         { lineNumber: 3, text: "Holy, holy, holy! merciful and mighty," },
         { lineNumber: 4, text: "God in three persons, blessed Trinity!" }
       ],
-      month: "February"
+      month: "February",
+      updatedBy: "fallback"
     },
     march: {
       title: "Be Thou My Vision",
@@ -398,7 +401,8 @@ function getFallbackHymnForMonth(month: string): Hymn {
         { lineNumber: 3, text: "Thou my best Thought, by day or by night," },
         { lineNumber: 4, text: "Waking or sleeping, Thy presence my light." }
       ],
-      month: "March"
+      month: "March",
+      updatedBy: "fallback"
     },
     april: {
       title: "When I Survey the Wondrous Cross",
@@ -409,7 +413,8 @@ function getFallbackHymnForMonth(month: string): Hymn {
         { lineNumber: 3, text: "My richest gain I count but loss," },
         { lineNumber: 4, text: "And pour contempt on all my pride." }
       ],
-      month: "April"
+      month: "April",
+      updatedBy: "fallback"
     },
     may: {
       title: "O Master, Let Me Walk With Thee",
@@ -420,7 +425,8 @@ function getFallbackHymnForMonth(month: string): Hymn {
         { lineNumber: 3, text: "Tell me Thy secret; help me bear" },
         { lineNumber: 4, text: "The strain of toil, the fret of care." }
       ],
-      month: "May"
+      month: "May",
+      updatedBy: "fallback"
     },
     june: {
       title: "Great Is Thy Faithfulness",
@@ -431,7 +437,8 @@ function getFallbackHymnForMonth(month: string): Hymn {
         { lineNumber: 3, text: "Thou changest not, Thy compassions, they fail not" },
         { lineNumber: 4, text: "As Thou hast been Thou forever wilt be." }
       ],
-      month: "June"
+      month: "June",
+      updatedBy: "fallback"
     },
     july: {
       title: "Blessed Assurance",
@@ -442,7 +449,8 @@ function getFallbackHymnForMonth(month: string): Hymn {
         { lineNumber: 3, text: "Heir of salvation, purchase of God," },
         { lineNumber: 4, text: "Born of His Spirit, washed in His blood." }
       ],
-      month: "July"
+      month: "July",
+      updatedBy: "fallback"
     },
     august: {
       title: "It Is Well With My Soul",
@@ -453,7 +461,8 @@ function getFallbackHymnForMonth(month: string): Hymn {
         { lineNumber: 3, text: "Whatever my lot, Thou hast taught me to say," },
         { lineNumber: 4, text: "It is well, it is well with my soul." }
       ],
-      month: "August"
+      month: "August",
+      updatedBy: "fallback"
     },
     september: {
       title: "Come, Thou Fount of Every Blessing",
@@ -464,7 +473,8 @@ function getFallbackHymnForMonth(month: string): Hymn {
         { lineNumber: 3, text: "Streams of mercy, never ceasing," },
         { lineNumber: 4, text: "Call for songs of loudest praise." }
       ],
-      month: "September"
+      month: "September",
+      updatedBy: "fallback"
     },
     october: {
       title: "A Mighty Fortress Is Our God",
@@ -475,7 +485,8 @@ function getFallbackHymnForMonth(month: string): Hymn {
         { lineNumber: 3, text: "Our helper He, amid the flood" },
         { lineNumber: 4, text: "Of mortal ills prevailing." }
       ],
-      month: "October"
+      month: "October",
+      updatedBy: "fallback"
     },
     november: {
       title: "How Great Thou Art",
@@ -486,7 +497,8 @@ function getFallbackHymnForMonth(month: string): Hymn {
         { lineNumber: 3, text: "I see the stars, I hear the rolling thunder," },
         { lineNumber: 4, text: "Thy pow'r throughout the universe displayed," }
       ],
-      month: "November"
+      month: "November",
+      updatedBy: "fallback"
     },
     december: {
       title: "Joy to the World",
@@ -497,7 +509,8 @@ function getFallbackHymnForMonth(month: string): Hymn {
         { lineNumber: 3, text: "Let ev'ry heart prepare Him room," },
         { lineNumber: 4, text: "And heav'n and nature sing," }
       ],
-      month: "December"
+      month: "December",
+      updatedBy: "fallback"
     }
   };
   
@@ -641,7 +654,7 @@ export async function getAvailableDates(): Promise<string[]> {
     console.log('Using fallback dates due to error');
     return fallbackDates;
   }
-}
+} 
 
 // Function to convert hymn lyrics from Firebase format to verses format for display
 const convertHymnLyricsToVerses = (hymnData: Hymn | null): Array<{verse: number, lines: string[]}> => {

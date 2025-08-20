@@ -585,13 +585,13 @@ export default function JournalPage({ params }: { params: { date: string } }) {
         <div className="container mx-auto px-4 py-8 max-w-3xl">
           {/* Header */}
           <div className="mb-6 flex items-center justify-between">
-            <Link
+        <Link
               href={`/devotion/${params.date}/reflection`}
               className="text-white/70 hover:text-white flex items-center"
-            >
+        >
               <ArrowLeftIcon className="w-5 h-5 mr-2" />
               <span>Back to Reflection</span>
-            </Link>
+        </Link>
             
             <div className="flex items-center space-x-6">
               <Link
@@ -689,7 +689,7 @@ export default function JournalPage({ params }: { params: { date: string } }) {
     <div className="min-h-screen bg-black text-white pb-20 font-outfit">
       <style dangerouslySetInnerHTML={{ __html: modalAnimations }} />
       <div className="container mx-auto px-4 py-8 max-w-3xl">
-        {/* Header */}
+      {/* Header */}
         <div className="mb-6 flex items-center justify-between">
           <Link
             href={`/devotion/${params.date}/reflection`}
@@ -700,7 +700,7 @@ export default function JournalPage({ params }: { params: { date: string } }) {
           </Link>
           
           <div className="flex items-center space-x-6">
-            <Link
+            <Link 
               href="/history"
               className="text-white/70 hover:text-white"
               onClick={() => {

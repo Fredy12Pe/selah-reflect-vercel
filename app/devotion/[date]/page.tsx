@@ -13,7 +13,7 @@ import {
 import DynamicBackground from "@/app/components/DynamicBackground";
 import BackgroundImage from "@/app/components/BackgroundImage";
 import ReliableBackground from "@/app/components/ReliableBackground";
-import { format, parseISO, isToday } from "date-fns";
+import { format, parseISO, isToday, addDays, isFuture } from "date-fns";
 import { getVerse, createScriptureVerse } from "@/lib/bibleApi";
 import Link from "next/link";
 
@@ -113,6 +113,15 @@ export default function DevotionPage({ params }: { params: { date: string } }) {
     // If no date is provided or it's invalid, redirect to today's date
     const todayDate = getTodayDate();
     if (!params.date || isNaN(Date.parse(params.date))) {
+      router.replace(`/devotion/${todayDate}`);
+      return;
+    }
+
+    // Check if the date is more than 7 days in the future, and redirect to today if it is
+    const dateObj = parseISO(params.date);
+    const oneWeekFromNow = addDays(new Date(), 7);
+    if (isFuture(dateObj) && dateObj > oneWeekFromNow) {
+      console.log('Date is more than a week in the future, redirecting to today');
       router.replace(`/devotion/${todayDate}`);
       return;
     }
@@ -287,6 +296,12 @@ export default function DevotionPage({ params }: { params: { date: string } }) {
     }
   }, [devotion, bibleVerse, pageLoading]);
 
+  // Function to check if a date is a weekday and within the preview window
+  const isPreviewableWeekday = (date: Date): boolean => {
+    const isWeekday = !['Saturday', 'Sunday'].includes(format(date, 'EEEE'));
+    return isFuture(date) && date <= addDays(new Date(), 7) && isWeekday;
+  };
+
   if (loading || pageLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-black">
@@ -295,7 +310,7 @@ export default function DevotionPage({ params }: { params: { date: string } }) {
     );
   }
 
-  if (!devotion) {
+  if (!devotion && !isPreviewableWeekday(currentDate)) {
     return (
       <DynamicBackground
         date={params.date}
@@ -340,6 +355,90 @@ export default function DevotionPage({ params }: { params: { date: string } }) {
                     <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
                   </svg>
                 </Link>
+              </div>
+            </div>
+          </div>
+        </div>
+      </DynamicBackground>
+    );
+  }
+
+  // Handle previewable future weekday without devotion data
+  if (!devotion && isPreviewableWeekday(currentDate)) {
+    return (
+      <DynamicBackground
+        date={params.date}
+        query="landscape mountains sunset forest"
+        showAttribution={true}
+        overlayOpacity={0.7}
+        className="h-screen flex flex-col overflow-hidden"
+      >
+        <Toaster position="top-center" />
+
+        {/* Content */}
+        <div className="relative z-10 flex flex-col h-full">
+          {/* Header Section */}
+          <div className="flex-none p-6">
+            <div className="max-w-lg mx-auto pt-12 space-y-1">
+              <h1 className="text-5xl font-bold text-white">
+                {format(currentDate, "EEEE")},
+                <br />
+                {format(currentDate, "MMMM d")}
+              </h1>
+              <p className="text-xl text-white/90">
+                Have a blessed day{user ? `, ${user.displayName?.split(" ")[0] || ""}` : ""}!
+              </p>
+              
+              {/* Future Date Preview Indicator */}
+              <div className="mt-2 px-3 py-2 bg-blue-600/30 rounded-lg text-sm">
+                <p>📆 You're viewing a future date</p>
+                <p className="text-white/80 text-xs mt-1">Preview mode</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Preview Mode Content */}
+          <div className="flex-1 mt-12 bg-black/50 backdrop-blur-md rounded-t-3xl flex flex-col min-h-0">
+            <div className="max-w-lg mx-auto w-full p-8 flex flex-col min-h-0">
+              <h2 className="text-2xl font-bold text-white flex-none mb-6">
+                Preview Content
+              </h2>
+
+              <div className="flex-1 overflow-y-auto min-h-0 pr-4 mb-6">
+                <div className="space-y-8">
+                  <div className="bg-zinc-800/50 animate-pulse h-8 rounded mb-4 w-3/4"></div>
+                  <div className="bg-zinc-800/50 animate-pulse h-6 rounded w-1/2 mb-2"></div>
+                  <div className="bg-zinc-800/50 animate-pulse h-6 rounded w-5/6"></div>
+                  <div className="bg-zinc-800/50 animate-pulse h-6 rounded w-4/6"></div>
+                </div>
+              </div>
+
+              <button
+                onClick={() => router.push(`/devotion/${params.date}/reflection`)}
+                className="w-full bg-white/10 hover:bg-white/20 text-white 
+                  rounded-full py-4 px-6 font-medium transition-all flex items-center 
+                  justify-between flex-none"
+              >
+                <span>See Today's Reflection</span>
+                <svg
+                  className="w-6 h-6"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M9 5l7 7-7 7"
+                  />
+                </svg>
+              </button>
+              
+              {/* Future Date Indicator */}
+              <div className="mt-4 px-4 py-3 bg-blue-600/30 rounded-lg text-sm text-center">
+                <p className="font-medium">📆 You're viewing a future date</p>
+                <p className="text-white/80 text-xs mt-1">Content will be available on {format(currentDate, "MMMM d")}.</p>
               </div>
             </div>
           </div>
@@ -518,6 +617,14 @@ export default function DevotionPage({ params }: { params: { date: string } }) {
                     />
                   </svg>
                 </button>
+                
+                {/* Future Date Indicator */}
+                {isFuture(currentDate) && (
+                  <div className="mt-4 px-4 py-3 bg-blue-600/30 rounded-lg text-sm text-center">
+                    <p className="font-medium">📆 You're viewing a future date</p>
+                    <p className="text-white/80 text-xs mt-1">Some content may not be available yet.</p>
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -677,6 +784,14 @@ export default function DevotionPage({ params }: { params: { date: string } }) {
                     />
                   </svg>
                 </button>
+                
+                {/* Future Date Indicator */}
+                {isFuture(currentDate) && (
+                  <div className="mt-4 px-4 py-3 bg-blue-600/30 rounded-lg text-sm text-center">
+                    <p className="font-medium">📆 You're viewing a future date</p>
+                    <p className="text-white/80 text-xs mt-1">Some content may not be available yet.</p>
+                  </div>
+                )}
               </div>
             </div>
           </div>
